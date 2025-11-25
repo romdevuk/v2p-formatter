@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Upload Test</title>
+</head>
+<body>
+    <h1>Simple Upload Test</h1>
+    <input type="file" id="testInput" accept=".mp4">
+    <button onclick="document.getElementById('testInput').click()">Choose File</button>
+    <div id="result"></div>
+    
+    <script>
+        const input = document.getElementById('testInput');
+        const result = document.getElementById('result');
+        
+        input.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) {
+                result.innerHTML = 'No file selected';
+                return;
+            }
+            
+            result.innerHTML = `File selected: ${file.name}<br>Size: ${file.size} bytes<br>Uploading...`;
+            
+            const formData = new FormData();
+            formData.append('video', file);
+            
+            fetch('/v2p-formatter/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                result.innerHTML += `<br>Status: ${response.status}`;
+                return response.json();
+            })
+            .then(data => {
+                result.innerHTML += `<br>Success: ${data.success}`;
+                if (data.success) {
+                    result.innerHTML += `<br>Duration: ${data.duration}s`;
+                } else {
+                    result.innerHTML += `<br>Error: ${data.error}`;
+                }
+            })
+            .catch(error => {
+                result.innerHTML += `<br>Error: ${error.message}`;
+            });
+        });
+    </script>
+</body>
+</html>
+

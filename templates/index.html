@@ -1,0 +1,756 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="app-container">
+    <!-- Video Selection Section -->
+    <section class="upload-section">
+        <h2>1. Select Video</h2>
+        <div class="file-selector-container">
+            <div id="fileTree" class="file-tree" style="margin-top: 20px; max-height: 500px; overflow-y: auto; border: 1px solid #555; border-radius: 6px; padding: 15px; background: #1e1e1e;">
+                <div id="fileTreeContent">
+                    <p style="text-align: center; color: #999; padding: 20px;">Loading MP4 files...</p>
+                </div>
+            </div>
+            <div id="fileTreeLoading" style="display: block; margin-top: 20px; text-align: center; color: #999;">
+                <p>Scanning input directory for MP4 files...</p>
+            </div>
+        </div>
+        <div id="uploadStatus" class="status-message"></div>
+        <div id="debugOutput" style="background: #1e1e1e; padding: 10px; margin-top: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; border: 2px solid #555; color: #e0e0e0;">
+            <strong style="color: #e0e0e0;">🔍 Debug Output:</strong>
+            <button onclick="document.getElementById('debugMessages').innerHTML='';" style="float: right; padding: 2px 8px; font-size: 10px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; cursor: pointer;">Clear</button>
+            <div id="debugMessages" style="margin-top: 10px;"></div>
+        </div>
+    </section>
+
+    <!-- Time Selection Section -->
+    <section class="time-section" id="timeSection" style="display: none;">
+        <h2>2. Select Time Points from Video</h2>
+        <div class="video-container">
+            <video id="videoPlayer" controls style="width: 100%; max-width: 800px; background: #000;"></video>
+        </div>
+        <div class="time-points-container" style="margin-top: 20px;">
+            <div class="selected-times" id="selectedTimes">
+                <p><strong>Selected Time Points (with previews):</strong></p>
+                <div id="timePointsList" style="margin-top: 10px; min-height: 150px; padding: 15px; background: #1e1e1e; border-radius: 6px; border: 1px solid #444;"></div>
+                <div style="margin-top: 15px; padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+                    <div style="margin-bottom: 10px;">
+                        <label for="autoShotsSelect" style="display: block; margin-bottom: 5px; font-weight: 500;">
+                            <strong>Auto-generate time points:</strong>
+                        </label>
+                        <select id="autoShotsSelect" style="padding: 8px; border: 1px solid #555; border-radius: 4px; font-size: 14px; width: 200px; margin-right: 10px; background: #1e1e1e; color: #e0e0e0;">
+                            <option value="">Manual (click to add)</option>
+                            <option value="5">5 shots (evenly spaced)</option>
+                            <option value="10">10 shots (evenly spaced)</option>
+                            <option value="15">15 shots (evenly spaced)</option>
+                            <option value="20">20 shots (evenly spaced)</option>
+                            <option value="custom">Custom number...</option>
+                        </select>
+                        <input type="number" id="customShotsInput" min="1" max="100" placeholder="Number of shots" 
+                               style="padding: 8px; border: 1px solid #555; border-radius: 4px; font-size: 14px; width: 150px; display: none; margin-right: 10px; background: #1e1e1e; color: #e0e0e0;">
+                        <button class="btn btn-secondary" id="applyAutoShotsBtn" type="button" style="display: none;">Apply</button>
+                    </div>
+                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #555;">
+                        <button class="btn btn-secondary" id="addCurrentTimeBtn" type="button">+ Add Current Time</button>
+                        <button class="btn btn-secondary" id="clearAllTimesBtn" type="button" style="margin-left: 10px;">Clear All</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="video-info" id="videoInfo" style="margin-top: 15px;"></div>
+    </section>
+
+    <!-- Output Settings Section -->
+    <section class="output-settings-section" id="outputSettingsSection" style="display: none;">
+        <h2>3. Output Settings</h2>
+        <div class="settings-container">
+            <div class="settings-group">
+                <h3>Image Settings</h3>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="qualitySlider">Quality: <span id="qualityValue">95</span></label>
+                        <input type="range" id="qualitySlider" min="1" max="100" value="95">
+                    </div>
+                    <div class="config-item">
+                        <label for="resolutionSelect">Resolution:</label>
+                        <select id="resolutionSelect">
+                            <option value="original">Original</option>
+                            <option value="1920x1080">1920x1080</option>
+                            <option value="1280x720">1280x720</option>
+                            <option value="640x480" selected>640x480</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-group">
+                <h3>Output Format</h3>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="outputFormat">Format:</label>
+                        <select id="outputFormat">
+                            <option value="pdf">PDF</option>
+                            <option value="docx">DOCX (Word)</option>
+                        </select>
+                    </div>
+                    <div class="config-item" id="pdfSettingsContainer">
+                        <label for="layoutSelect">Layout:</label>
+                        <select id="layoutSelect">
+                            <option value="grid">Grid</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div class="config-item" id="imagesPerPageContainer">
+                        <label for="imagesPerPage">Images per Page:</label>
+                        <select id="imagesPerPage">
+                            <option value="1">1</option>
+                            <option value="4" selected>4</option>
+                            <option value="6">6</option>
+                            <option value="9">9</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <p class="output-info" style="margin-top: 20px; padding: 15px; background-color: #2a2a2a; border: 1px solid #555; border-radius: 8px; color: #e0e0e0;">
+            All generated files (images and PDFs) will be saved in: <code style="background: #1e1e1e; color: #667eea; padding: 2px 6px; border-radius: 4px; border: 1px solid #555;">/Users/rom/Documents/nvq/v2p-formatter-output</code>
+        </p>
+    </section>
+
+    <!-- Processing Section -->
+    <section class="processing-section" id="processingSection" style="display: none;">
+        <h2>4. Process</h2>
+        <div class="action-buttons">
+            <button class="btn btn-primary" id="extractFramesBtn" type="button">Extract Frames</button>
+            <button class="btn btn-primary" id="generateOutputBtn" type="button" style="display: none;">Generate PDF & DOCX</button>
+        </div>
+        <div id="progressContainer" class="progress-container" style="display: none;">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p id="progressText"></p>
+        </div>
+        <div id="results" class="results"></div>
+    </section>
+</div>
+
+<script>
+// GLOBAL STATE - SIMPLE AND DIRECT
+window.appData = {
+    videoPath: null,
+    videoInfo: null,
+    selectedTimes: [],
+    extractedImages: []
+};
+
+// Debug function
+function debug(msg, type = 'info') {
+    const msgs = document.getElementById('debugMessages');
+    if (msgs) {
+        const div = document.createElement('div');
+        div.style.color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'blue';
+        div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        msgs.appendChild(div);
+        msgs.scrollTop = msgs.scrollHeight;
+    }
+    console.log(`[${type.toUpperCase()}]`, msg);
+}
+
+// Load files on page load
+(function() {
+    function loadFiles() {
+        debug('Loading files...', 'info');
+        fetch('/v2p-formatter/list_files')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.files && data.files.length > 0) {
+                    let html = '';
+                    data.files.forEach(file => {
+                        const path = file.path.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+                        html += `<div onclick="selectFile('${path}', '${file.name}')" style="cursor: pointer; padding: 12px; margin: 8px 0; background: #2a2a2a; border-radius: 6px; border: 1px solid #555; transition: all 0.2s; color: #e0e0e0;" onmouseover="this.style.background='#333'; this.style.borderColor='#667eea'" onmouseout="this.style.background='#2a2a2a'; this.style.borderColor='#555'">
+                            <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                <span style="font-size: 1.3em;">🎬</span>
+                                <strong style="margin-left: 10px;">${file.name}</strong>
+                                <span style="color: #999; margin-left: 10px;">(${file.size_mb} MB)</span>
+                            </div>
+                            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #555; font-size: 11px;">
+                                <strong style="color: #999;">📁 Path:</strong><br>
+                                <code style="background: #1e1e1e; color: #667eea; padding: 3px 8px; border-radius: 3px; font-size: 11px; display: inline-block; margin-top: 4px; border: 1px solid #555; word-break: break-all;">${file.path}</code>
+                            </div>
+                        </div>`;
+                    });
+                    document.getElementById('fileTreeContent').innerHTML = html;
+                    document.getElementById('fileTreeLoading').style.display = 'none';
+                    debug(`Loaded ${data.files.length} file(s)`, 'success');
+                } else {
+                    document.getElementById('fileTreeContent').innerHTML = '<p style="color: #666; padding: 20px; text-align: center;">No MP4 files found.</p>';
+                    document.getElementById('fileTreeLoading').style.display = 'none';
+                }
+            })
+            .catch(err => {
+                debug('Error loading files: ' + err.message, 'error');
+                document.getElementById('fileTreeContent').innerHTML = `<p style="color: red; padding: 20px;">Error: ${err.message}</p>`;
+                document.getElementById('fileTreeLoading').style.display = 'none';
+            });
+    }
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadFiles);
+    } else {
+        loadFiles();
+    }
+})();
+
+// Select file
+window.selectFile = function(filePath, fileName) {
+    debug(`Selecting file: ${fileName}`, 'info');
+    
+    fetch('/v2p-formatter/select_file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_path: filePath })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.appData.videoPath = data.filepath;
+            window.appData.videoInfo = data;
+            
+            const video = document.getElementById('videoPlayer');
+            if (video) {
+                video.src = `/v2p-formatter/video_file?path=${encodeURIComponent(filePath)}`;
+            }
+            
+            const infoDiv = document.getElementById('videoInfo');
+            if (infoDiv) {
+                infoDiv.innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px;">
+                        <div><strong>Duration:</strong> ${data.duration.toFixed(2)}s</div>
+                        <div><strong>Resolution:</strong> ${data.width}x${data.height}</div>
+                        <div><strong>FPS:</strong> ${data.fps.toFixed(2)}</div>
+                        <div><strong>File:</strong> ${data.filename}</div>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('timeSection').style.display = 'block';
+            document.getElementById('outputSettingsSection').style.display = 'block';
+            document.getElementById('processingSection').style.display = 'block';
+            
+            // Initialize time selector
+            setTimeout(initTimeSelector, 500);
+            
+            debug('File loaded successfully', 'success');
+        } else {
+            alert('Error: ' + (data.error || 'Failed to load file'));
+            debug('Error loading file: ' + (data.error || 'Unknown'), 'error');
+        }
+    })
+    .catch(err => {
+        alert('Error: ' + err.message);
+        debug('Error: ' + err.message, 'error');
+    });
+};
+
+// Time selector - WITH PREVIEW THUMBNAILS AND AUTO-GENERATION
+function initTimeSelector() {
+    debug('Initializing time selector...', 'info');
+    
+    const addBtn = document.getElementById('addCurrentTimeBtn');
+    const clearBtn = document.getElementById('clearAllTimesBtn');
+    const autoShotsSelect = document.getElementById('autoShotsSelect');
+    const customShotsInput = document.getElementById('customShotsInput');
+    const applyAutoShotsBtn = document.getElementById('applyAutoShotsBtn');
+    
+    if (!addBtn || !clearBtn) {
+        debug('Time selector buttons not found', 'error');
+        return;
+    }
+    
+    // Remove old handlers
+    const newAdd = addBtn.cloneNode(true);
+    addBtn.parentNode.replaceChild(newAdd, addBtn);
+    const newClear = clearBtn.cloneNode(true);
+    clearBtn.parentNode.replaceChild(newClear, clearBtn);
+    
+    // Get fresh references
+    const freshAdd = document.getElementById('addCurrentTimeBtn');
+    const freshClear = document.getElementById('clearAllTimesBtn');
+    
+    freshAdd.onclick = function() {
+        const video = document.getElementById('videoPlayer');
+        if (!video) {
+            alert('Video not found');
+            return;
+        }
+        
+        const time = Math.round(video.currentTime * 100) / 100;
+        if (isNaN(time) || time < 0) {
+            alert('Video not ready');
+            return;
+        }
+        
+        if (window.appData.selectedTimes.includes(time)) {
+            debug(`Time ${time.toFixed(2)}s already added`, 'info');
+            return;
+        }
+        
+        window.appData.selectedTimes.push(time);
+        window.appData.selectedTimes.sort((a, b) => a - b);
+        
+        // Add thumbnail preview
+        addTimePointWithThumbnail(time);
+        debug(`Added time: ${time.toFixed(2)}s`, 'success');
+    };
+    
+    freshClear.onclick = function() {
+        window.appData.selectedTimes = [];
+        window.appData.timeThumbnails = {};
+        updateTimeDisplay();
+        debug('Cleared all times', 'info');
+    };
+    
+    // Auto-shots selector
+    if (autoShotsSelect) {
+        autoShotsSelect.onchange = function() {
+            const value = this.value;
+            if (value === 'custom') {
+                customShotsInput.style.display = 'inline-block';
+                applyAutoShotsBtn.style.display = 'inline-block';
+            } else if (value === '') {
+                customShotsInput.style.display = 'none';
+                applyAutoShotsBtn.style.display = 'none';
+            } else {
+                customShotsInput.style.display = 'none';
+                applyAutoShotsBtn.style.display = 'none';
+                // Auto-apply
+                generateAutoTimePoints(parseInt(value));
+            }
+        };
+    }
+    
+    // Apply custom shots button
+    if (applyAutoShotsBtn) {
+        applyAutoShotsBtn.onclick = function() {
+            const numShots = parseInt(customShotsInput.value);
+            if (isNaN(numShots) || numShots < 1 || numShots > 100) {
+                alert('Please enter a number between 1 and 100');
+                return;
+            }
+            generateAutoTimePoints(numShots);
+        };
+    }
+    
+    // Initialize thumbnails object
+    if (!window.appData.timeThumbnails) {
+        window.appData.timeThumbnails = {};
+    }
+    
+    updateTimeDisplay();
+    debug('Time selector ready', 'success');
+}
+
+// Generate evenly spaced time points
+function generateAutoTimePoints(numShots) {
+    if (!window.appData.videoInfo || !window.appData.videoInfo.duration) {
+        alert('Video info not available. Please wait for video to load.');
+        return;
+    }
+    
+    const duration = window.appData.videoInfo.duration;
+    const maxTime = duration - 0.01; // Ensure we're always slightly before the end
+    
+    // Clear existing times
+    window.appData.selectedTimes = [];
+    window.appData.timeThumbnails = {};
+    
+    // Generate evenly spaced time points
+    const times = [];
+    if (numShots === 1) {
+        // Single shot at middle
+        const time = Math.min(duration / 2, maxTime);
+        times.push(Math.round(time * 100) / 100);
+    } else {
+        // Evenly spaced from start to (duration - small buffer)
+        // This ensures all points are safely within the video duration
+        const startTime = 0;
+        const endTime = maxTime; // Slightly before the end
+        const interval = (endTime - startTime) / (numShots - 1);
+        
+        for (let i = 0; i < numShots; i++) {
+            let time = startTime + (i * interval);
+            // Ensure time is within bounds
+            time = Math.max(0, Math.min(time, maxTime));
+            times.push(Math.round(time * 100) / 100);
+        }
+    }
+    
+    // Remove duplicates and sort
+    const uniqueTimes = [...new Set(times)].sort((a, b) => a - b);
+    
+    debug(`Generating ${numShots} evenly spaced time points (video duration: ${duration.toFixed(2)}s)...`, 'info');
+    
+    // Add all time points
+    window.appData.selectedTimes = uniqueTimes;
+    updateTimeDisplay();
+    
+    // Load thumbnails for all time points
+    uniqueTimes.forEach((time, index) => {
+        setTimeout(() => {
+            addTimePointWithThumbnail(time);
+        }, index * 200); // Stagger thumbnail loading
+    });
+    
+    debug(`✅ Generated ${uniqueTimes.length} time points (${uniqueTimes[0].toFixed(2)}s to ${uniqueTimes[uniqueTimes.length-1].toFixed(2)}s)`, 'success');
+}
+
+function addTimePointWithThumbnail(time) {
+    if (!window.appData.videoPath) {
+        updateTimeDisplay();
+        return;
+    }
+    
+    // Get preview thumbnail from backend
+    fetch('/v2p-formatter/preview_frame', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            video_path: window.appData.videoPath,
+            time_point: time
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to get preview');
+        }
+        return response.blob();
+    })
+    .then(blob => {
+        const url = URL.createObjectURL(blob);
+        window.appData.timeThumbnails[time] = url;
+        updateTimeDisplay();
+        debug(`Thumbnail loaded for ${time.toFixed(2)}s`, 'success');
+    })
+    .catch(err => {
+        debug(`Could not load thumbnail for ${time.toFixed(2)}s: ${err.message}`, 'warning');
+        // Still show the time point without thumbnail
+        updateTimeDisplay();
+    });
+}
+
+function updateTimeDisplay() {
+    const container = document.getElementById('timePointsList');
+    if (!container) return;
+    
+    const times = window.appData.selectedTimes;
+    
+    if (times.length === 0) {
+        container.innerHTML = '<p style="color: #999; font-style: italic; padding: 10px;">No time points. Click "+ Add Current Time" to add.</p>';
+        return;
+    }
+    
+    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px;">';
+    
+    times.forEach(time => {
+        const thumbnail = window.appData.timeThumbnails && window.appData.timeThumbnails[time];
+        const timeStr = time.toFixed(2);
+        
+        html += `<div onclick="removeTime(${time})" style="
+            position: relative;
+            cursor: pointer;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #2a2a2a;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        " onmouseover="this.style.borderColor='#5568d3'; this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.4)'" 
+           onmouseout="this.style.borderColor='#667eea'; this.style.transform='scale(1)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.3)'"
+           title="Click to remove">
+            ${thumbnail ? 
+                `<img src="${thumbnail}" style="width: 100%; height: 100px; object-fit: cover; display: block;" alt="Frame at ${timeStr}s">` :
+                `<div style="width: 100%; height: 100px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">⏱️</div>`
+            }
+            <div style="padding: 8px; text-align: center; background: #1e1e1e; border-top: 1px solid #555;">
+                <strong style="color: #e0e0e0; font-size: 14px;">${timeStr}s</strong>
+                <div style="color: #999; font-size: 11px; margin-top: 2px;">Click to remove</div>
+            </div>
+            <div style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold;">×</div>
+        </div>`;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+window.removeTime = function(time) {
+    window.appData.selectedTimes = window.appData.selectedTimes.filter(t => t !== time);
+    // Clean up thumbnail URL
+    if (window.appData.timeThumbnails && window.appData.timeThumbnails[time]) {
+        URL.revokeObjectURL(window.appData.timeThumbnails[time]);
+        delete window.appData.timeThumbnails[time];
+    }
+    updateTimeDisplay();
+    debug(`Removed time: ${time.toFixed(2)}s`, 'info');
+};
+
+// Quality slider
+document.addEventListener('DOMContentLoaded', function() {
+    const slider = document.getElementById('qualitySlider');
+    const value = document.getElementById('qualityValue');
+    if (slider && value) {
+        slider.oninput = function() {
+            value.textContent = this.value;
+        };
+    }
+});
+
+// Extract frames
+(function() {
+    function initExtractBtn() {
+        const btn = document.getElementById('extractFramesBtn');
+        if (!btn) return;
+        
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        const freshBtn = document.getElementById('extractFramesBtn');
+        
+        freshBtn.onclick = function() {
+            const times = window.appData.selectedTimes;
+            if (!times || times.length === 0) {
+                alert('Please add at least one time point first!');
+                debug('No time points selected', 'error');
+                return;
+            }
+            
+            if (!window.appData.videoPath) {
+                alert('Please select a video first!');
+                return;
+            }
+            
+            debug(`Extracting frames at times: ${times.join(', ')}`, 'info');
+            
+            const quality = parseInt(document.getElementById('qualitySlider').value) || 95;
+            const resolution = document.getElementById('resolutionSelect').value || 'original';
+            
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressText').textContent = 'Extracting frames...';
+            
+            fetch('/v2p-formatter/extract_frames', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    video_path: window.appData.videoPath,
+                    time_points: times.map(t => parseFloat(t)),
+                    quality: quality,
+                    resolution: resolution
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    window.appData.extractedImages = data.images || [];
+                    document.getElementById('progressFill').style.width = '100%';
+                    document.getElementById('progressText').textContent = `Extracted ${data.count} frames!`;
+                    
+                    setTimeout(() => {
+                        document.getElementById('progressContainer').style.display = 'none';
+                        document.getElementById('generateOutputBtn').style.display = 'inline-block';
+                        document.getElementById('results').innerHTML = `
+                            <div style="padding: 15px; background: #1e3a1e; border: 1px solid #2d5a2d; border-radius: 6px; margin-top: 15px; color: #e0e0e0;">
+                                <strong>✅ Success!</strong> Extracted ${data.count} frames.<br>
+                                Images saved to: ${data.output_dir}
+                            </div>
+                        `;
+                        debug(`Extracted ${data.count} frames successfully`, 'success');
+                    }, 1000);
+                } else {
+                    document.getElementById('progressContainer').style.display = 'none';
+                    alert('Error: ' + (data.error || 'Failed to extract frames'));
+                    debug('Extract error: ' + (data.error || 'Unknown'), 'error');
+                }
+            })
+            .catch(err => {
+                document.getElementById('progressContainer').style.display = 'none';
+                alert('Error: ' + err.message);
+                debug('Extract error: ' + err.message, 'error');
+            });
+        };
+    }
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initExtractBtn);
+    } else {
+        setTimeout(initExtractBtn, 1000);
+    }
+})();
+
+// Format selector - show/hide PDF-specific options
+(function() {
+    function initFormatSelector() {
+        const formatSelect = document.getElementById('outputFormat');
+        const pdfSettingsContainer = document.getElementById('pdfSettingsContainer');
+        const imagesPerPageContainer = document.getElementById('imagesPerPageContainer');
+        
+        if (formatSelect) {
+            formatSelect.onchange = function() {
+                const format = this.value;
+                if (format === 'pdf') {
+                    pdfSettingsContainer.style.display = 'block';
+                    imagesPerPageContainer.style.display = 'block';
+                } else {
+                    // DOCX - hide PDF-specific settings
+                    pdfSettingsContainer.style.display = 'none';
+                    imagesPerPageContainer.style.display = 'block'; // Still show for DOCX layout reference
+                }
+            };
+            // Trigger initial state
+            formatSelect.onchange();
+        }
+    }
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initFormatSelector);
+    } else {
+        setTimeout(initFormatSelector, 500);
+    }
+})();
+
+// Generate Document (PDF or DOCX)
+(function() {
+    function initGenerateBtn() {
+        const btn = document.getElementById('generateOutputBtn');
+        if (!btn) return;
+        
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        const freshBtn = document.getElementById('generateOutputBtn');
+        
+        freshBtn.onclick = function() {
+            const images = window.appData.extractedImages;
+            if (!images || images.length === 0) {
+                alert('Please extract frames first!');
+                return;
+            }
+            
+            if (!window.appData.videoPath) {
+                alert('Video path not found');
+                return;
+            }
+            
+            const layout = document.getElementById('layoutSelect').value || 'grid';
+            const imagesPerPage = parseInt(document.getElementById('imagesPerPage').value) || 4;
+            
+            debug(`Generating both PDF and DOCX from ${images.length} images`, 'info');
+            
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressText').textContent = 'Generating PDF and DOCX...';
+            
+            // Store results
+            const results = { pdf: null, docx: null };
+            let completed = 0;
+            const total = 2;
+            
+            function updateProgress() {
+                completed++;
+                const percent = Math.round((completed / total) * 100);
+                document.getElementById('progressFill').style.width = percent + '%';
+                
+                if (completed === total) {
+                    document.getElementById('progressText').textContent = 'PDF and DOCX generated!';
+                    setTimeout(() => {
+                        document.getElementById('progressContainer').style.display = 'none';
+                        showResults(results);
+                    }, 1000);
+                } else {
+                    document.getElementById('progressText').textContent = `Generating... (${completed}/${total})`;
+                }
+            }
+            
+            function showResults(results) {
+                let html = '<div style="padding: 15px; background: #1e3a1e; border: 1px solid #2d5a2d; border-radius: 6px; margin-top: 15px; color: #e0e0e0;">';
+                html += '<strong>✅ Documents Generated Successfully!</strong><br><br>';
+                
+                if (results.pdf) {
+                    const pdfUrl = `/v2p-formatter/download?path=${encodeURIComponent(results.pdf.file_path)}`;
+                    html += `<a href="${pdfUrl}" download style="display: inline-block; padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px; margin-bottom: 10px;">
+                        📄 Download PDF: ${results.pdf.filename}
+                    </a>`;
+                }
+                
+                if (results.docx) {
+                    const docxUrl = `/v2p-formatter/download?path=${encodeURIComponent(results.docx.file_path)}`;
+                    html += `<a href="${docxUrl}" download style="display: inline-block; padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px; margin-bottom: 10px;">
+                        📝 Download DOCX: ${results.docx.filename}
+                    </a>`;
+                }
+                
+                html += '<br><br><small style="color: #999;">Both files saved in the video output folder</small>';
+                html += '</div>';
+                
+                document.getElementById('results').innerHTML = html;
+                document.getElementById('results').style.display = 'block';
+            }
+            
+            // Generate PDF
+            fetch('/v2p-formatter/generate_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    video_path: window.appData.videoPath,
+                    image_paths: images,
+                    layout: layout,
+                    images_per_page: imagesPerPage
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    results.pdf = data;
+                    debug(`PDF generated: ${data.filename}`, 'success');
+                } else {
+                    debug(`Error generating PDF: ${data.error}`, 'error');
+                }
+                updateProgress();
+            })
+            .catch(err => {
+                debug(`Network error during PDF generation: ${err.message}`, 'error');
+                updateProgress();
+            });
+            
+            // Generate DOCX
+            fetch('/v2p-formatter/generate_docx', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    video_path: window.appData.videoPath,
+                    image_paths: images,
+                    images_per_page: imagesPerPage
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    results.docx = data;
+                    debug(`DOCX generated: ${data.filename}`, 'success');
+                } else {
+                    debug(`Error generating DOCX: ${data.error}`, 'error');
+                }
+                updateProgress();
+            })
+            .catch(err => {
+                debug(`Network error during DOCX generation: ${err.message}`, 'error');
+                updateProgress();
+            });
+        };
+    }
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initGenerateBtn);
+    } else {
+        setTimeout(initGenerateBtn, 1000);
+    }
+})();
+</script>
+{% endblock %}
