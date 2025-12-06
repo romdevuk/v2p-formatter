@@ -1,0 +1,2718 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="app-container">
+    <!-- Navigation Tabs -->
+    <div style="margin-bottom: 30px; border-bottom: 2px solid #555;">
+        <div style="display: flex; gap: 10px;">
+            <a href="/v2p-formatter/" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Video to Image
+            </a>
+            <a href="/v2p-formatter/media-converter" style="padding: 12px 24px; background: #1e1e1e; color: #667eea; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #667eea; border-bottom: none; font-weight: bold;">
+                Media Converter
+            </a>
+            <a href="/v2p-formatter/observation-media" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Observation Media
+            </a>
+        </div>
+    </div>
+
+    <h1 style="color: #e0e0e0; margin-bottom: 30px;" id="pageTitle">Media Converter</h1>
+
+    <!-- Media Converter Content -->
+    <div id="mediaConverterContent">
+    <!-- File Selection Section -->
+    <section class="upload-section">
+        <h2>1. Select Media Files</h2>
+        <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+            <input type="text" id="fileSearch" placeholder="🔍 Search files..." 
+                   style="flex: 1; padding: 10px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e; color: #e0e0e0; font-size: 14px;">
+            <button class="btn btn-secondary" id="refreshFilesBtn" onclick="loadMediaFiles()">🔄 Refresh</button>
+        </div>
+
+        <div id="fileSelectionContainer" style="margin-top: 20px;">
+            <!-- Video Files Section -->
+            <div style="margin-bottom: 30px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 12px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555; cursor: pointer;"
+                     onclick="toggleSection('videoSection')">
+                    <h3 style="margin: 0; color: #e0e0e0;">🎬 Video Files (MOV) <span id="videoCount">(0 files)</span></h3>
+                    <span id="videoToggle" style="color: #999;">▼</span>
+                </div>
+                <div id="videoSection" style="display: block;">
+                    <div style="padding: 10px; background: #1e1e1e; border-radius: 4px; margin-bottom: 10px; border: 1px solid #444;">
+                        <label style="color: #e0e0e0; cursor: pointer;">
+                            <input type="checkbox" id="selectAllVideos" onchange="toggleSelectAll('video')">
+                            <strong>Select All Videos</strong>
+                            <span id="videoTotalInfo" style="color: #999; margin-left: 10px;">(0 files, 0 MB)</span>
+                        </label>
+                    </div>
+                    <div id="videoFilesList" style="max-height: 600px; overflow-y: auto; padding: 10px; background: #1e1e1e; border-radius: 6px; border: 1px solid #444;">
+                        <p style="text-align: center; color: #999; padding: 20px;">Loading video files...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Image Files Section -->
+            <div style="margin-bottom: 30px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 12px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555; cursor: pointer;"
+                     onclick="toggleSection('imageSection')">
+                    <h3 style="margin: 0; color: #e0e0e0;">🖼️ Image Files (JPG/PNG) <span id="imageCount">(0 files)</span></h3>
+                    <span id="imageToggle" style="color: #999;">▼</span>
+                </div>
+                <div id="imageSection" style="display: block;">
+                    <div style="padding: 10px; background: #1e1e1e; border-radius: 4px; margin-bottom: 10px; border: 1px solid #444;">
+                        <label style="color: #e0e0e0; cursor: pointer;">
+                            <input type="checkbox" id="selectAllImages" onchange="toggleSelectAll('image')">
+                            <strong>Select All Images</strong>
+                            <span id="imageTotalInfo" style="color: #999; margin-left: 10px;">(0 files, 0 MB)</span>
+                        </label>
+                    </div>
+                    <div id="imageFilesList" style="max-height: 600px; overflow-y: auto; padding: 10px; background: #1e1e1e; border-radius: 6px; border: 1px solid #444;">
+                        <p style="text-align: center; color: #999; padding: 20px;">Loading image files...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selection Summary -->
+            <div style="padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555; margin-top: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #e0e0e0;">📊 Selection Summary</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 15px; color: #e0e0e0;">
+                    <div>Videos Selected: <strong id="selectedVideosCount">0</strong> of <span id="totalVideosCount">0</span></div>
+                    <div>Images Selected: <strong id="selectedImagesCount">0</strong> of <span id="totalImagesCount">0</span></div>
+                    <div>Total Selected: <strong id="totalSelectedCount">0</strong> files</div>
+                    <div>Total Size: <strong id="totalSelectedSize">0 MB</strong></div>
+                </div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn btn-secondary" onclick="clearSelection()">Clear Selection</button>
+                    <button class="btn btn-secondary" onclick="selectAllFiles()">Select All Files</button>
+                </div>
+            </div>
+
+            <!-- Bulk Rotation Controls (separate field) -->
+            <div id="bulkRotateSection" style="display: none; padding: 15px; background: #1e1e1e; border-radius: 6px; border: 1px solid #555; margin-top: 15px;">
+                <h4 style="margin: 0 0 12px 0; color: #e0e0e0;">🔄 Rotate Selected Images</h4>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <span style="color: #999; margin-right: 5px;">Rotate <strong id="bulkRotateCount">0</strong> selected image(s):</span>
+                    <button class="btn btn-secondary" onclick="bulkRotateImages(-90)" title="Rotate Left 90°" style="padding: 8px 16px; font-size: 14px;">
+                        ↺ Rotate Left
+                    </button>
+                    <button class="btn btn-secondary" onclick="bulkRotateImages(90)" title="Rotate Right 90°" style="padding: 8px 16px; font-size: 14px;">
+                        ↻ Rotate Right
+                    </button>
+                    <button class="btn btn-secondary" onclick="bulkRotateImages(180)" title="Rotate 180°" style="padding: 8px 16px; font-size: 14px;">
+                        ↻↻ Rotate 180°
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Conversion Settings Section -->
+    <section class="settings-section" id="settingsSection" style="display: none; margin-top: 30px;">
+        <h2>2. Conversion Settings</h2>
+        
+        <!-- Video Settings -->
+        <div id="videoSettings" style="display: none; margin-bottom: 30px; padding: 20px; background: #1e1e1e; border-radius: 6px; border: 1px solid #444;">
+            <h3 style="color: #e0e0e0; margin-bottom: 15px;">🎬 Video Conversion Settings (MOV → MP4)</h3>
+            <div style="margin-bottom: 15px;">
+                <label for="videoQualityPreset" style="display: block; margin-bottom: 5px; color: #e0e0e0; font-weight: 500;">
+                    Quality Preset:
+                </label>
+                <select id="videoQualityPreset" onchange="updateVideoSettings()" 
+                        style="padding: 8px; border: 1px solid #555; border-radius: 4px; font-size: 14px; width: 200px; background: #2a2a2a; color: #e0e0e0;">
+                    <option value="low">Low (Smallest size, lower quality)</option>
+                    <option value="medium" selected>Medium (Balanced size/quality)</option>
+                    <option value="high">High (Larger size, best quality)</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            <div id="videoCustomSettings" style="display: none; padding: 15px; background: #2a2a2a; border-radius: 4px; border: 1px solid #555;">
+                <div style="margin-bottom: 10px;">
+                    <label for="customBitrate" style="display: block; margin-bottom: 5px; color: #e0e0e0;">Bitrate (kbps):</label>
+                    <input type="number" id="customBitrate" value="1000" min="100" max="10000" step="100"
+                           style="padding: 8px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e; color: #e0e0e0; width: 150px;">
+                </div>
+                <div style="margin-bottom: 10px;">
+                    <label for="customCodec" style="display: block; margin-bottom: 5px; color: #e0e0e0;">Codec:</label>
+                    <select id="customCodec" style="padding: 8px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e; color: #e0e0e0; width: 150px;">
+                        <option value="libx264">H.264</option>
+                        <option value="libx265">H.265/HEVC</option>
+                    </select>
+                </div>
+            </div>
+            <div id="videoEstimatedSize" style="margin-top: 10px; padding: 10px; background: #2a2a2a; border-radius: 4px; color: #999; font-size: 12px;">
+                Estimated output size will be calculated after file selection
+            </div>
+        </div>
+
+        <!-- Image Settings -->
+        <div id="imageSettings" style="display: none; margin-bottom: 30px; padding: 20px; background: #1e1e1e; border-radius: 6px; border: 1px solid #444;">
+            <h3 style="color: #e0e0e0; margin-bottom: 15px;">🖼️ Image Conversion Settings (JPG/PNG → JPEG)</h3>
+            
+            <div style="margin-bottom: 15px;">
+                <label for="imageResolutionPreset" style="display: block; margin-bottom: 5px; color: #e0e0e0; font-weight: 500;">
+                    Resolution Preset:
+                </label>
+                <select id="imageResolutionPreset" onchange="updateImageSettings()"
+                        style="padding: 8px; border: 1px solid #555; border-radius: 4px; font-size: 14px; width: 200px; background: #2a2a2a; color: #e0e0e0;">
+                    <option value="original">Original Resolution</option>
+                    <option value="1920x1080">1920x1080 (Full HD)</option>
+                    <option value="1280x720">1280x720 (HD)</option>
+                    <option value="640x480">640x480 (SD)</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            
+            <div id="imageCustomResolution" style="display: none; margin-bottom: 15px; padding: 15px; background: #2a2a2a; border-radius: 4px; border: 1px solid #555;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <div>
+                        <label for="customWidth" style="display: block; margin-bottom: 5px; color: #e0e0e0;">Width (px):</label>
+                        <input type="number" id="customWidth" value="1920" min="100" max="7680" step="10"
+                               onchange="calculateEstimatedOutputSize()"
+                               style="padding: 8px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e; color: #e0e0e0; width: 100%;">
+                    </div>
+                    <div>
+                        <label for="customHeight" style="display: block; margin-bottom: 5px; color: #e0e0e0;">Height (px):</label>
+                        <input type="number" id="customHeight" value="1080" min="100" max="4320" step="10"
+                               onchange="calculateEstimatedOutputSize()"
+                               style="padding: 8px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e; color: #e0e0e0; width: 100%;">
+                    </div>
+                </div>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <label style="color: #e0e0e0; cursor: pointer;">
+                        <input type="checkbox" id="maintainAspectRatio" checked onchange="calculateEstimatedOutputSize()">
+                        Maintain Aspect Ratio
+                    </label>
+                    <label style="color: #e0e0e0; cursor: pointer;">
+                        <input type="checkbox" id="allowStretch" onchange="calculateEstimatedOutputSize()">
+                        Allow Stretching/Cropping
+                    </label>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label for="imageQualityPreset" style="display: block; margin-bottom: 5px; color: #e0e0e0; font-weight: 500;">
+                    Quality Preset:
+                </label>
+                <select id="imageQualityPreset" onchange="updateImageSettings()"
+                        style="padding: 8px; border: 1px solid #555; border-radius: 4px; font-size: 14px; width: 200px; background: #2a2a2a; color: #e0e0e0;">
+                    <option value="low">Low (Smallest size, lower quality - 60%)</option>
+                    <option value="medium" selected>Medium (Balanced - 80%)</option>
+                    <option value="high">High (Larger size, best quality - 95%)</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+
+
+            <div id="imageCustomQuality" style="display: none; margin-bottom: 15px; padding: 15px; background: #2a2a2a; border-radius: 4px; border: 1px solid #555;">
+                <label for="customQualitySlider" style="display: block; margin-bottom: 5px; color: #e0e0e0;">
+                    Quality (%): <span id="customQualityValue">85</span>
+                </label>
+                <input type="range" id="customQualitySlider" min="1" max="100" value="85" 
+                       oninput="document.getElementById('customQualityValue').textContent = this.value; calculateEstimatedOutputSize();"
+                       style="width: 100%;">
+            </div>
+
+            <div id="imageEstimatedSize" style="margin-top: 10px; padding: 10px; background: #2a2a2a; border-radius: 4px; color: #999; font-size: 12px;">
+                Estimated output size will be calculated after file selection
+            </div>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <button class="btn btn-primary" id="startConversionBtn" onclick="startConversion()" disabled>
+                Start Conversion
+            </button>
+        </div>
+    </section>
+
+    <!-- Processing & Results Section -->
+    <section class="processing-section" id="processingSection" style="display: none; margin-top: 30px;">
+        <h2>3. Conversion Progress</h2>
+        <div style="padding: 20px; background: #1e1e1e; border-radius: 6px; border: 1px solid #444;">
+            <div style="margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: #e0e0e0;">
+                    <span>Overall Progress:</span>
+                    <span id="overallProgressPercent">0%</span>
+                </div>
+                <div style="width: 100%; height: 25px; background: #2a2a2a; border-radius: 4px; overflow: hidden; border: 1px solid #555;">
+                    <div id="overallProgressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #667eea, #764ba2); transition: width 0.3s;"></div>
+                </div>
+            </div>
+            <div style="margin-bottom: 15px; color: #e0e0e0;">
+                Status: <strong id="conversionStatus">Pending...</strong>
+            </div>
+            <div id="fileProgressList" style="max-height: 400px; overflow-y: auto;">
+                <!-- File progress items will be added here -->
+            </div>
+            <div style="margin-top: 15px;">
+                <button class="btn btn-secondary" id="cancelConversionBtn" onclick="cancelConversion()" style="display: none;">
+                    Cancel Conversion
+                </button>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- Debug Output -->
+    <div id="debugOutput" style="background: #1e1e1e; padding: 10px; margin-top: 30px; border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; border: 2px solid #555; color: #e0e0e0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <strong style="color: #e0e0e0;">🔍 Debug Output:</strong>
+            <div>
+                <button onclick="document.getElementById('debugMessages').innerHTML='';" style="padding: 4px 12px; font-size: 11px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; cursor: pointer; margin-right: 5px;">Clear</button>
+                <button onclick="toggleDebugPanel()" style="padding: 4px 12px; font-size: 11px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; cursor: pointer;">Hide</button>
+            </div>
+        </div>
+        <div id="debugMessages" style="margin-top: 10px;"></div>
+    </div>
+    
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Global state
+window.mediaConverterData = {
+    videos: [],
+    images: [],
+    selectedFiles: new Set(),
+    currentJobId: null,
+    statusInterval: null
+};
+
+// Debug function
+function debug(message, type = 'info') {
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${type.toUpperCase()}] ${timestamp} - ${message}`;
+    console.log(logEntry);
+    
+    const debugPanel = document.getElementById('debugMessages');
+    if (debugPanel) {
+        const entry = document.createElement('div');
+        entry.className = `debug-${type}`;
+        entry.style.color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : type === 'warning' ? '#ffd43b' : '#e0e0e0';
+        entry.textContent = logEntry;
+        debugPanel.appendChild(entry);
+        debugPanel.scrollTop = debugPanel.scrollHeight;
+    }
+}
+
+function toggleDebugPanel() {
+    const panel = document.getElementById('debugOutput');
+    const messages = document.getElementById('debugMessages');
+    if (messages.style.display === 'none') {
+        messages.style.display = 'block';
+        panel.querySelector('button:last-child').textContent = 'Hide';
+    } else {
+        messages.style.display = 'none';
+        panel.querySelector('button:last-child').textContent = 'Show';
+    }
+}
+
+// Load media files
+function loadMediaFiles() {
+    debug('Loading media files...', 'info');
+    fetch('/v2p-formatter/media-converter/list')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                window.mediaConverterData.videos = data.videos || [];
+                window.mediaConverterData.images = data.images || [];
+                renderFileLists();
+                updateSelectionSummary();
+                debug(`Loaded ${data.video_count} videos, ${data.image_count} images`, 'success');
+            } else {
+                debug('Error loading files: ' + (data.error || 'Unknown'), 'error');
+            }
+        })
+        .catch(err => {
+            debug('Error: ' + err.message, 'error');
+        });
+}
+
+// Render file lists
+function renderFileLists() {
+    renderVideoList();
+    renderImageList();
+    updateCounts();
+}
+
+function renderVideoList() {
+    const container = document.getElementById('videoFilesList');
+    const videos = window.mediaConverterData.videos;
+    
+    if (videos.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No MOV files found in input folder.</p>';
+        return;
+    }
+    
+    let html = '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">';
+    videos.forEach((file, index) => {
+        const isSelected = window.mediaConverterData.selectedFiles.has(file.path);
+        // Add cache-busting parameter based on file modification time or current timestamp
+        const cacheBuster = new Date().getTime();
+        const thumbnailUrl = `/v2p-formatter/media-converter/thumbnail?path=${encodeURIComponent(file.path)}&size=300x225&t=${cacheBuster}`;
+        const videoId = `video_${file.path.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const previewId = `preview_${file.path.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        html += `
+            <div onclick="toggleFileSelection('${file.path}', 'video')" 
+                 style="cursor: pointer; padding: 12px; background: ${isSelected ? '#333' : '#2a2a2a'}; border-radius: 6px; border: 1px solid ${isSelected ? '#667eea' : '#555'}; transition: all 0.2s; color: #e0e0e0; display: flex; flex-direction: column;"
+                 onmouseover="this.style.background='#333'; this.style.borderColor='#667eea'"
+                 onmouseout="this.style.background='${isSelected ? '#333' : '#2a2a2a'}'; this.style.borderColor='${isSelected ? '#667eea' : '#555'}'">
+                <div id="${previewId}" style="width: 100%; height: 300px; background: #1a1a1a; border: 1px solid #444; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 10px;">
+                    <img src="${thumbnailUrl}" 
+                         alt="${file.name}" 
+                         class="video-thumbnail"
+                         id="thumb_img_${videoId}"
+                         style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: pointer;"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                         onload="this.nextElementSibling.style.display='none';"
+                         onclick="event.stopPropagation(); openVideoActionsOverlay('${file.path}', ${file.duration || 0}, ${file.width || 0}, ${file.height || 0}, '${file.name}')">
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; position: absolute; width: 100%; height: 100%; background: #1a1a1a;">
+                        <span style="font-size: 1.5em;">⏳</span>
+                        <span>Loading...</span>
+                    </div>
+                    <div id="${videoId}" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 15;"
+                         onclick="event.stopPropagation();">
+                        <video id="video_el_${videoId}" 
+                               style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: pointer;" 
+                               preload="metadata"
+                               onclick="event.stopPropagation(); pauseVideoOnClick('${videoId}')"></video>
+                        <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.9); padding: 8px; z-index: 20; pointer-events: auto;"
+                             onclick="event.stopPropagation();">
+                            <input type="range" 
+                                   id="scrubber_${videoId}"
+                                   min="0" max="100" value="0" step="0.1" 
+                                   style="width: 100%; margin-bottom: 5px; cursor: pointer; -webkit-appearance: none; appearance: none; height: 6px; background: #555; border-radius: 3px; outline: none; pointer-events: auto;"
+                                   data-video-id="${videoId}"
+                                   data-duration="${file.duration || 0}">
+                            <div style="display: flex; justify-content: space-between; align-items: center; color: #fff; font-size: 11px; pointer-events: auto;"
+                                 onclick="event.stopPropagation();">
+                                <button onclick="event.stopPropagation(); toggleVideoPlay('${videoId}')" 
+                                        style="background: transparent; border: none; color: #fff; cursor: pointer; font-size: 14px; padding: 4px 8px; pointer-events: auto;">⏯</button>
+                                <span class="video-time" id="time_${videoId}">0:00 / ${formatDuration(file.duration || 0)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                               onclick="event.stopPropagation(); toggleFileSelection('${file.path}', 'video')"
+                               style="margin-right: 8px;">
+                        <span style="font-size: 1.2em;">🎬</span>
+                        <strong style="margin-left: 6px; word-break: break-word; font-size: 13px; flex: 1;">${file.name}</strong>
+                    </div>
+                    <div style="font-size: 11px; color: #999; margin-bottom: 4px;">
+                        <span>${file.size_mb} MB</span>
+                    </div>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: #999;">
+                        <span>🕐 ${formatDuration(file.duration || 0)}</span>
+                        <span>📐 ${file.width || '?'}x${file.height || '?'}</span>
+                    </div>
+                    <div style="margin-top: 8px; padding: 6px; background: #1e1e1e; border-radius: 4px; text-align: center; font-size: 11px; color: #999;">
+                        Click thumbnail to trim or crop
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+    
+    // Initialize scrubbers for all videos after rendering (only when video is visible)
+    // Scrubbers will be initialized when videos are shown
+}
+
+function formatDuration(seconds) {
+    if (!seconds || seconds === 0) return 'N/A';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+}
+
+function renderImageList() {
+    const container = document.getElementById('imageFilesList');
+    const images = window.mediaConverterData.images;
+    
+    if (images.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No JPG/PNG files found in input folder.</p>';
+        return;
+    }
+    
+    let html = '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">';
+    images.forEach((file, index) => {
+        const isSelected = window.mediaConverterData.selectedFiles.has(file.path);
+        // Add cache-busting parameter - use file modification time if available, otherwise timestamp
+        const cacheBuster = file.mtime || new Date().getTime();
+        const thumbnailUrl = `/v2p-formatter/media-converter/thumbnail?path=${encodeURIComponent(file.path)}&size=300x225&t=${cacheBuster}`;
+        html += `
+            <div onclick="toggleFileSelection('${file.path}', 'image')" 
+                 style="cursor: pointer; padding: 12px; background: ${isSelected ? '#333' : '#2a2a2a'}; border-radius: 6px; border: 1px solid ${isSelected ? '#667eea' : '#555'}; color: #e0e0e0; display: flex; flex-direction: column;">
+                <div style="width: 100%; height: 300px; background: #1a1a1a; border: 1px solid #444; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 10px;">
+                    <img src="${thumbnailUrl}" 
+                         alt="${file.name}" 
+                         id="thumb_${file.path.replace(/[^a-zA-Z0-9]/g, '_')}"
+                         style="max-width: 100%; max-height: 100%; object-fit: contain;"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                         onload="this.nextElementSibling.style.display='none';">
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; position: absolute; width: 100%; height: 100%; background: #1a1a1a;">
+                        <span style="font-size: 1.5em;">⏳</span>
+                        <span>Loading...</span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 4px; justify-content: center; margin-bottom: 8px;">
+                    <button onclick="event.stopPropagation(); rotateSingleImage('${file.path}', -90)" 
+                            style="width: 32px; height: 28px; padding: 0; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 3px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center;"
+                            title="Rotate Left 90°">↺</button>
+                    <button onclick="event.stopPropagation(); rotateSingleImage('${file.path}', 90)" 
+                            style="width: 32px; height: 28px; padding: 0; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 3px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center;"
+                            title="Rotate Right 90°">↻</button>
+                    <button onclick="event.stopPropagation(); rotateSingleImage('${file.path}', 180)" 
+                            style="width: 32px; height: 28px; padding: 0; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 3px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center;"
+                            title="Rotate 180°">↻↻</button>
+                </div>
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                               onclick="event.stopPropagation(); toggleFileSelection('${file.path}', 'image')"
+                               style="margin-right: 8px;">
+                        <span style="font-size: 1.2em;">🖼️</span>
+                        <strong style="margin-left: 6px; word-break: break-word; font-size: 13px; flex: 1;">${file.name}</strong>
+                    </div>
+                    <div style="font-size: 11px; color: #999; margin-bottom: 4px;">
+                        <span>${file.size_mb} MB</span>
+                    </div>
+                    <div style="font-size: 11px; color: #999;">
+                        <span>📐 ${file.width || '?'}x${file.height || '?'}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function updateCounts() {
+    document.getElementById('videoCount').textContent = `(${window.mediaConverterData.videos.length} files)`;
+    document.getElementById('imageCount').textContent = `(${window.mediaConverterData.images.length} files)`;
+    
+    const videoTotalSize = window.mediaConverterData.videos.reduce((sum, f) => sum + f.size_mb, 0);
+    const imageTotalSize = window.mediaConverterData.images.reduce((sum, f) => sum + f.size_mb, 0);
+    
+    document.getElementById('videoTotalInfo').textContent = `(${window.mediaConverterData.videos.length} files, ${videoTotalSize.toFixed(2)} MB)`;
+    document.getElementById('imageTotalInfo').textContent = `(${window.mediaConverterData.images.length} files, ${imageTotalSize.toFixed(2)} MB)`;
+    
+    document.getElementById('totalVideosCount').textContent = window.mediaConverterData.videos.length;
+    document.getElementById('totalImagesCount').textContent = window.mediaConverterData.images.length;
+}
+
+function toggleSection(sectionId) {
+    const section = document.getElementById(sectionId);
+    const toggle = document.getElementById(sectionId.replace('Section', 'Toggle'));
+    if (section.style.display === 'none') {
+        section.style.display = 'block';
+        toggle.textContent = '▼';
+    } else {
+        section.style.display = 'none';
+        toggle.textContent = '▶';
+    }
+}
+
+function toggleFileSelection(filePath, type) {
+    if (window.mediaConverterData.selectedFiles.has(filePath)) {
+        window.mediaConverterData.selectedFiles.delete(filePath);
+    } else {
+        window.mediaConverterData.selectedFiles.add(filePath);
+    }
+    renderFileLists();
+    updateSelectionSummary();
+    updateSettingsVisibility();
+}
+
+function toggleSelectAll(type) {
+    const files = type === 'video' ? window.mediaConverterData.videos : window.mediaConverterData.images;
+    const checkbox = document.getElementById(`selectAll${type === 'video' ? 'Videos' : 'Images'}`);
+    
+    files.forEach(file => {
+        if (checkbox.checked) {
+            window.mediaConverterData.selectedFiles.add(file.path);
+        } else {
+            window.mediaConverterData.selectedFiles.delete(file.path);
+        }
+    });
+    
+    renderFileLists();
+    updateSelectionSummary();
+    updateSettingsVisibility();
+}
+
+function selectAllFiles() {
+    [...window.mediaConverterData.videos, ...window.mediaConverterData.images].forEach(file => {
+        window.mediaConverterData.selectedFiles.add(file.path);
+    });
+    document.getElementById('selectAllVideos').checked = true;
+    document.getElementById('selectAllImages').checked = true;
+    renderFileLists();
+    updateSelectionSummary();
+    updateSettingsVisibility();
+}
+
+function clearSelection() {
+    window.mediaConverterData.selectedFiles.clear();
+    document.getElementById('selectAllVideos').checked = false;
+    document.getElementById('selectAllImages').checked = false;
+    renderFileLists();
+    updateSelectionSummary();
+    updateSettingsVisibility();
+}
+
+function updateSelectionSummary() {
+    const selected = Array.from(window.mediaConverterData.selectedFiles);
+    const videos = selected.filter(p => window.mediaConverterData.videos.some(v => v.path === p));
+    const images = selected.filter(p => window.mediaConverterData.images.some(i => i.path === p));
+    
+    const totalSize = selected.reduce((sum, path) => {
+        const file = [...window.mediaConverterData.videos, ...window.mediaConverterData.images].find(f => f.path === path);
+        return sum + (file ? file.size_mb : 0);
+    }, 0);
+    
+    document.getElementById('selectedVideosCount').textContent = videos.length;
+    document.getElementById('selectedImagesCount').textContent = images.length;
+    document.getElementById('totalSelectedCount').textContent = selected.length;
+    document.getElementById('totalSelectedSize').textContent = totalSize.toFixed(2) + ' MB';
+    
+    // Show/hide bulk rotate section based on image selection
+    const bulkRotateSection = document.getElementById('bulkRotateSection');
+    const bulkRotateCount = document.getElementById('bulkRotateCount');
+    if (bulkRotateSection && bulkRotateCount) {
+        if (images.length > 0) {
+            bulkRotateSection.style.display = 'block';
+            bulkRotateCount.textContent = images.length;
+        } else {
+            bulkRotateSection.style.display = 'none';
+        }
+    }
+}
+
+function updateSettingsVisibility() {
+    const selected = Array.from(window.mediaConverterData.selectedFiles);
+    const hasVideos = selected.some(p => window.mediaConverterData.videos.some(v => v.path === p));
+    const hasImages = selected.some(p => window.mediaConverterData.images.some(i => i.path === p));
+    
+    if (selected.length > 0) {
+        document.getElementById('settingsSection').style.display = 'block';
+        document.getElementById('videoSettings').style.display = hasVideos ? 'block' : 'none';
+        document.getElementById('imageSettings').style.display = hasImages ? 'block' : 'none';
+        document.getElementById('startConversionBtn').disabled = false;
+        
+        // Calculate and update estimated output sizes
+        calculateEstimatedOutputSize();
+    } else {
+        document.getElementById('settingsSection').style.display = 'none';
+        document.getElementById('startConversionBtn').disabled = true;
+        
+        // Reset estimates
+        document.getElementById('videoEstimatedSize').innerHTML = 'Estimated output size will be calculated after file selection';
+        document.getElementById('imageEstimatedSize').innerHTML = 'Estimated output size will be calculated after file selection';
+    }
+}
+
+function updateVideoSettings() {
+    const preset = document.getElementById('videoQualityPreset').value;
+    document.getElementById('videoCustomSettings').style.display = preset === 'custom' ? 'block' : 'none';
+    calculateEstimatedOutputSize();
+}
+
+function updateImageSettings() {
+    const resolutionPreset = document.getElementById('imageResolutionPreset').value;
+    const qualityPreset = document.getElementById('imageQualityPreset').value;
+    
+    document.getElementById('imageCustomResolution').style.display = resolutionPreset === 'custom' ? 'block' : 'none';
+    document.getElementById('imageCustomQuality').style.display = qualityPreset === 'custom' ? 'block' : 'none';
+    calculateEstimatedOutputSize();
+}
+
+
+function calculateEstimatedOutputSize() {
+    const selected = Array.from(window.mediaConverterData.selectedFiles);
+    const selectedVideos = selected.filter(p => window.mediaConverterData.videos.some(v => v.path === p));
+    const selectedImages = selected.filter(p => window.mediaConverterData.images.some(i => i.path === p));
+    
+    if (selectedVideos.length > 0) {
+        updateVideoEstimatedSize(selectedVideos);
+    } else {
+        document.getElementById('videoEstimatedSize').innerHTML = 'No videos selected';
+    }
+    
+    if (selectedImages.length > 0) {
+        updateImageEstimatedSize(selectedImages);
+    } else {
+        document.getElementById('imageEstimatedSize').innerHTML = 'No images selected';
+    }
+}
+
+function updateVideoEstimatedSize(selectedVideoPaths) {
+    const preset = document.getElementById('videoQualityPreset').value;
+    
+    // Typical compression ratios based on quality preset
+    const compressionRatios = {
+        'low': 0.25,      // ~75% reduction (very aggressive)
+        'medium': 0.40,   // ~60% reduction (balanced)
+        'high': 0.70,     // ~30% reduction (minimal)
+        'custom': 0.50    // ~50% reduction (estimate for custom)
+    };
+    
+    const ratio = compressionRatios[preset] || 0.40;
+    
+    // Calculate total input size
+    let totalInputSize = 0;
+    selectedVideoPaths.forEach(path => {
+        const video = window.mediaConverterData.videos.find(v => v.path === path);
+        if (video) {
+            totalInputSize += video.size_mb;
+        }
+    });
+    
+    // Calculate estimated output size
+    const estimatedOutputSize = totalInputSize * ratio;
+    const reduction = (1 - ratio) * 100;
+    
+    const videoCount = selectedVideoPaths.length;
+    const sizeText = estimatedOutputSize > 1024 
+        ? `${(estimatedOutputSize / 1024).toFixed(2)} GB` 
+        : `${estimatedOutputSize.toFixed(2)} MB`;
+    
+    document.getElementById('videoEstimatedSize').innerHTML = `
+        <strong style="color: #667eea;">📊 Estimated Output:</strong><br>
+        <span style="color: #e0e0e0;">
+            ${videoCount} file(s): ~${sizeText} (${reduction.toFixed(1)}% reduction)<br>
+            <span style="color: #999; font-size: 11px;">
+                Original: ${totalInputSize.toFixed(2)} MB → Estimated: ${estimatedOutputSize.toFixed(2)} MB
+            </span>
+        </span>
+    `;
+}
+
+function updateImageEstimatedSize(selectedImagePaths) {
+    const resolutionPreset = document.getElementById('imageResolutionPreset').value;
+    const qualityPreset = document.getElementById('imageQualityPreset').value;
+    
+    // Quality compression ratios
+    const qualityRatios = {
+        'low': 0.15,      // ~85% reduction (60% quality)
+        'medium': 0.25,   // ~75% reduction (80% quality)
+        'high': 0.50,     // ~50% reduction (95% quality)
+        'custom': 0.30    // Estimate based on slider
+    };
+    
+    let qualityRatio = qualityRatios[qualityPreset] || 0.25;
+    
+    // If custom quality, estimate based on slider value
+    if (qualityPreset === 'custom') {
+        const customQuality = parseInt(document.getElementById('customQualitySlider').value) || 85;
+        // Lower quality = smaller file (rough estimate)
+        qualityRatio = (100 - customQuality) / 100 * 0.4 + 0.1; // Range from 0.1 to 0.5
+    }
+    
+    // Resolution impact (if downscaling, additional reduction)
+    let resolutionRatio = 1.0;
+    if (resolutionPreset !== 'original') {
+        // Estimate resolution reduction impact
+        // Typical: 1920x1080 = 2MP, 1280x720 = 0.9MP, 640x480 = 0.3MP
+        const resolutionRatios = {
+            '1920x1080': 0.85,  // ~15% reduction from original
+            '1280x720': 0.60,   // ~40% reduction
+            '640x480': 0.30,    // ~70% reduction
+            'custom': 0.70       // Estimate for custom
+        };
+        
+        if (resolutionPreset === 'custom') {
+            const customWidth = parseInt(document.getElementById('customWidth').value) || 1920;
+            const customHeight = parseInt(document.getElementById('customHeight').value) || 1080;
+            const customPixels = customWidth * customHeight;
+            // Estimate based on pixel count (assuming original is ~8MP = 4000x3000)
+            const originalPixels = 4000 * 3000; // Rough estimate
+            resolutionRatio = Math.min(customPixels / originalPixels, 1.0);
+        } else {
+            resolutionRatio = resolutionRatios[resolutionPreset] || 1.0;
+        }
+    }
+    
+    // Calculate total input size
+    let totalInputSize = 0;
+    selectedImagePaths.forEach(path => {
+        const image = window.mediaConverterData.images.find(i => i.path === path);
+        if (image) {
+            totalInputSize += image.size_mb;
+        }
+    });
+    
+    // Calculate estimated output size (quality * resolution impact)
+    const combinedRatio = qualityRatio * resolutionRatio;
+    const estimatedOutputSize = totalInputSize * combinedRatio;
+    const reduction = (1 - combinedRatio) * 100;
+    
+    const imageCount = selectedImagePaths.length;
+    const sizeText = estimatedOutputSize > 1024 
+        ? `${(estimatedOutputSize / 1024).toFixed(2)} GB` 
+        : `${estimatedOutputSize.toFixed(2)} MB`;
+    
+    document.getElementById('imageEstimatedSize').innerHTML = `
+        <strong style="color: #667eea;">📊 Estimated Output:</strong><br>
+        <span style="color: #e0e0e0;">
+            ${imageCount} file(s): ~${sizeText} (${reduction.toFixed(1)}% reduction)<br>
+            <span style="color: #999; font-size: 11px;">
+                Original: ${totalInputSize.toFixed(2)} MB → Estimated: ${estimatedOutputSize.toFixed(2)} MB
+            </span>
+        </span>
+    `;
+}
+
+function startConversion() {
+    const selected = Array.from(window.mediaConverterData.selectedFiles);
+    if (selected.length === 0) {
+        alert('Please select at least one file to convert');
+        return;
+    }
+    
+    // Build file list with types
+    const files = selected.map(path => {
+        const video = window.mediaConverterData.videos.find(v => v.path === path);
+        const image = window.mediaConverterData.images.find(i => i.path === path);
+        return {
+            path: path,
+            type: video ? 'mov' : (image ? image.type : 'unknown')
+        };
+    });
+    
+    // Get settings
+    const settings = {
+        video: {
+            quality: document.getElementById('videoQualityPreset').value,
+            custom: document.getElementById('videoQualityPreset').value === 'custom' ? {
+                bitrate: document.getElementById('customBitrate').value + 'k',
+                codec: document.getElementById('customCodec').value
+            } : null
+        },
+        image: {
+            resolution: document.getElementById('imageResolutionPreset').value,
+            custom_resolution: document.getElementById('imageResolutionPreset').value === 'custom',
+            custom_width: parseInt(document.getElementById('customWidth').value),
+            custom_height: parseInt(document.getElementById('customHeight').value),
+            maintain_aspect: document.getElementById('maintainAspectRatio').checked,
+            allow_stretch: document.getElementById('allowStretch').checked,
+            quality: document.getElementById('imageQualityPreset').value,
+            custom_quality: document.getElementById('imageQualityPreset').value === 'custom',
+            custom_quality_value: parseInt(document.getElementById('customQualitySlider').value)
+        }
+    };
+    
+    debug(`Starting conversion for ${files.length} file(s)...`, 'info');
+    
+    fetch('/v2p-formatter/media-converter/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files, settings })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.mediaConverterData.currentJobId = data.job_id;
+            document.getElementById('processingSection').style.display = 'block';
+            document.getElementById('cancelConversionBtn').style.display = 'block';
+            startStatusPolling(data.job_id);
+            debug(`Conversion job started: ${data.job_id}`, 'success');
+        } else {
+            debug('Error starting conversion: ' + (data.error || 'Unknown'), 'error');
+            alert('Error: ' + (data.error || 'Failed to start conversion'));
+        }
+    })
+    .catch(err => {
+        debug('Error: ' + err.message, 'error');
+        alert('Error: ' + err.message);
+    });
+}
+
+function startStatusPolling(jobId) {
+    if (window.mediaConverterData.statusInterval) {
+        clearInterval(window.mediaConverterData.statusInterval);
+    }
+    
+    window.mediaConverterData.statusInterval = setInterval(() => {
+        fetch(`/v2p-formatter/media-converter/status/${jobId}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    updateProgress(data);
+                    if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
+                        clearInterval(window.mediaConverterData.statusInterval);
+                        document.getElementById('cancelConversionBtn').style.display = 'none';
+                    }
+                }
+            })
+            .catch(err => {
+                debug('Error checking status: ' + err.message, 'error');
+            });
+    }, 2000); // Poll every 2 seconds
+}
+
+function updateProgress(status) {
+    document.getElementById('overallProgressPercent').textContent = status.progress.toFixed(1) + '%';
+    document.getElementById('overallProgressBar').style.width = status.progress + '%';
+    document.getElementById('conversionStatus').textContent = status.status.charAt(0).toUpperCase() + status.status.slice(1);
+    
+    // Update file progress list
+    const container = document.getElementById('fileProgressList');
+    let html = '';
+    
+    const selected = Array.from(window.mediaConverterData.selectedFiles);
+    selected.forEach(path => {
+        const fileStatus = status.file_statuses[path] || 'pending';
+        const result = status.results[path];
+        const error = status.errors[path];
+        
+        const file = [...window.mediaConverterData.videos, ...window.mediaConverterData.images].find(f => f.path === path);
+        const fileName = file ? file.name : path.split('/').pop();
+        
+        let statusIcon = '⏸️';
+        let statusText = 'Pending';
+        let statusColor = '#999';
+        
+        if (fileStatus === 'processing') {
+            statusIcon = '⏳';
+            statusText = 'Processing...';
+            statusColor = '#667eea';
+        } else if (fileStatus === 'completed') {
+            statusIcon = '✅';
+            statusText = 'Completed';
+            statusColor = '#51cf66';
+        } else if (fileStatus === 'failed') {
+            statusIcon = '❌';
+            statusText = 'Failed';
+            statusColor = '#ff6b6b';
+        } else if (fileStatus === 'cancelled') {
+            statusIcon = '🚫';
+            statusText = 'Cancelled';
+            statusColor = '#999';
+        }
+        
+        html += `
+            <div style="padding: 12px; margin: 8px 0; background: #2a2a2a; border-radius: 4px; border: 1px solid #555;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="color: #e0e0e0;"><strong>${statusIcon} ${fileName}</strong></span>
+                    <span style="color: ${statusColor};">${statusText}</span>
+                </div>
+                ${result ? `
+                    <div style="font-size: 12px; color: #999;">
+                        Original: ${result.input_size_mb}MB → Converted: ${result.output_size_mb}MB 
+                        (${result.reduction_percent}% reduction, ${result.processing_time}s)
+                    </div>
+                ` : ''}
+                ${error ? `
+                    <div style="font-size: 12px; color: #ff6b6b;">
+                        Error: ${error}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function cancelConversion() {
+    if (!window.mediaConverterData.currentJobId) return;
+    
+    if (confirm('Are you sure you want to cancel the conversion?')) {
+        fetch(`/v2p-formatter/media-converter/cancel/${window.mediaConverterData.currentJobId}`, {
+            method: 'POST'
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                debug('Conversion cancelled', 'info');
+                if (window.mediaConverterData.statusInterval) {
+                    clearInterval(window.mediaConverterData.statusInterval);
+                }
+                document.getElementById('cancelConversionBtn').style.display = 'none';
+            } else {
+                debug('Error cancelling: ' + (data.error || 'Unknown'), 'error');
+            }
+        })
+        .catch(err => {
+            debug('Error: ' + err.message, 'error');
+        });
+    }
+}
+
+// Rotate a single image
+function rotateSingleImage(filePath, angle) {
+    debug(`Rotating single image: ${filePath} by ${angle}°`, 'info');
+    
+    // Find the file to get its type
+    const image = window.mediaConverterData.images.find(i => i.path === filePath);
+    if (!image) {
+        debug('Image not found in data', 'error');
+        alert('Image not found');
+        return;
+    }
+    
+    // Get thumbnail element
+    const thumbId = `thumb_${filePath.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const thumbElement = document.getElementById(thumbId);
+    if (thumbElement) {
+        thumbElement.style.opacity = '0.5'; // Dim during rotation
+    }
+    
+    // Call API
+    fetch('/v2p-formatter/media-converter/rotate-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            files: [{ path: filePath, type: image.type }],
+            angle: angle
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            debug(`Successfully rotated image: ${filePath}`, 'success');
+            // Reload file list to get updated mtime and refresh thumbnails
+            loadMediaFiles();
+        } else {
+            debug('Error rotating image: ' + (data.error || 'Unknown'), 'error');
+            alert('Error: ' + (data.error || 'Failed to rotate image'));
+            if (thumbElement) {
+                thumbElement.style.opacity = '1';
+            }
+        }
+    })
+    .catch(err => {
+        debug('Error: ' + err.message, 'error');
+        alert('Error: ' + err.message);
+        if (thumbElement) {
+            thumbElement.style.opacity = '1';
+        }
+    });
+}
+
+// Rotate multiple selected images
+function bulkRotateImages(angle) {
+    const selected = Array.from(window.mediaConverterData.selectedFiles);
+    const selectedImages = selected.filter(p => {
+        return window.mediaConverterData.images.some(i => i.path === p);
+    });
+    
+    if (selectedImages.length === 0) {
+        alert('Please select at least one image to rotate');
+        return;
+    }
+    
+    debug(`Rotating ${selectedImages.length} image(s) by ${angle}°`, 'info');
+    
+    // Build file list with types
+    const files = selectedImages.map(path => {
+        const image = window.mediaConverterData.images.find(i => i.path === path);
+        return {
+            path: path,
+            type: image ? image.type : 'jpg'
+        };
+    });
+    
+    // Dim all selected thumbnails
+    selectedImages.forEach(path => {
+        const thumbId = `thumb_${path.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const thumbElement = document.getElementById(thumbId);
+        if (thumbElement) {
+            thumbElement.style.opacity = '0.5';
+        }
+    });
+    
+    // Call API
+    fetch('/v2p-formatter/media-converter/rotate-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            files: files,
+            angle: angle
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            debug(`Successfully rotated ${data.rotated_count} image(s)`, 'success');
+            // Reload file list to get updated mtime and refresh thumbnails
+            loadMediaFiles();
+        } else {
+            debug('Error rotating images: ' + (data.error || 'Unknown'), 'error');
+            alert('Error: ' + (data.error || 'Failed to rotate images'));
+            // Restore opacity
+            selectedImages.forEach(path => {
+                const thumbId = `thumb_${path.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                const thumbElement = document.getElementById(thumbId);
+                if (thumbElement) {
+                    thumbElement.style.opacity = '1';
+                }
+            });
+        }
+    })
+    .catch(err => {
+        debug('Error: ' + err.message, 'error');
+        alert('Error: ' + err.message);
+        // Restore opacity
+        selectedImages.forEach(path => {
+            const thumbId = `thumb_${path.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const thumbElement = document.getElementById(thumbId);
+            if (thumbElement) {
+                thumbElement.style.opacity = '1';
+            }
+        });
+    });
+}
+
+// Video preview functions
+let activeVideoPreview = null;
+
+function showVideoPreview(filePath, previewId, videoId, duration) {
+    // Hide any other active preview
+    if (activeVideoPreview && activeVideoPreview !== videoId) {
+        hideVideoPreview(null, activeVideoPreview);
+    }
+    
+    const previewDiv = document.getElementById(previewId);
+    const videoDiv = document.getElementById(videoId);
+    const thumbnail = previewDiv.querySelector('.video-thumbnail');
+    
+    if (!videoDiv || !previewDiv) return;
+    
+    // Show video player, hide thumbnail
+    if (thumbnail) thumbnail.style.display = 'none';
+    videoDiv.style.display = 'block';
+    
+    const video = videoDiv.querySelector('video');
+    if (video && !video.src) {
+        // Load video source
+        video.src = `/v2p-formatter/media-converter/video-preview?path=${encodeURIComponent(filePath)}`;
+        video.load();
+        
+        // Update time display when video loads
+        video.addEventListener('loadedmetadata', function() {
+            updateVideoTime(videoId, 0, video.duration || duration);
+        });
+        
+        // Update time display during playback
+        video.addEventListener('timeupdate', function() {
+            updateVideoTime(videoId, video.currentTime, video.duration || duration);
+        });
+    }
+    
+    activeVideoPreview = videoId;
+}
+
+function hideVideoPreview(previewId, videoId) {
+    // Don't auto-hide video - user controls it via click
+    // Video stays visible until user clicks thumbnail again to pause/stop
+    return;
+}
+
+function toggleVideoPlayPause(filePath, previewId, videoId, duration) {
+    const videoDiv = document.getElementById(videoId);
+    if (!videoDiv) return;
+    
+    const video = videoDiv.querySelector('video');
+    if (!video) return;
+    
+    // If video is not loaded, load it first
+    if (!video.src) {
+        video.src = `/v2p-formatter/media-converter/video-preview?path=${encodeURIComponent(filePath)}`;
+        video.load();
+        
+        // Wait for video to load, then play
+        video.addEventListener('loadedmetadata', function() {
+            video.play().catch(err => {
+                debug('Error playing video: ' + err.message, 'error');
+            });
+            // Initialize scrubber after video metadata is loaded
+            initScrubber(videoId, video.duration || duration);
+        }, { once: true });
+        
+        // Show video player, hide thumbnail
+        videoDiv.style.display = 'flex';
+        videoDiv.style.alignItems = 'center';
+        videoDiv.style.justifyContent = 'center';
+        const previewDiv = document.getElementById(previewId);
+        if (previewDiv) {
+            const thumbnail = previewDiv.querySelector('.video-thumbnail');
+            if (thumbnail) thumbnail.style.display = 'none';
+        }
+        
+        // Update time display
+        video.addEventListener('timeupdate', function() {
+            updateVideoTime(videoId, video.currentTime, video.duration || duration);
+        });
+        
+        // Initialize scrubber after video div is visible
+        setTimeout(() => {
+            initScrubber(videoId, duration);
+        }, 200);
+        
+        activeVideoPreview = videoId;
+    } else if (videoDiv.style.display === 'none' || videoDiv.style.display === '') {
+        // Video is loaded but hidden, show and play
+        videoDiv.style.display = 'flex';
+        videoDiv.style.alignItems = 'center';
+        videoDiv.style.justifyContent = 'center';
+        const previewDiv = document.getElementById(previewId);
+        if (previewDiv) {
+            const thumbnail = previewDiv.querySelector('.video-thumbnail');
+            if (thumbnail) thumbnail.style.display = 'none';
+        }
+        video.play().catch(err => {
+            debug('Error playing video: ' + err.message, 'error');
+        });
+        // Initialize scrubber after video div is visible
+        setTimeout(() => {
+            initScrubber(videoId, video.duration || duration);
+        }, 200);
+    } else {
+        // Video is visible, toggle play/pause or stop
+        if (video.paused) {
+            // Resume playing
+            video.play().catch(err => {
+                debug('Error playing video: ' + err.message, 'error');
+            });
+            // Hide thumbnail when playing
+            const previewDiv = document.getElementById(previewId);
+            if (previewDiv) {
+                const thumbnail = previewDiv.querySelector('.video-thumbnail');
+                if (thumbnail) thumbnail.style.display = 'none';
+            }
+        } else {
+            // If playing, pause and hide (stop)
+            video.pause();
+            video.currentTime = 0;
+            videoDiv.style.display = 'none';
+            
+            // Show thumbnail again
+            const previewDiv = document.getElementById(previewId);
+            if (previewDiv) {
+                const thumbnail = previewDiv.querySelector('.video-thumbnail');
+                if (thumbnail) thumbnail.style.display = 'block';
+            }
+            
+            if (activeVideoPreview === videoId) {
+                activeVideoPreview = null;
+            }
+        }
+    }
+}
+
+function toggleVideoPlay(videoId) {
+    const videoDiv = document.getElementById(videoId);
+    if (!videoDiv) return;
+    
+    const video = videoDiv.querySelector('video');
+    if (!video) return;
+    
+    if (video.paused) {
+        video.play();
+    } else {
+        video.pause();
+    }
+}
+
+function pauseVideoOnClick(videoId) {
+    const videoDiv = document.getElementById(videoId);
+    if (!videoDiv) return;
+    
+    const video = videoDiv.querySelector('video');
+    if (!video) return;
+    
+    // Toggle play/pause when clicking on video
+    if (video.paused) {
+        video.play().catch(err => {
+            debug('Error playing video: ' + err.message, 'error');
+        });
+        // Hide thumbnail when playing
+        const previewDiv = videoDiv.parentElement;
+        if (previewDiv) {
+            const thumbnail = previewDiv.querySelector('.video-thumbnail');
+            if (thumbnail) {
+                thumbnail.style.display = 'none';
+                thumbnail.style.position = '';
+                thumbnail.style.zIndex = '';
+            }
+        }
+    } else {
+        video.pause();
+        // Show thumbnail when paused so user can click it to resume
+        const previewDiv = videoDiv.parentElement;
+        if (previewDiv) {
+            const thumbnail = previewDiv.querySelector('.video-thumbnail');
+            if (thumbnail) {
+                thumbnail.style.display = 'block';
+                thumbnail.style.position = 'absolute';
+                thumbnail.style.top = '0';
+                thumbnail.style.left = '0';
+                thumbnail.style.width = '100%';
+                thumbnail.style.height = '100%';
+                thumbnail.style.zIndex = '25';
+                thumbnail.style.background = 'rgba(0,0,0,0.3)';
+            }
+        }
+    }
+}
+
+// Scrubber functionality - simple and reliable
+function initScrubber(videoId, duration) {
+    const scrubber = document.getElementById(`scrubber_${videoId}`);
+    if (!scrubber) {
+        console.log(`Scrubber not found: scrubber_${videoId}`);
+        return;
+    }
+    
+    const videoDiv = document.getElementById(videoId);
+    if (!videoDiv) {
+        console.log(`Video div not found: ${videoId}`);
+        return;
+    }
+    
+    // Check if already initialized (avoid duplicate listeners)
+    if (scrubber.dataset.initialized === 'true') {
+        return;
+    }
+    
+    // Remove any existing event listeners by replacing the element
+    const parent = scrubber.parentNode;
+    const newScrubber = scrubber.cloneNode(true);
+    newScrubber.dataset.initialized = 'true';
+    parent.replaceChild(newScrubber, scrubber);
+    
+    // Get fresh reference
+    const scrub = document.getElementById(`scrubber_${videoId}`);
+    if (!scrub) {
+        console.log(`Scrubber not found after clone: scrubber_${videoId}`);
+        return;
+    }
+    
+    console.log(`Initializing scrubber for: ${videoId}`);
+    let isDragging = false;
+    
+    // Handle scrubber interaction
+    function handleScrub(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        
+        const video = videoDiv.querySelector('video');
+        if (!video) {
+            console.log('Video element not found in handleScrub');
+            return;
+        }
+        
+        // Calculate position from click/drag
+        const rect = scrub.getBoundingClientRect();
+        const clientX = e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX) || 0;
+        const x = clientX - rect.left;
+        const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+        
+        scrub.value = percent;
+        console.log(`Scrubbing to ${percent}%`);
+        
+        // Update video position
+        if (video.src) {
+            const actualDuration = video.duration || duration;
+            if (actualDuration > 0) {
+                const time = (percent / 100) * actualDuration;
+                video.currentTime = Math.max(0, Math.min(time, actualDuration));
+                updateVideoTime(videoId, video.currentTime, actualDuration);
+                console.log(`Video time set to ${time.toFixed(2)}s`);
+            } else if (video.readyState < 2) {
+                // Wait for metadata
+                video.addEventListener('loadedmetadata', function() {
+                    const actualDuration = video.duration || duration;
+                    if (actualDuration > 0) {
+                        const time = (percent / 100) * actualDuration;
+                        video.currentTime = Math.max(0, Math.min(time, actualDuration));
+                        updateVideoTime(videoId, video.currentTime, actualDuration);
+                    }
+                }, { once: true });
+            }
+        } else {
+            console.log('Video src not set yet');
+        }
+    }
+    
+    // Mouse events
+    scrub.addEventListener('mousedown', function(e) {
+        isDragging = true;
+        scrub.dataset.dragging = 'true';
+        handleScrub(e);
+        
+        // Add global mouse move and up listeners
+        function onMouseMove(e) {
+            if (isDragging) {
+                handleScrub(e);
+            }
+        }
+        
+        function onMouseUp(e) {
+            isDragging = false;
+            scrub.dataset.dragging = '';
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        }
+        
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
+    
+    // Click event (for direct clicks)
+    scrub.addEventListener('click', function(e) {
+        if (!isDragging) {
+            handleScrub(e);
+        }
+    });
+    
+    // Input event (for range slider changes)
+    scrub.addEventListener('input', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        if (!isDragging) {
+            handleScrub(e);
+        }
+    });
+    
+    // Touch events
+    scrub.addEventListener('touchstart', function(e) {
+        isDragging = true;
+        scrub.dataset.dragging = 'true';
+        handleScrub(e);
+    });
+    
+    scrub.addEventListener('touchmove', function(e) {
+        if (isDragging) {
+            handleScrub(e);
+        }
+    });
+    
+    scrub.addEventListener('touchend', function(e) {
+        isDragging = false;
+        scrub.dataset.dragging = '';
+    });
+}
+
+function updateVideoTime(videoId, currentTime, duration) {
+    const videoDiv = document.getElementById(videoId);
+    if (!videoDiv) return;
+    
+    const timeDisplay = document.getElementById(`time_${videoId}`);
+    if (timeDisplay) {
+        timeDisplay.textContent = `${formatDuration(currentTime)} / ${formatDuration(duration)}`;
+    }
+    
+    // Update scrubber (only if user is not actively interacting)
+    const scrubber = document.getElementById(`scrubber_${videoId}`);
+    if (scrubber && duration > 0 && !scrubber.dataset.dragging) {
+        const percent = (currentTime / duration) * 100;
+        scrubber.value = percent;
+    }
+}
+
+// Video Actions Overlay System
+let videoActionsOverlay = null;
+let currentVideoState = {
+    filePath: null,
+    duration: 0,
+    width: 0,
+    height: 0,
+    fileName: '',
+    mode: 'none', // 'none', 'trim', 'crop'
+    trimStart: 0,
+    trimEnd: 0,
+    cropX: 0,
+    cropY: 0,
+    cropWidth: 0,
+    cropHeight: 0
+};
+
+function openVideoActionsOverlay(filePath, duration, width, height, fileName) {
+    debug(`Opening video actions overlay for: ${filePath}`, 'info');
+    
+    // Set current video state
+    currentVideoState = {
+        filePath: filePath,
+        duration: duration,
+        width: width,
+        height: height,
+        fileName: fileName,
+        mode: 'none',
+        trimStart: 0,
+        trimEnd: duration,
+        cropX: 0,
+        cropY: 0,
+        cropWidth: width,
+        cropHeight: height
+    };
+    
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'videoActionsOverlay';
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;';
+    overlay.onclick = function(e) {
+        if (e.target === overlay) {
+            closeVideoActionsOverlay();
+        }
+    };
+    
+    overlay.innerHTML = `
+        <div style="background: #1e1e1e; border-radius: 8px; border: 1px solid #555; max-width: 90%; max-height: 90vh; width: 100%; display: flex; flex-direction: column; position: relative; overflow-y: auto; overflow-x: hidden;">
+            <!-- Close Button -->
+            <button onclick="closeVideoActionsOverlay()" 
+                    style="position: absolute; top: 10px; right: 10px; z-index: 100; background: rgba(0,0,0,0.7); color: #e0e0e0; border: 1px solid #555; border-radius: 4px; width: 32px; height: 32px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center;">
+                ✕
+            </button>
+            
+            <!-- Video Player Container -->
+            <div id="videoPlayerContainer" style="position: relative; width: 100%; background: #000; display: flex; align-items: center; justify-content: center; min-height: 300px; max-height: 60vh; flex-shrink: 0;">
+                <video id="videoActionsPlayer" 
+                       style="max-width: 100%; max-height: 100%; object-fit: contain;"
+                       preload="metadata"
+                       controls></video>
+                
+                <!-- Crop Overlay (hidden by default) -->
+                <div id="cropOverlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
+                    <div id="cropRectangle" style="position: absolute; border: 2px solid #667eea; background: rgba(102, 126, 234, 0.3); cursor: move; pointer-events: all;">
+                        <div style="position: absolute; top: -8px; left: -8px; width: 16px; height: 16px; background: #667eea; border-radius: 50%; cursor: nwse-resize;"></div>
+                        <div style="position: absolute; top: -8px; right: -8px; width: 16px; height: 16px; background: #667eea; border-radius: 50%; cursor: nesw-resize;"></div>
+                        <div style="position: absolute; bottom: -8px; left: -8px; width: 16px; height: 16px; background: #667eea; border-radius: 50%; cursor: nesw-resize;"></div>
+                        <div style="position: absolute; bottom: -8px; right: -8px; width: 16px; height: 16px; background: #667eea; border-radius: 50%; cursor: nwse-resize;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Video Controls Bar -->
+            <div style="background: rgba(0,0,0,0.9); padding: 12px; border-top: 1px solid #555;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                    <button id="playPauseBtn" onclick="toggleVideoPlayback()" 
+                            style="background: transparent; border: none; color: #e0e0e0; cursor: pointer; font-size: 18px; padding: 4px 8px;">
+                        ⏯
+                    </button>
+                    <span id="videoTimeDisplay" style="color: #e0e0e0; font-family: monospace; font-size: 12px; min-width: 100px;">0:00 / ${formatDuration(duration)}</span>
+                    <button onclick="toggleVideoMute()" 
+                            style="background: transparent; border: none; color: #e0e0e0; cursor: pointer; font-size: 16px; padding: 4px 8px;">
+                        🔊
+                    </button>
+                    <button onclick="toggleFullscreen()" 
+                            style="background: transparent; border: none; color: #e0e0e0; cursor: pointer; font-size: 16px; padding: 4px 8px; margin-left: auto;">
+                        ⛶
+                    </button>
+                </div>
+                <div style="position: relative;">
+                    <input type="range" id="videoTimeline" 
+                           min="0" max="100" value="0" step="0.1"
+                           style="width: 100%; height: 6px; -webkit-appearance: none; appearance: none; background: #555; border-radius: 3px; outline: none; cursor: pointer;">
+                    <!-- Trim Markers (shown in trim mode) -->
+                    <div id="trimMarkers" style="display: none; position: absolute; top: 0; left: 0; right: 0; height: 6px; pointer-events: none;">
+                        <div id="trimStartMarker" style="position: absolute; top: -4px; width: 2px; height: 14px; background: #51cf66; cursor: ew-resize; pointer-events: all;"></div>
+                        <div id="trimEndMarker" style="position: absolute; top: -4px; width: 2px; height: 14px; background: #51cf66; cursor: ew-resize; pointer-events: all;"></div>
+                        <div id="trimRegion" style="position: absolute; top: 0; height: 6px; background: rgba(81, 207, 102, 0.3); pointer-events: none;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Actions Panel -->
+            <div id="actionsPanel" style="background: #2a2a2a; padding: 20px; border-top: 1px solid #555;">
+                <h3 style="color: #e0e0e0; margin: 0 0 15px 0; font-size: 18px;">🎬 Video Actions</h3>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button onclick="activateTrimMode()" 
+                            style="flex: 1; min-width: 150px; padding: 12px 20px; background: #667eea; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500;">
+                        ⏱️ Trim Video
+                    </button>
+                    <button onclick="activateCropMode()" 
+                            style="flex: 1; min-width: 150px; padding: 12px 20px; background: #667eea; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500;">
+                        ✂️ Crop Video
+                    </button>
+                    <button onclick="closeVideoActionsOverlay()" 
+                            style="flex: 1; min-width: 150px; padding: 12px 20px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                        ✕ Close
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Trim Mode Panel (hidden by default) -->
+            <div id="trimModePanel" style="display: none; background: #2a2a2a; border-top: 1px solid #555;">
+                <div style="padding: 20px;">
+                    <h3 style="color: #e0e0e0; margin: 0 0 20px 0; font-size: 18px;">⏱️ Trim Video</h3>
+                    
+                    <!-- Visual Timeline for Trim Selection -->
+                    <div style="margin-bottom: 20px; padding: 15px; background: #1e1e1e; border-radius: 6px; border: 1px solid #555;">
+                        <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #e0e0e0; font-size: 13px; font-weight: 500;">Timeline</span>
+                            <span style="color: #999; font-size: 11px;">Drag markers or click timeline to set trim points</span>
+                        </div>
+                        <div style="position: relative; height: 60px; background: #2a2a2a; border-radius: 4px; border: 1px solid #555; margin-bottom: 10px; overflow: hidden;">
+                            <!-- Trim region highlight -->
+                            <div id="trimVisualRegion" style="position: absolute; top: 0; left: 0%; width: 100%; height: 100%; background: rgba(81, 207, 102, 0.2); pointer-events: none; border-left: 2px solid #51cf66; border-right: 2px solid #51cf66;"></div>
+                            <!-- Start marker -->
+                            <div id="trimVisualStartMarker" style="position: absolute; top: 0; left: 0%; width: 4px; height: 100%; background: #51cf66; cursor: ew-resize; z-index: 10; pointer-events: all;">
+                                <div style="position: absolute; top: -8px; left: -8px; width: 20px; height: 20px; background: #51cf66; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>
+                                <div style="position: absolute; bottom: -20px; left: -15px; width: 34px; text-align: center; color: #51cf66; font-size: 10px; font-weight: 600;">START</div>
+                            </div>
+                            <!-- End marker -->
+                            <div id="trimVisualEndMarker" style="position: absolute; top: 0; left: 100%; width: 4px; height: 100%; background: #51cf66; cursor: ew-resize; z-index: 10; pointer-events: all; margin-left: -4px;">
+                                <div style="position: absolute; top: -8px; left: -8px; width: 20px; height: 20px; background: #51cf66; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>
+                                <div style="position: absolute; bottom: -20px; left: -15px; width: 34px; text-align: center; color: #51cf66; font-size: 10px; font-weight: 600;">END</div>
+                            </div>
+                            <!-- Clickable timeline -->
+                            <div id="trimVisualTimeline" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; cursor: pointer; z-index: 5;"></div>
+                        </div>
+                        <!-- Time labels -->
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #999; margin-top: 5px;">
+                            <span id="trimStartTimeLabel">0:00</span>
+                            <span id="trimEndTimeLabel">${formatDuration(duration)}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Time Input Fields -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 8px; color: #e0e0e0; font-size: 13px; font-weight: 500;">
+                                🟢 Start Time
+                            </label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="number" id="trimStartInput" value="0" min="0" step="0.1"
+                                       style="flex: 1; padding: 10px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e; color: #e0e0e0; font-size: 14px; box-sizing: border-box;">
+                                <button onclick="setTrimStartToCurrent()" 
+                                        style="padding: 10px 16px; background: #51cf66; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap; font-weight: 500;">
+                                    ⏯ Set Now
+                                </button>
+                            </div>
+                            <div style="margin-top: 5px; font-size: 11px; color: #999;">
+                                Current: <span id="trimStartCurrentTime">0:00</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 8px; color: #e0e0e0; font-size: 13px; font-weight: 500;">
+                                🔴 End Time
+                            </label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="number" id="trimEndInput" value="${duration}" min="0" step="0.1"
+                                       style="flex: 1; padding: 10px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e; color: #e0e0e0; font-size: 14px; box-sizing: border-box;">
+                                <button onclick="setTrimEndToCurrent()" 
+                                        style="padding: 10px 16px; background: #ff6b6b; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap; font-weight: 500;">
+                                    ⏯ Set Now
+                                </button>
+                            </div>
+                            <div style="margin-top: 5px; font-size: 11px; color: #999;">
+                                Current: <span id="trimEndCurrentTime">${formatDuration(duration)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Duration Info -->
+                    <div style="margin-bottom: 15px; padding: 12px; background: #1e1e1e; border-radius: 4px; border-left: 3px solid #667eea;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span style="color: #999; font-size: 12px;">Original Duration:</span>
+                            <span style="color: #e0e0e0; font-size: 13px; font-weight: 500;">${formatDuration(duration)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="color: #999; font-size: 12px;">Trimmed Duration:</span>
+                            <span id="trimmedDurationDisplay" style="color: #51cf66; font-size: 14px; font-weight: 600;">${formatDuration(duration)}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Actions -->
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+                        <button onclick="resetTrim()" 
+                                style="padding: 10px 16px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-size: 13px; white-space: nowrap;">
+                            🔄 Reset to Full Video
+                        </button>
+                    </div>
+                </div>
+                <!-- Fixed Action Buttons Bar -->
+                <div style="background: #1e1e1e; padding: 15px 20px; border-top: 2px solid #555; display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; position: sticky; bottom: 0; z-index: 10;">
+                    <button onclick="previewTrim()" 
+                            style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500; white-space: nowrap;">
+                        👁️ Preview Trim
+                    </button>
+                    <button onclick="applyTrim()" 
+                            style="padding: 12px 24px; background: #667eea; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; white-space: nowrap; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);">
+                        ✓ Apply Trim
+                    </button>
+                    <button onclick="cancelTrim()" 
+                            style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500; white-space: nowrap;">
+                        ✕ Cancel
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Crop Mode Panel (hidden by default) -->
+            <div id="cropModePanel" style="display: none; background: #2a2a2a; border-top: 1px solid #555;">
+                <div style="padding: 20px;">
+                    <h3 style="color: #e0e0e0; margin: 0 0 15px 0; font-size: 18px;">✂️ Crop Video</h3>
+                    <div style="margin-bottom: 15px; padding: 10px; background: #1e1e1e; border-radius: 4px; color: #999; font-size: 12px;">
+                        Original Size: ${width}x${height}px
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 15px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: #e0e0e0; font-size: 13px;">X (left):</label>
+                            <input type="number" id="cropXInput" value="0" min="0" max="${width}" step="1"
+                                   style="width: 100%; padding: 10px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e; color: #e0e0e0; font-size: 14px; box-sizing: border-box;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: #e0e0e0; font-size: 13px;">Y (top):</label>
+                            <input type="number" id="cropYInput" value="0" min="0" max="${height}" step="1"
+                                   style="width: 100%; padding: 10px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e; color: #e0e0e0; font-size: 14px; box-sizing: border-box;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: #e0e0e0; font-size: 13px;">Width:</label>
+                            <input type="number" id="cropWidthInput" value="${width}" min="1" max="${width}" step="1"
+                                   style="width: 100%; padding: 10px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e; color: #e0e0e0; font-size: 14px; box-sizing: border-box;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: #e0e0e0; font-size: 13px;">Height:</label>
+                            <input type="number" id="cropHeightInput" value="${height}" min="1" max="${height}" step="1"
+                                   style="width: 100%; padding: 10px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e; color: #e0e0e0; font-size: 14px; box-sizing: border-box;">
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 15px; padding: 10px; background: #1e1e1e; border-radius: 4px; color: #999; font-size: 12px;">
+                        Crop Region: <span id="cropRegionDisplay" style="color: #e0e0e0; font-weight: 500;">${width}x${height} @ 0,0</span>
+                    </div>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+                        <button onclick="centerCrop()" 
+                                style="padding: 10px 16px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-size: 13px; white-space: nowrap;">
+                            Center Crop
+                        </button>
+                        <button onclick="resetCrop()" 
+                                style="padding: 10px 16px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-size: 13px; white-space: nowrap;">
+                            Reset
+                        </button>
+                        <select id="aspectRatioSelect" onchange="applyAspectRatio()"
+                                style="padding: 10px 16px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-size: 13px; flex: 1; min-width: 150px;">
+                            <option value="original">Aspect Ratio: Original</option>
+                            <option value="16:9">16:9</option>
+                            <option value="4:3">4:3</option>
+                            <option value="1:1">1:1</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                </div>
+                <!-- Fixed Action Buttons Bar -->
+                <div style="background: #1e1e1e; padding: 15px 20px; border-top: 2px solid #555; display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; position: sticky; bottom: 0; z-index: 10;">
+                    <button onclick="previewCrop()" 
+                            style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500; white-space: nowrap;">
+                        👁️ Preview Crop
+                    </button>
+                    <button onclick="applyCrop()" 
+                            style="padding: 12px 24px; background: #667eea; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; white-space: nowrap; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);">
+                        ✓ Apply Crop
+                    </button>
+                    <button onclick="cancelCrop()" 
+                            style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500; white-space: nowrap;">
+                        ✕ Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    videoActionsOverlay = overlay;
+    
+    // Load video
+    const video = document.getElementById('videoActionsPlayer');
+    video.src = `/v2p-formatter/media-converter/video-preview?path=${encodeURIComponent(filePath)}`;
+    video.load();
+    
+    // Initialize video controls
+    initVideoActionsControls();
+}
+
+function closeVideoActionsOverlay() {
+    if (videoActionsOverlay) {
+        const video = document.getElementById('videoActionsPlayer');
+        if (video) {
+            video.pause();
+            video.src = '';
+        }
+        videoActionsOverlay.remove();
+        videoActionsOverlay = null;
+        currentVideoState.mode = 'none';
+    }
+}
+
+function initVideoActionsControls() {
+    const video = document.getElementById('videoActionsPlayer');
+    const timeline = document.getElementById('videoTimeline');
+    const timeDisplay = document.getElementById('videoTimeDisplay');
+    
+    if (!video || !timeline) return;
+    
+    // Update timeline on video time update
+    video.addEventListener('timeupdate', function() {
+        if (video.duration > 0) {
+            const percent = (video.currentTime / video.duration) * 100;
+            timeline.value = percent;
+            timeDisplay.textContent = `${formatDuration(video.currentTime)} / ${formatDuration(video.duration)}`;
+        }
+    });
+    
+    // Seek on timeline change
+    timeline.addEventListener('input', function() {
+        if (video.duration > 0) {
+            const percent = parseFloat(timeline.value);
+            video.currentTime = (percent / 100) * video.duration;
+        }
+    });
+    
+    // Update time display on metadata load
+    video.addEventListener('loadedmetadata', function() {
+        timeDisplay.textContent = `0:00 / ${formatDuration(video.duration)}`;
+        currentVideoState.duration = video.duration;
+        currentVideoState.trimEnd = video.duration;
+        if (document.getElementById('trimEndInput')) {
+            document.getElementById('trimEndInput').max = video.duration;
+            document.getElementById('trimEndInput').value = video.duration;
+        }
+    });
+}
+
+function toggleVideoPlayback() {
+    const video = document.getElementById('videoActionsPlayer');
+    const btn = document.getElementById('playPauseBtn');
+    if (!video) return;
+    
+    if (video.paused) {
+        video.play();
+        btn.textContent = '⏸';
+    } else {
+        video.pause();
+        btn.textContent = '⏯';
+    }
+}
+
+function toggleVideoMute() {
+    const video = document.getElementById('videoActionsPlayer');
+    if (!video) return;
+    video.muted = !video.muted;
+}
+
+function toggleFullscreen() {
+    const container = document.getElementById('videoPlayerContainer');
+    if (!container) return;
+    
+    if (!document.fullscreenElement) {
+        container.requestFullscreen().catch(err => {
+            debug('Error attempting to enable fullscreen: ' + err.message, 'error');
+        });
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+// Trim Mode Functions
+function activateTrimMode() {
+    currentVideoState.mode = 'trim';
+    document.getElementById('actionsPanel').style.display = 'none';
+    document.getElementById('trimModePanel').style.display = 'block';
+    document.getElementById('trimMarkers').style.display = 'block';
+    updateTrimMarkers();
+    updateTrimVisualTimeline();
+    updateTrimmedDuration();
+    // Initialize marker dragging and visual timeline after a short delay to ensure DOM is ready
+    setTimeout(() => {
+        initTrimMarkerDragging();
+        initTrimVisualTimeline();
+    }, 100);
+}
+
+function cancelTrim() {
+    currentVideoState.mode = 'none';
+    document.getElementById('actionsPanel').style.display = 'block';
+    document.getElementById('trimModePanel').style.display = 'none';
+    document.getElementById('trimMarkers').style.display = 'none';
+    resetTrim();
+}
+
+function resetTrim() {
+    currentVideoState.trimStart = 0;
+    currentVideoState.trimEnd = currentVideoState.duration;
+    document.getElementById('trimStartInput').value = 0;
+    document.getElementById('trimEndInput').value = currentVideoState.duration;
+    updateTrimMarkers();
+    updateTrimVisualTimeline();
+    updateTrimmedDuration();
+}
+
+function setTrimStartToCurrent() {
+    const video = document.getElementById('videoActionsPlayer');
+    if (!video) return;
+    const time = video.currentTime;
+    currentVideoState.trimStart = Math.max(0, Math.min(time, currentVideoState.trimEnd - 0.1));
+    document.getElementById('trimStartInput').value = currentVideoState.trimStart.toFixed(1);
+    updateTrimMarkers();
+    updateTrimVisualTimeline();
+    updateTrimmedDuration();
+}
+
+function setTrimEndToCurrent() {
+    const video = document.getElementById('videoActionsPlayer');
+    if (!video) return;
+    const time = video.currentTime;
+    currentVideoState.trimEnd = Math.max(currentVideoState.trimStart + 0.1, Math.min(time, currentVideoState.duration));
+    document.getElementById('trimEndInput').value = currentVideoState.trimEnd.toFixed(1);
+    updateTrimMarkers();
+    updateTrimVisualTimeline();
+    updateTrimmedDuration();
+}
+
+function updateTrimMarkers() {
+    const startPercent = (currentVideoState.trimStart / currentVideoState.duration) * 100;
+    const endPercent = (currentVideoState.trimEnd / currentVideoState.duration) * 100;
+    const startMarker = document.getElementById('trimStartMarker');
+    const endMarker = document.getElementById('trimEndMarker');
+    const region = document.getElementById('trimRegion');
+    
+    if (startMarker) {
+        startMarker.style.left = startPercent + '%';
+    }
+    if (endMarker) {
+        endMarker.style.left = endPercent + '%';
+    }
+    if (region) {
+        region.style.left = startPercent + '%';
+        region.style.width = (endPercent - startPercent) + '%';
+    }
+    
+    // Also update visual timeline
+    updateTrimVisualTimeline();
+}
+
+function updateTrimVisualTimeline() {
+    if (currentVideoState.mode !== 'trim') return;
+    
+    const startPercent = (currentVideoState.trimStart / currentVideoState.duration) * 100;
+    const endPercent = (currentVideoState.trimEnd / currentVideoState.duration) * 100;
+    
+    const visualStartMarker = document.getElementById('trimVisualStartMarker');
+    const visualEndMarker = document.getElementById('trimVisualEndMarker');
+    const visualRegion = document.getElementById('trimVisualRegion');
+    const startTimeLabel = document.getElementById('trimStartTimeLabel');
+    const endTimeLabel = document.getElementById('trimEndTimeLabel');
+    
+    if (visualStartMarker) {
+        visualStartMarker.style.left = Math.max(0, Math.min(100, startPercent)) + '%';
+    }
+    if (visualEndMarker) {
+        visualEndMarker.style.left = Math.max(0, Math.min(100, endPercent)) + '%';
+    }
+    if (visualRegion) {
+        const left = Math.max(0, Math.min(100, startPercent));
+        const width = Math.max(0, Math.min(100 - left, endPercent - startPercent));
+        visualRegion.style.left = left + '%';
+        visualRegion.style.width = width + '%';
+    }
+    if (startTimeLabel) {
+        startTimeLabel.textContent = formatDuration(currentVideoState.trimStart);
+    }
+    if (endTimeLabel) {
+        endTimeLabel.textContent = formatDuration(currentVideoState.trimEnd);
+    }
+    
+    // Update current time displays
+    const video = document.getElementById('videoActionsPlayer');
+    if (video) {
+        const startCurrent = document.getElementById('trimStartCurrentTime');
+        const endCurrent = document.getElementById('trimEndCurrentTime');
+        if (startCurrent) {
+            startCurrent.textContent = formatDuration(video.currentTime);
+        }
+        if (endCurrent) {
+            endCurrent.textContent = formatDuration(video.currentTime);
+        }
+    }
+}
+
+function initTrimVisualTimeline() {
+    const visualTimeline = document.getElementById('trimVisualTimeline');
+    const visualStartMarker = document.getElementById('trimVisualStartMarker');
+    const visualEndMarker = document.getElementById('trimVisualEndMarker');
+    
+    if (!visualTimeline || !visualStartMarker || !visualEndMarker) return;
+    
+    let draggingMarker = null;
+    let dragStartX = 0;
+    let dragStartPercent = 0;
+    
+    // Handle clicking on timeline to set trim points
+    visualTimeline.addEventListener('click', function(e) {
+        const rect = visualTimeline.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickPercent = (clickX / rect.width) * 100;
+        const clickTime = (clickPercent / 100) * currentVideoState.duration;
+        
+        // Determine which marker is closer
+        const startDist = Math.abs(clickPercent - (currentVideoState.trimStart / currentVideoState.duration * 100));
+        const endDist = Math.abs(clickPercent - (currentVideoState.trimEnd / currentVideoState.duration * 100));
+        
+        if (startDist < endDist && startDist < 10) {
+            // Set start marker
+            currentVideoState.trimStart = Math.max(0, Math.min(clickTime, currentVideoState.trimEnd - 0.1));
+            document.getElementById('trimStartInput').value = currentVideoState.trimStart.toFixed(1);
+        } else if (endDist < 10) {
+            // Set end marker
+            currentVideoState.trimEnd = Math.max(currentVideoState.trimStart + 0.1, Math.min(clickTime, currentVideoState.duration));
+            document.getElementById('trimEndInput').value = currentVideoState.trimEnd.toFixed(1);
+        } else {
+            // Set the closer marker, or set start if in first half, end if in second half
+            if (clickPercent < 50) {
+                currentVideoState.trimStart = Math.max(0, Math.min(clickTime, currentVideoState.trimEnd - 0.1));
+                document.getElementById('trimStartInput').value = currentVideoState.trimStart.toFixed(1);
+            } else {
+                currentVideoState.trimEnd = Math.max(currentVideoState.trimStart + 0.1, Math.min(clickTime, currentVideoState.duration));
+                document.getElementById('trimEndInput').value = currentVideoState.trimEnd.toFixed(1);
+            }
+        }
+        
+        updateTrimVisualTimeline();
+        updateTrimMarkers();
+        updateTrimmedDuration();
+    });
+    
+    // Handle dragging visual markers
+    function startDrag(marker, isStart) {
+        return function(e) {
+            draggingMarker = isStart ? 'start' : 'end';
+            dragStartX = e.clientX;
+            const rect = visualTimeline.getBoundingClientRect();
+            dragStartPercent = isStart ? 
+                (currentVideoState.trimStart / currentVideoState.duration * 100) : 
+                (currentVideoState.trimEnd / currentVideoState.duration * 100);
+            e.preventDefault();
+            e.stopPropagation();
+        };
+    }
+    
+    function onDrag(e) {
+        if (!draggingMarker) return;
+        
+        const rect = visualTimeline.getBoundingClientRect();
+        const deltaX = e.clientX - dragStartX;
+        const deltaPercent = (deltaX / rect.width) * 100;
+        const newPercent = Math.max(0, Math.min(100, dragStartPercent + deltaPercent));
+        const newTime = (newPercent / 100) * currentVideoState.duration;
+        
+        if (draggingMarker === 'start') {
+            currentVideoState.trimStart = Math.max(0, Math.min(newTime, currentVideoState.trimEnd - 0.1));
+            document.getElementById('trimStartInput').value = currentVideoState.trimStart.toFixed(1);
+        } else {
+            currentVideoState.trimEnd = Math.max(currentVideoState.trimStart + 0.1, Math.min(newTime, currentVideoState.duration));
+            document.getElementById('trimEndInput').value = currentVideoState.trimEnd.toFixed(1);
+        }
+        
+        updateTrimVisualTimeline();
+        updateTrimMarkers();
+        updateTrimmedDuration();
+    }
+    
+    function endDrag() {
+        draggingMarker = null;
+    }
+    
+    visualStartMarker.addEventListener('mousedown', startDrag(visualStartMarker, true));
+    visualEndMarker.addEventListener('mousedown', startDrag(visualEndMarker, false));
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('mouseup', endDrag);
+    
+    // Update visual timeline when video time changes
+    const video = document.getElementById('videoActionsPlayer');
+    if (video) {
+        video.addEventListener('timeupdate', function() {
+            if (currentVideoState.mode === 'trim') {
+                const startCurrent = document.getElementById('trimStartCurrentTime');
+                const endCurrent = document.getElementById('trimEndCurrentTime');
+                if (startCurrent) {
+                    startCurrent.textContent = formatDuration(video.currentTime);
+                }
+                if (endCurrent) {
+                    endCurrent.textContent = formatDuration(video.currentTime);
+                }
+            }
+        });
+    }
+}
+
+function updateTrimmedDuration() {
+    const duration = currentVideoState.trimEnd - currentVideoState.trimStart;
+    const display = document.getElementById('trimmedDurationDisplay');
+    if (display) {
+        display.textContent = formatDuration(duration);
+    }
+}
+
+// Trim input handlers
+document.addEventListener('input', function(e) {
+    if (e.target.id === 'trimStartInput') {
+        const value = parseFloat(e.target.value) || 0;
+        currentVideoState.trimStart = Math.max(0, Math.min(value, currentVideoState.trimEnd - 0.1));
+        e.target.value = currentVideoState.trimStart.toFixed(1);
+        updateTrimMarkers();
+        updateTrimVisualTimeline();
+        updateTrimmedDuration();
+    } else if (e.target.id === 'trimEndInput') {
+        const value = parseFloat(e.target.value) || currentVideoState.duration;
+        currentVideoState.trimEnd = Math.max(currentVideoState.trimStart + 0.1, Math.min(value, currentVideoState.duration));
+        e.target.value = currentVideoState.trimEnd.toFixed(1);
+        updateTrimMarkers();
+        updateTrimVisualTimeline();
+        updateTrimmedDuration();
+    }
+});
+
+function previewTrim() {
+    const video = document.getElementById('videoActionsPlayer');
+    if (!video) return;
+    
+    video.currentTime = currentVideoState.trimStart;
+    video.play();
+    
+    // Pause at end
+    const checkEnd = setInterval(function() {
+        if (video.currentTime >= currentVideoState.trimEnd || video.paused) {
+            video.pause();
+            clearInterval(checkEnd);
+        }
+    }, 100);
+}
+
+function applyTrim() {
+    // Validation
+    if (currentVideoState.trimEnd <= currentVideoState.trimStart) {
+        const errorMsg = `Invalid trim range: start=${currentVideoState.trimStart}, end=${currentVideoState.trimEnd}`;
+        debug(errorMsg, 'error');
+        console.error('Trim validation failed:', { trimStart: currentVideoState.trimStart, trimEnd: currentVideoState.trimEnd });
+        alert('End time must be greater than start time');
+        return;
+    }
+    
+    // Prepare request data
+    const requestData = {
+        file_path: currentVideoState.filePath,
+        start_time: currentVideoState.trimStart,
+        end_time: currentVideoState.trimEnd,
+        quality: 'medium'
+    };
+    
+    debug(`Applying trim: ${currentVideoState.filePath}`, 'info');
+    debug(`Trim parameters: ${JSON.stringify(requestData, null, 2)}`, 'info');
+    console.log('Trim request data:', requestData);
+    console.log('Current video state:', currentVideoState);
+    
+    // Show loading state
+    const applyBtn = document.querySelector('button[onclick*="applyTrim()"]');
+    const originalBtnText = applyBtn ? applyBtn.textContent : '';
+    if (applyBtn) {
+        applyBtn.disabled = true;
+        applyBtn.textContent = '⏳ Processing...';
+    }
+    
+    fetch('/v2p-formatter/media-converter/trim-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => {
+        console.log('Response status:', response.status, response.statusText);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        // Check if response is OK before parsing JSON
+        if (!response.ok) {
+            return response.text().then(text => {
+                console.error('Non-OK response body:', text);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}. Response: ${text}`);
+            });
+        }
+        
+        return response.json().then(data => {
+            console.log('Response data:', data);
+            return { response, data };
+        });
+    })
+    .then(({ response, data }) => {
+        if (applyBtn) {
+            applyBtn.disabled = false;
+            applyBtn.textContent = originalBtnText || '✓ Apply Trim';
+        }
+        
+        if (data.success) {
+            debug(`Video trimmed successfully: ${data.output_path}`, 'success');
+            console.log('Trim successful:', data);
+            
+            // Show detailed success message with file location
+            const outputPath = data.output_path || 'Unknown';
+            const fileName = outputPath.split('/').pop() || outputPath.split('\\\\').pop() || 'trimmed_video.mp4';
+            const fileSize = data.output_size_mb || 0;
+            const duration = data.trimmed_duration || 0;
+            
+            // Create a better success message with download option
+            const successMsg = `✅ Video trimmed successfully!\\n\\n` +
+                `📁 Output File: ${fileName}\\n` +
+                `📊 Size: ${fileSize} MB\\n` +
+                `⏱️ Duration: ${formatDuration(duration)}\\n` +
+                `📍 Saved to: OUTPUT folder\\n\\n` +
+                `ℹ️ Note: The trimmed file is saved in the OUTPUT folder.\\n` +
+                `The original file remains unchanged in the INPUT folder.`;
+            
+            // Show success message
+            alert(successMsg);
+            
+            // Offer to download the file
+            // Extract relative path from output folder
+            const outputPathStr = outputPath.toString();
+            const outputFolderMatch = outputPathStr.match(/[\\/]output[\\/](.+)$/);
+            const relativePath = outputFolderMatch ? outputFolderMatch[1] : outputPathStr.split(/[\\/]/).pop();
+            
+            const downloadUrl = `/v2p-formatter/media-converter/download/${encodeURIComponent(relativePath)}`;
+            console.log('Download URL:', downloadUrl);
+            console.log('Output path:', outputPath);
+            console.log('Relative path:', relativePath);
+            
+            if (confirm('Would you like to download the trimmed file now?')) {
+                // Create a temporary link to download the file
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = fileName;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+            
+            closeVideoActionsOverlay();
+            // Don't reload input files since the trimmed file is in output folder
+        } else {
+            const errorDetails = {
+                error: data.error || 'Unknown error',
+                error_type: data.error_type || 'Unknown',
+                ffmpeg_stderr: data.ffmpeg_stderr || null,
+                ffmpeg_stdout: data.ffmpeg_stdout || null,
+                processing_time: data.processing_time || null
+            };
+            
+            debug('Error trimming video: ' + JSON.stringify(errorDetails, null, 2), 'error');
+            console.error('Trim error details:', errorDetails);
+            console.error('Full error response:', data);
+            
+            let errorMessage = `Error: ${errorDetails.error}`;
+            if (errorDetails.error_type) {
+                errorMessage += `\\nError Type: ${errorDetails.error_type}`;
+            }
+            if (errorDetails.ffmpeg_stderr) {
+                errorMessage += `\\n\\nFFmpeg Error:\\n${errorDetails.ffmpeg_stderr.substring(0, 500)}`;
+            }
+            if (errorDetails.processing_time) {
+                errorMessage += `\\nProcessing Time: ${errorDetails.processing_time}s`;
+            }
+            
+            alert(errorMessage);
+        }
+    })
+    .catch(err => {
+        if (applyBtn) {
+            applyBtn.disabled = false;
+            applyBtn.textContent = originalBtnText || '✓ Apply Trim';
+        }
+        
+        const errorMsg = `Network/Parse Error: ${err.message}`;
+        debug(errorMsg, 'error');
+        console.error('Trim fetch error:', err);
+        console.error('Error stack:', err.stack);
+        console.error('Request data that failed:', requestData);
+        
+        alert(`Error: ${err.message}\\n\\nCheck browser console for details.`);
+    });
+}
+
+// Crop Mode Functions
+function activateCropMode() {
+    currentVideoState.mode = 'crop';
+    document.getElementById('actionsPanel').style.display = 'none';
+    document.getElementById('cropModePanel').style.display = 'block';
+    document.getElementById('cropOverlay').style.display = 'block';
+    initCropOverlay();
+}
+
+function cancelCrop() {
+    currentVideoState.mode = 'none';
+    document.getElementById('actionsPanel').style.display = 'block';
+    document.getElementById('cropModePanel').style.display = 'none';
+    document.getElementById('cropOverlay').style.display = 'none';
+    resetCrop();
+}
+
+function resetCrop() {
+    currentVideoState.cropX = 0;
+    currentVideoState.cropY = 0;
+    currentVideoState.cropWidth = currentVideoState.width;
+    currentVideoState.cropHeight = currentVideoState.height;
+    updateCropInputs();
+    updateCropOverlay();
+}
+
+function centerCrop() {
+    const video = document.getElementById('videoPlayerContainer');
+    if (!video) return;
+    
+    const rect = video.getBoundingClientRect();
+    const videoWidth = rect.width;
+    const videoHeight = rect.height;
+    
+    // Center crop region
+    currentVideoState.cropX = Math.max(0, (currentVideoState.width - currentVideoState.cropWidth) / 2);
+    currentVideoState.cropY = Math.max(0, (currentVideoState.height - currentVideoState.cropHeight) / 2);
+    
+    updateCropInputs();
+    updateCropOverlay();
+}
+
+function applyAspectRatio() {
+    const select = document.getElementById('aspectRatioSelect');
+    const ratio = select.value;
+    
+    if (ratio === 'original') {
+        resetCrop();
+        return;
+    }
+    
+    if (ratio === 'custom') {
+        return; // User can manually adjust
+    }
+    
+    const [w, h] = ratio.split(':').map(Number);
+    const aspectRatio = w / h;
+    
+    // Calculate crop dimensions maintaining aspect ratio
+    let newWidth = currentVideoState.cropWidth;
+    let newHeight = newWidth / aspectRatio;
+    
+    if (newHeight > currentVideoState.height) {
+        newHeight = currentVideoState.height;
+        newWidth = newHeight * aspectRatio;
+    }
+    
+    currentVideoState.cropWidth = Math.min(newWidth, currentVideoState.width);
+    currentVideoState.cropHeight = Math.min(newHeight, currentVideoState.height);
+    
+    // Center the crop
+    currentVideoState.cropX = Math.max(0, (currentVideoState.width - currentVideoState.cropWidth) / 2);
+    currentVideoState.cropY = Math.max(0, (currentVideoState.height - currentVideoState.cropHeight) / 2);
+    
+    updateCropInputs();
+    updateCropOverlay();
+}
+
+function initCropOverlay() {
+    const cropRect = document.getElementById('cropRectangle');
+    if (!cropRect) return;
+    
+    let isDragging = false;
+    let isResizing = false;
+    let resizeHandle = null;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let startX = 0;
+    let startY = 0;
+    let startWidth = 0;
+    let startHeight = 0;
+    
+    // Handle dragging the crop rectangle
+    cropRect.addEventListener('mousedown', function(e) {
+        if (e.target === cropRect || e.target.parentElement === cropRect) {
+            isDragging = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            startX = currentVideoState.cropX;
+            startY = currentVideoState.cropY;
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+    
+    // Handle resizing via corner handles
+    const handles = cropRect.querySelectorAll('div[style*="background: #667eea"]');
+    handles.forEach(function(handle) {
+        handle.addEventListener('mousedown', function(e) {
+            isResizing = true;
+            resizeHandle = handle;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            startX = currentVideoState.cropX;
+            startY = currentVideoState.cropY;
+            startWidth = currentVideoState.cropWidth;
+            startHeight = currentVideoState.cropHeight;
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
+    
+    document.addEventListener('mousemove', function(e) {
+        const video = document.getElementById('videoPlayerContainer');
+        if (!video) return;
+        
+        const rect = video.getBoundingClientRect();
+        const scaleX = currentVideoState.width / rect.width;
+        const scaleY = currentVideoState.height / rect.height;
+        
+        if (isResizing && resizeHandle) {
+            const deltaX = (e.clientX - dragStartX) * scaleX;
+            const deltaY = (e.clientY - dragStartY) * scaleY;
+            
+            // Determine which corner is being dragged
+            const isTopLeft = resizeHandle.style.top === '-8px' && resizeHandle.style.left === '-8px';
+            const isTopRight = resizeHandle.style.top === '-8px' && resizeHandle.style.right === '-8px';
+            const isBottomLeft = resizeHandle.style.bottom === '-8px' && resizeHandle.style.left === '-8px';
+            const isBottomRight = resizeHandle.style.bottom === '-8px' && resizeHandle.style.right === '-8px';
+            
+            if (isTopLeft) {
+                currentVideoState.cropX = Math.max(0, Math.min(startX + deltaX, startX + startWidth - 10));
+                currentVideoState.cropY = Math.max(0, Math.min(startY + deltaY, startY + startHeight - 10));
+                currentVideoState.cropWidth = Math.max(10, startWidth - deltaX);
+                currentVideoState.cropHeight = Math.max(10, startHeight - deltaY);
+            } else if (isTopRight) {
+                currentVideoState.cropY = Math.max(0, Math.min(startY + deltaY, startY + startHeight - 10));
+                currentVideoState.cropWidth = Math.max(10, startWidth + deltaX);
+                currentVideoState.cropHeight = Math.max(10, startHeight - deltaY);
+            } else if (isBottomLeft) {
+                currentVideoState.cropX = Math.max(0, Math.min(startX + deltaX, startX + startWidth - 10));
+                currentVideoState.cropWidth = Math.max(10, startWidth - deltaX);
+                currentVideoState.cropHeight = Math.max(10, startHeight + deltaY);
+            } else if (isBottomRight) {
+                currentVideoState.cropWidth = Math.max(10, Math.min(startWidth + deltaX, currentVideoState.width - currentVideoState.cropX));
+                currentVideoState.cropHeight = Math.max(10, Math.min(startHeight + deltaY, currentVideoState.height - currentVideoState.cropY));
+            }
+            
+            // Ensure crop stays within bounds
+            currentVideoState.cropX = Math.max(0, Math.min(currentVideoState.cropX, currentVideoState.width - currentVideoState.cropWidth));
+            currentVideoState.cropY = Math.max(0, Math.min(currentVideoState.cropY, currentVideoState.height - currentVideoState.cropHeight));
+            currentVideoState.cropWidth = Math.min(currentVideoState.cropWidth, currentVideoState.width - currentVideoState.cropX);
+            currentVideoState.cropHeight = Math.min(currentVideoState.cropHeight, currentVideoState.height - currentVideoState.cropY);
+            
+            updateCropOverlay();
+            updateCropInputs();
+        } else if (isDragging) {
+            const deltaX = (e.clientX - dragStartX) * scaleX;
+            const deltaY = (e.clientY - dragStartY) * scaleY;
+            
+            currentVideoState.cropX = Math.max(0, Math.min(currentVideoState.width - currentVideoState.cropWidth, startX + deltaX));
+            currentVideoState.cropY = Math.max(0, Math.min(currentVideoState.height - currentVideoState.cropHeight, startY + deltaY));
+            
+            updateCropOverlay();
+            updateCropInputs();
+        }
+    });
+    
+    document.addEventListener('mouseup', function() {
+        isDragging = false;
+        isResizing = false;
+        resizeHandle = null;
+    });
+    
+    // Update crop overlay on window resize
+    window.addEventListener('resize', function() {
+        if (currentVideoState.mode === 'crop') {
+            updateCropOverlay();
+        }
+    });
+    
+    updateCropOverlay();
+}
+
+function updateCropOverlay() {
+    const cropRect = document.getElementById('cropRectangle');
+    const video = document.getElementById('videoPlayerContainer');
+    if (!cropRect || !video) return;
+    
+    const rect = video.getBoundingClientRect();
+    const scaleX = rect.width / currentVideoState.width;
+    const scaleY = rect.height / currentVideoState.height;
+    
+    cropRect.style.left = (currentVideoState.cropX * scaleX) + 'px';
+    cropRect.style.top = (currentVideoState.cropY * scaleY) + 'px';
+    cropRect.style.width = (currentVideoState.cropWidth * scaleX) + 'px';
+    cropRect.style.height = (currentVideoState.cropHeight * scaleY) + 'px';
+}
+
+function updateCropInputs() {
+    document.getElementById('cropXInput').value = Math.round(currentVideoState.cropX);
+    document.getElementById('cropYInput').value = Math.round(currentVideoState.cropY);
+    document.getElementById('cropWidthInput').value = Math.round(currentVideoState.cropWidth);
+    document.getElementById('cropHeightInput').value = Math.round(currentVideoState.cropHeight);
+    
+    const display = document.getElementById('cropRegionDisplay');
+    if (display) {
+        display.textContent = `${Math.round(currentVideoState.cropWidth)}x${Math.round(currentVideoState.cropHeight)} @ ${Math.round(currentVideoState.cropX)},${Math.round(currentVideoState.cropY)}`;
+    }
+}
+
+// Crop input handlers
+document.addEventListener('input', function(e) {
+    if (e.target.id === 'cropXInput') {
+        currentVideoState.cropX = Math.max(0, Math.min(currentVideoState.width - currentVideoState.cropWidth, parseInt(e.target.value) || 0));
+        updateCropOverlay();
+    } else if (e.target.id === 'cropYInput') {
+        currentVideoState.cropY = Math.max(0, Math.min(currentVideoState.height - currentVideoState.cropHeight, parseInt(e.target.value) || 0));
+        updateCropOverlay();
+    } else if (e.target.id === 'cropWidthInput') {
+        const width = parseInt(e.target.value) || currentVideoState.width;
+        currentVideoState.cropWidth = Math.max(1, Math.min(currentVideoState.width - currentVideoState.cropX, width));
+        updateCropOverlay();
+    } else if (e.target.id === 'cropHeightInput') {
+        const height = parseInt(e.target.value) || currentVideoState.height;
+        currentVideoState.cropHeight = Math.max(1, Math.min(currentVideoState.height - currentVideoState.cropY, height));
+        updateCropOverlay();
+    }
+});
+
+function previewCrop() {
+    // For preview, we could show a cropped version, but for now just show the crop region
+    alert('Crop preview: The crop region is shown on the video. Apply crop to see the result.');
+}
+
+function applyCrop() {
+    // Validation
+    if (currentVideoState.cropWidth <= 0 || currentVideoState.cropHeight <= 0) {
+        const errorMsg = `Invalid crop dimensions: width=${currentVideoState.cropWidth}, height=${currentVideoState.cropHeight}`;
+        debug(errorMsg, 'error');
+        console.error('Crop validation failed:', { cropWidth: currentVideoState.cropWidth, cropHeight: currentVideoState.cropHeight });
+        alert('Crop width and height must be greater than 0');
+        return;
+    }
+    
+    if (currentVideoState.cropX + currentVideoState.cropWidth > currentVideoState.width ||
+        currentVideoState.cropY + currentVideoState.cropHeight > currentVideoState.height) {
+        const errorMsg = `Crop region exceeds video dimensions: crop(${currentVideoState.cropX + currentVideoState.cropWidth}, ${currentVideoState.cropY + currentVideoState.cropHeight}) > video(${currentVideoState.width}, ${currentVideoState.height})`;
+        debug(errorMsg, 'error');
+        console.error('Crop bounds validation failed:', {
+            cropX: currentVideoState.cropX,
+            cropY: currentVideoState.cropY,
+            cropWidth: currentVideoState.cropWidth,
+            cropHeight: currentVideoState.cropHeight,
+            videoWidth: currentVideoState.width,
+            videoHeight: currentVideoState.height
+        });
+        alert('Crop region exceeds video dimensions');
+        return;
+    }
+    
+    // Prepare request data
+    const requestData = {
+        file_path: currentVideoState.filePath,
+        x: Math.round(currentVideoState.cropX),
+        y: Math.round(currentVideoState.cropY),
+        width: Math.round(currentVideoState.cropWidth),
+        height: Math.round(currentVideoState.cropHeight),
+        quality: 'medium'
+    };
+    
+    debug(`Applying crop: ${currentVideoState.filePath}`, 'info');
+    debug(`Crop parameters: ${JSON.stringify(requestData, null, 2)}`, 'info');
+    console.log('Crop request data:', requestData);
+    console.log('Current video state:', currentVideoState);
+    
+    // Show loading state
+    const applyBtn = document.querySelector('button[onclick*="applyCrop()"]');
+    const originalBtnText = applyBtn ? applyBtn.textContent : '';
+    if (applyBtn) {
+        applyBtn.disabled = true;
+        applyBtn.textContent = '⏳ Processing...';
+    }
+    
+    fetch('/v2p-formatter/media-converter/crop-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => {
+        console.log('Response status:', response.status, response.statusText);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        // Check if response is OK before parsing JSON
+        if (!response.ok) {
+            return response.text().then(text => {
+                console.error('Non-OK response body:', text);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}. Response: ${text}`);
+            });
+        }
+        
+        return response.json().then(data => {
+            console.log('Response data:', data);
+            return { response, data };
+        });
+    })
+    .then(({ response, data }) => {
+        if (applyBtn) {
+            applyBtn.disabled = false;
+            applyBtn.textContent = originalBtnText || '✓ Apply Crop';
+        }
+        
+        if (data.success) {
+            debug(`Video cropped successfully: ${data.output_path}`, 'success');
+            console.log('Crop successful:', data);
+            
+            // Show detailed success message with file location
+            const outputPath = data.output_path || 'Unknown';
+            const fileName = outputPath.split('/').pop() || outputPath.split('\\\\').pop() || 'cropped_video.mp4';
+            const fileSize = data.output_size_mb || 0;
+            
+            // Create a better success message with download option
+            const successMsg = `✅ Video cropped successfully!\\n\\n` +
+                `📁 Output File: ${fileName}\\n` +
+                `📊 Size: ${fileSize} MB\\n` +
+                `📍 Saved to: OUTPUT folder\\n\\n` +
+                `ℹ️ Note: The cropped file is saved in the OUTPUT folder.\\n` +
+                `The original file remains unchanged in the INPUT folder.`;
+            
+            // Show success message
+            alert(successMsg);
+            
+            // Offer to download the file
+            // Extract relative path from output folder
+            const outputPathStr = outputPath.toString();
+            const outputFolderMatch = outputPathStr.match(/[\\/]output[\\/](.+)$/);
+            const relativePath = outputFolderMatch ? outputFolderMatch[1] : outputPathStr.split(/[\\/]/).pop();
+            
+            const downloadUrl = `/v2p-formatter/media-converter/download/${encodeURIComponent(relativePath)}`;
+            console.log('Download URL:', downloadUrl);
+            console.log('Output path:', outputPath);
+            console.log('Relative path:', relativePath);
+            
+            if (confirm('Would you like to download the cropped file now?')) {
+                // Create a temporary link to download the file
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = fileName;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+            
+            closeVideoActionsOverlay();
+            // Don't reload input files since the cropped file is in output folder
+        } else {
+            const errorDetails = {
+                error: data.error || 'Unknown error',
+                error_type: data.error_type || 'Unknown',
+                ffmpeg_stderr: data.ffmpeg_stderr || null,
+                ffmpeg_stdout: data.ffmpeg_stdout || null,
+                processing_time: data.processing_time || null
+            };
+            
+            debug('Error cropping video: ' + JSON.stringify(errorDetails, null, 2), 'error');
+            console.error('Crop error details:', errorDetails);
+            console.error('Full error response:', data);
+            
+            let errorMessage = `Error: ${errorDetails.error}`;
+            if (errorDetails.error_type) {
+                errorMessage += `\\nError Type: ${errorDetails.error_type}`;
+            }
+            if (errorDetails.ffmpeg_stderr) {
+                errorMessage += `\\n\\nFFmpeg Error:\\n${errorDetails.ffmpeg_stderr.substring(0, 500)}`;
+            }
+            if (errorDetails.processing_time) {
+                errorMessage += `\\nProcessing Time: ${errorDetails.processing_time}s`;
+            }
+            
+            alert(errorMessage);
+        }
+    })
+    .catch(err => {
+        if (applyBtn) {
+            applyBtn.disabled = false;
+            applyBtn.textContent = originalBtnText || '✓ Apply Crop';
+        }
+        
+        const errorMsg = `Network/Parse Error: ${err.message}`;
+        debug(errorMsg, 'error');
+        console.error('Crop fetch error:', err);
+        console.error('Error stack:', err.stack);
+        console.error('Request data that failed:', requestData);
+        
+        alert(`Error: ${err.message}\\n\\nCheck browser console for details.`);
+    });
+}
+
+// Initialize trim marker dragging
+function initTrimMarkerDragging() {
+    const startMarker = document.getElementById('trimStartMarker');
+    const endMarker = document.getElementById('trimEndMarker');
+    const timeline = document.getElementById('videoTimeline');
+    
+    if (!startMarker || !endMarker || !timeline) return;
+    
+    let draggingMarker = null;
+    let dragStartX = 0;
+    let dragStartPercent = 0;
+    
+    function startDrag(marker, isStart) {
+        return function(e) {
+            draggingMarker = isStart ? 'start' : 'end';
+            dragStartX = e.clientX;
+            const rect = timeline.getBoundingClientRect();
+            dragStartPercent = isStart ? currentVideoState.trimStart / currentVideoState.duration * 100 : currentVideoState.trimEnd / currentVideoState.duration * 100;
+            e.preventDefault();
+        };
+    }
+    
+    function onDrag(e) {
+        if (!draggingMarker) return;
+        
+        const rect = timeline.getBoundingClientRect();
+        const deltaX = e.clientX - dragStartX;
+        const deltaPercent = (deltaX / rect.width) * 100;
+        const newPercent = Math.max(0, Math.min(100, dragStartPercent + deltaPercent));
+        const newTime = (newPercent / 100) * currentVideoState.duration;
+        
+        if (draggingMarker === 'start') {
+            currentVideoState.trimStart = Math.max(0, Math.min(newTime, currentVideoState.trimEnd - 0.1));
+            document.getElementById('trimStartInput').value = currentVideoState.trimStart.toFixed(1);
+        } else {
+            currentVideoState.trimEnd = Math.max(currentVideoState.trimStart + 0.1, Math.min(newTime, currentVideoState.duration));
+            document.getElementById('trimEndInput').value = currentVideoState.trimEnd.toFixed(1);
+        }
+        
+        updateTrimMarkers();
+        updateTrimmedDuration();
+    }
+    
+    function endDrag() {
+        draggingMarker = null;
+    }
+    
+    startMarker.addEventListener('mousedown', startDrag(startMarker, true));
+    endMarker.addEventListener('mousedown', startDrag(endMarker, false));
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('mouseup', endDrag);
+}
+
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    debug('Media Converter page loaded', 'info');
+    loadMediaFiles();
+    
+    // Search functionality
+    document.getElementById('fileSearch').addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        // TODO: Implement search filtering
+    });
+    
+});
+</script>
+
+{% endblock %}
+

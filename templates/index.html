@@ -2,16 +2,34 @@
 
 {% block content %}
 <div class="app-container">
+    <!-- Navigation Tabs -->
+    <div style="margin-bottom: 30px; border-bottom: 2px solid #555;">
+        <div style="display: flex; gap: 10px;">
+            <a href="/v2p-formatter/" style="padding: 12px 24px; background: #1e1e1e; color: #667eea; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #667eea; border-bottom: none; font-weight: bold;">
+                Video to Image
+            </a>
+            <a href="/v2p-formatter/media-converter" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Media Converter
+            </a>
+            <a href="/v2p-formatter/observation-media" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Observation Media
+            </a>
+        </div>
+    </div>
+
     <!-- Video Selection Section -->
     <section class="upload-section">
         <h2>1. Select Video</h2>
         <div class="file-selector-container">
-            <div id="fileTree" class="file-tree" style="margin-top: 20px; max-height: 500px; overflow-y: auto; border: 1px solid #555; border-radius: 6px; padding: 15px; background: #1e1e1e;">
+            <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+                <button class="btn btn-secondary" onclick="loadFiles()" style="padding: 8px 16px;">🔄 Refresh</button>
+            </div>
+            <div id="fileTree" class="file-tree" style="margin-top: 20px; max-height: 600px; overflow-y: auto; border: 1px solid #555; border-radius: 6px; padding: 15px; background: #1e1e1e;">
                 <div id="fileTreeContent">
                     <p style="text-align: center; color: #999; padding: 20px;">Loading MP4 files...</p>
                 </div>
             </div>
-            <div id="fileTreeLoading" style="display: block; margin-top: 20px; text-align: center; color: #999;">
+            <div id="fileTreeLoading" style="display: none; margin-top: 20px; text-align: center; color: #999;">
                 <p>Scanning input directory for MP4 files...</p>
             </div>
         </div>
@@ -156,47 +174,69 @@ function debug(msg, type = 'info') {
 }
 
 // Load files on page load
-(function() {
-    function loadFiles() {
-        debug('Loading files...', 'info');
-        fetch('/v2p-formatter/list_files')
-            .then(r => r.json())
-            .then(data => {
-                if (data.success && data.files && data.files.length > 0) {
-                    let html = '';
-                    data.files.forEach(file => {
-                        const path = file.path.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
-                        html += `<div onclick="selectFile('${path}', '${file.name}')" style="cursor: pointer; padding: 12px; margin: 8px 0; background: #2a2a2a; border-radius: 6px; border: 1px solid #555; transition: all 0.2s; color: #e0e0e0;" onmouseover="this.style.background='#333'; this.style.borderColor='#667eea'" onmouseout="this.style.background='#2a2a2a'; this.style.borderColor='#555'">
-                            <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                                <span style="font-size: 1.3em;">🎬</span>
-                                <strong style="margin-left: 10px;">${file.name}</strong>
-                                <span style="color: #999; margin-left: 10px;">(${file.size_mb} MB)</span>
-                            </div>
-                            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #555; font-size: 11px;">
-                                <strong style="color: #999;">📁 Path:</strong><br>
-                                <code style="background: #1e1e1e; color: #667eea; padding: 3px 8px; border-radius: 3px; font-size: 11px; display: inline-block; margin-top: 4px; border: 1px solid #555; word-break: break-all;">${file.path}</code>
-                            </div>
-                        </div>`;
-                    });
-                    document.getElementById('fileTreeContent').innerHTML = html;
-                    document.getElementById('fileTreeLoading').style.display = 'none';
-                    debug(`Loaded ${data.files.length} file(s)`, 'success');
-                } else {
-                    document.getElementById('fileTreeContent').innerHTML = '<p style="color: #666; padding: 20px; text-align: center;">No MP4 files found.</p>';
-                    document.getElementById('fileTreeLoading').style.display = 'none';
-                }
-            })
-            .catch(err => {
-                debug('Error loading files: ' + err.message, 'error');
-                document.getElementById('fileTreeContent').innerHTML = `<p style="color: red; padding: 20px;">Error: ${err.message}</p>`;
-                document.getElementById('fileTreeLoading').style.display = 'none';
-            });
-    }
+window.loadFiles = function() {
+    debug('Loading files...', 'info');
+    document.getElementById('fileTreeLoading').style.display = 'block';
+    document.getElementById('fileTreeContent').innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Loading MP4 files...</p>';
     
+    fetch('/v2p-formatter/list_files')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('fileTreeLoading').style.display = 'none';
+            
+            if (data.success && data.files && data.files.length > 0) {
+                let html = '';
+                data.files.forEach(file => {
+                    const path = file.path.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+                    const cacheBuster = new Date().getTime();
+                    const thumbnailUrl = `/v2p-formatter/thumbnail?path=${encodeURIComponent(file.path)}&size=120x90&t=${cacheBuster}`;
+                    
+                    html += `
+                        <div onclick="selectFile('${path}', '${file.name}')" 
+                             style="cursor: pointer; padding: 12px; margin: 8px 0; background: #2a2a2a; border-radius: 6px; border: 1px solid #555; transition: all 0.2s; color: #e0e0e0; display: flex; gap: 12px; align-items: flex-start;"
+                             onmouseover="this.style.background='#333'; this.style.borderColor='#667eea'"
+                             onmouseout="this.style.background='#2a2a2a'; this.style.borderColor='#555'">
+                            <div style="flex-shrink: 0; width: 120px; height: 90px; background: #1a1a1a; border: 1px solid #444; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
+                                <img src="${thumbnailUrl}" 
+                                     alt="${file.name}" 
+                                     style="max-width: 100%; max-height: 100%; object-fit: contain;"
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                                     onload="this.nextElementSibling.style.display='none';">
+                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; position: absolute; width: 100%; height: 100%; background: #1a1a1a;">
+                                    <span style="font-size: 1.5em;">⏳</span>
+                                    <span>Loading...</span>
+                                </div>
+                                <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.7); color: #fff; padding: 2px 6px; border-radius: 3px; font-size: 10px;">▶️</div>
+                            </div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                    <span style="font-size: 1.3em;">🎬</span>
+                                    <strong style="margin-left: 10px; word-break: break-word;">${file.name}</strong>
+                                    <span style="color: #999; margin-left: 10px; white-space: nowrap;">(${file.size_mb} MB)</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                document.getElementById('fileTreeContent').innerHTML = html;
+                debug(`Loaded ${data.files.length} file(s)`, 'success');
+            } else {
+                document.getElementById('fileTreeContent').innerHTML = '<p style="color: #999; padding: 20px; text-align: center;">No MP4 files found in input folder.</p>';
+            }
+        })
+        .catch(err => {
+            document.getElementById('fileTreeLoading').style.display = 'none';
+            debug('Error loading files: ' + err.message, 'error');
+            document.getElementById('fileTreeContent').innerHTML = `<p style="color: #ff6b6b; padding: 20px; text-align: center;">Error: ${err.message}</p>`;
+        });
+};
+
+// Auto-load on page load
+(function() {
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', loadFiles);
+        document.addEventListener('DOMContentLoaded', window.loadFiles);
     } else {
-        loadFiles();
+        window.loadFiles();
     }
 })();
 

@@ -1,0 +1,676 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="app-container">
+    <!-- Navigation Tabs -->
+    <div style="margin-bottom: 30px; border-bottom: 2px solid #555;">
+        <div style="display: flex; gap: 10px;">
+            <a href="/v2p-formatter/" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Video to Image
+            </a>
+            <a href="/v2p-formatter/media-converter" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Media Converter
+            </a>
+            <a href="/v2p-formatter/observation-media" style="padding: 12px 24px; background: #1e1e1e; color: #667eea; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #667eea; border-bottom: none; font-weight: bold;">
+                Observation Media
+            </a>
+        </div>
+    </div>
+
+    <h1 style="color: #e0e0e0; margin-bottom: 30px;">Observation Media</h1>
+
+    <!-- Top Controls Bar -->
+    <div style="background: #2a2a2a; border: 1px solid #555; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
+        <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 300px;">
+                <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Select Subfolder:</label>
+                <select id="observationSubfolderSelect" style="flex: 1; padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
+                    <option value="">Select Subfolder...</option>
+                    {% for subfolder in observation_subfolders %}
+                    <option value="{{ subfolder }}">{{ subfolder }}</option>
+                    {% endfor %}
+                </select>
+                <button id="observationLoadBtn" class="btn btn-primary" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">📂 Load</button>
+                <button id="observationRefreshBtn" class="btn btn-secondary" onclick="window.location.reload();" style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🔄 Refresh</button>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Text Size:</label>
+                <div class="font-size-toggle">
+                    <button id="fontSizeRegular" style="opacity: 1;">Aa</button>
+                    <button id="fontSizeBig" style="opacity: 0.5;">AA</button>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button id="loadDraftBtn" class="btn btn-secondary" onclick="showLoadDraftDialog()" 
+                        style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                    📂 Load Draft
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Observation Media Content (API-free - all data embedded) -->
+    <div id="observationMediaContent">
+        <script>
+        // Embed data from server (API-free approach)
+        window.observationMediaData = {{ observation_subfolder_media | tojson }};
+        window.observationSubfolders = {{ observation_subfolders | tojson }};
+        window.observationMediaAssignments = {}; // Will store media assignments
+        </script>
+        
+        <div class="observation-media-container">
+            <!-- Left Panel: Media Browser -->
+            <div class="observation-media-left-panel">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div style="color: #999;">
+                        <span id="observationMediaCount">0 files</span>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <label style="color: #e0e0e0; font-size: 12px; cursor: pointer; display: none;" id="bulkSelectLabel">
+                            <input type="checkbox" id="bulkSelectMode" onchange="toggleBulkSelectMode()" style="margin-right: 5px;">
+                            Bulk Select
+                        </label>
+                        <button id="bulkAssignBtn" onclick="assignSelectedMedia()" 
+                                style="padding: 6px 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; display: none;">
+                            Assign Selected (<span id="selectedCount">0</span>)
+                        </button>
+                    </div>
+                </div>
+                <div id="observationMediaGrid" style="flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0;">
+                    <p style="color: #999; text-align: center; padding: 20px;">Select a subfolder to view media</p>
+                </div>
+            </div>
+            
+            <!-- Right Panel: Preview & Text Editor -->
+            <div class="observation-media-right-panel">
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="color: #e0e0e0; margin: 0;">Live Preview</h3>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <div id="sectionControls" style="display: none; gap: 8px;">
+                                <button onclick="expandAllSections()" 
+                                        style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    ▼ Expand All
+                                </button>
+                                <button onclick="collapseAllSections()" 
+                                        style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    ▶ Collapse All
+                                </button>
+                            </div>
+                            <button id="reshuffleBtn" onclick="toggleReshuffleMode()" 
+                                    style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; display: none;"
+                                    title="Enable drag-and-drop to reorder media in tables">
+                                🔄 Reshuffle
+                            </button>
+                        </div>
+                    </div>
+                    <div id="observationPreview" class="observation-preview" 
+                         ondrop="handlePreviewDrop(event)" 
+                         ondragover="handlePreviewDragOver(event)"
+                         style="min-height: 300px;">
+                        <p style="color: #999; text-align: center;">Start typing to see preview...</p>
+                    </div>
+                </div>
+                <div style="margin-top: 20px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="color: #e0e0e0; margin: 0;">Text Editor</h3>
+                        <div style="display: flex; gap: 10px; font-size: 12px; color: #999;">
+                            <span>Placeholders: <span id="placeholderCount">0</span></span>
+                            <span>Words: <span id="wordCount">0</span></span>
+                            <span>Assigned: <span id="assignedCount" style="color: #4ecdc4;">0</span></span>
+                            <span>Unassigned: <span id="unassignedCount" style="color: #ff6b6b;">0</span></span>
+                        </div>
+                    </div>
+                    <textarea id="observationTextEditor" class="observation-text-editor" placeholder="Enter text with placeholders like {{Placeholder_Name}}..."></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bottom Actions Bar -->
+    <div style="background: #2a2a2a; border: 1px solid #555; border-radius: 6px; padding: 15px; margin-top: 20px;">
+        <div style="display: flex; gap: 15px; align-items: center; justify-content: center; flex-wrap: wrap;">
+            <button id="saveDraftBtn" class="btn btn-secondary" onclick="showSaveDraftDialog()" 
+                    style="padding: 10px 20px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                💾 Save Draft
+            </button>
+            <button id="exportDocxBtn" class="btn btn-primary" onclick="exportObservationDocx()" 
+                    style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                📄 Export DOCX
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Define essential functions inline to ensure they're always available
+function loadObservationMedia() {
+    const subfolder = document.getElementById('observationSubfolderSelect').value;
+    
+    if (!subfolder) {
+        document.getElementById('observationMediaGrid').innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Please select a subfolder</p>';
+        document.getElementById('observationMediaCount').textContent = '0 files';
+        return;
+    }
+    
+    // Get media from embedded data (API-free)
+    if (!window.observationMediaData) {
+        document.getElementById('observationMediaGrid').innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Media data not loaded</p>';
+        return;
+    }
+    
+    const mediaFiles = window.observationMediaData[subfolder] || [];
+    
+    // Display media
+    if (typeof displayObservationMedia === 'function') {
+        displayObservationMedia(mediaFiles);
+    } else if (typeof window.displayObservationMedia === 'function') {
+        window.displayObservationMedia(mediaFiles);
+    } else {
+        document.getElementById('observationMediaGrid').innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Display function not available</p>';
+        return;
+    }
+    
+    document.getElementById('observationMediaCount').textContent = `${mediaFiles.length} files`;
+}
+
+// Make it globally available immediately
+window.loadObservationMedia = loadObservationMedia;
+
+// Define loadSelectedSubfolder inline to ensure it's always available
+function loadSelectedSubfolder() {
+    const subfolderSelect = document.getElementById('observationSubfolderSelect');
+    
+    if (!subfolderSelect) {
+        alert('Error: Subfolder selector not found. Please refresh the page.');
+        return;
+    }
+    
+    const subfolder = subfolderSelect.value;
+    
+    if (!subfolder) {
+        alert('Please select a subfolder first');
+        return;
+    }
+    
+    // Reload the page with subfolder query parameter to auto-select it
+    // This will trigger a server-side re-scan of all subfolders
+    window.location.href = `/v2p-formatter/observation-media?subfolder=${encodeURIComponent(subfolder)}`;
+}
+
+// Make it globally available immediately
+window.loadSelectedSubfolder = loadSelectedSubfolder;
+</script>
+<script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-media.js') }}"></script>
+<script>
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-select subfolder from query parameter if present
+    const urlParams = new URLSearchParams(window.location.search);
+    const selectedSubfolder = urlParams.get('subfolder');
+    const subfolderSelect = document.getElementById('observationSubfolderSelect');
+    
+    if (subfolderSelect && selectedSubfolder) {
+        subfolderSelect.value = selectedSubfolder;
+        
+        // Load media for the selected subfolder
+        if (typeof loadObservationMedia === 'function') {
+            loadObservationMedia();
+        } else if (typeof window.loadObservationMedia === 'function') {
+            window.loadObservationMedia();
+        }
+    }
+    
+    // Subfolder selection handler
+    if (subfolderSelect) {
+        subfolderSelect.addEventListener('change', function(e) {
+            const funcToCall = typeof loadObservationMedia === 'function' 
+                ? loadObservationMedia 
+                : (typeof window.loadObservationMedia === 'function' ? window.loadObservationMedia : null);
+            
+            if (funcToCall) {
+                try {
+                    funcToCall();
+                } catch (error) {
+                    // Fallback: manually load media using embedded data
+                    const selectedSubfolder = e.target.value;
+                    if (selectedSubfolder && window.observationMediaData) {
+                        const mediaFiles = window.observationMediaData[selectedSubfolder] || [];
+                        if (typeof displayObservationMedia === 'function') {
+                            displayObservationMedia(mediaFiles);
+                        } else if (typeof window.displayObservationMedia === 'function') {
+                            window.displayObservationMedia(mediaFiles);
+                        }
+                        const countElement = document.getElementById('observationMediaCount');
+                        if (countElement) {
+                            countElement.textContent = `${mediaFiles.length} files`;
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Load button click handler
+    const loadBtn = document.getElementById('observationLoadBtn');
+    if (loadBtn) {
+        loadBtn.addEventListener('click', function(e) {
+            const funcToCall = typeof loadSelectedSubfolder === 'function' 
+                ? loadSelectedSubfolder 
+                : (typeof window.loadSelectedSubfolder === 'function' ? window.loadSelectedSubfolder : null);
+            
+            if (funcToCall) {
+                try {
+                    funcToCall();
+                } catch (error) {
+                    alert(`Error loading subfolder: ${error.message}`);
+                }
+            } else {
+                alert('Load function not available. Please refresh the page.');
+            }
+        });
+    }
+    
+    // Font size toggle
+    const fontSizeRegular = document.getElementById('fontSizeRegular');
+    const fontSizeBig = document.getElementById('fontSizeBig');
+    if (fontSizeRegular && fontSizeBig) {
+        fontSizeRegular.addEventListener('click', function() {
+            fontSizeMode = 'regular';
+            toggleFontSize();
+        });
+        fontSizeBig.addEventListener('click', function() {
+            fontSizeMode = 'big';
+            toggleFontSize();
+        });
+    }
+    
+    // Text editor event listeners
+    const textEditor = document.getElementById('observationTextEditor');
+    if (textEditor) {
+        textEditor.addEventListener('input', function() {
+            if (typeof highlightPlaceholdersInEditor === 'function') {
+                highlightPlaceholdersInEditor();
+            }
+            if (typeof updatePreview === 'function') {
+                updatePreview();
+            }
+        });
+    }
+    
+    // Drag and drop handlers
+    window.handlePreviewDragOver = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'copy';
+    };
+    
+    window.handlePreviewDrop = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        try {
+            const mediaData = JSON.parse(e.dataTransfer.getData('application/json'));
+            if (mediaData && mediaData.path) {
+                const placeholders = extractPlaceholders(textEditor.value);
+                if (placeholders.length === 0) {
+                    alert('No placeholders found in text. Add placeholders like {{Placeholder_Name}} first.');
+                    return;
+                }
+                if (typeof showPlaceholderSelectionDialog === 'function') {
+                    showPlaceholderSelectionDialog(mediaData, placeholders);
+                }
+            }
+        } catch (err) {
+            console.error('Error handling drop:', err);
+        }
+    };
+    
+    // Initialize observation media functions
+    if (typeof loadObservationSubfolders === 'function') {
+        loadObservationSubfolders();
+    }
+});
+</script>
+
+<style>
+/* Observation Media Styles */
+.observation-media-container {
+    display: flex;
+    gap: 20px;
+    min-height: 500px;
+    width: 100%;
+}
+
+.observation-media-left-panel {
+    flex: 1;
+    background: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 6px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    max-height: calc(100vh - 200px);
+}
+
+.observation-media-right-panel {
+    flex: 1;
+    background: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 6px;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.observation-media-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.observation-media-header select {
+    padding: 8px 12px;
+    background: #1e1e1e;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.observation-media-header button {
+    padding: 8px 16px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.observation-media-header button:hover {
+    background: #5568d3;
+}
+
+.font-size-toggle {
+    display: flex;
+    gap: 5px;
+}
+
+.font-size-toggle button {
+    padding: 6px 12px;
+    background: #1e1e1e;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.font-size-toggle button:hover {
+    background: #2a2a2a;
+}
+
+.font-size-toggle button.active {
+    background: #667eea;
+    color: white;
+}
+
+#observationMediaGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+}
+
+.observation-media-card {
+    background: #1e1e1e;
+    border: 1px solid #555;
+    border-radius: 6px;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.observation-media-card:hover {
+    border-color: #667eea;
+    transform: translateY(-2px);
+}
+
+.observation-media-thumbnail {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4/3;
+    background: #1e1e1e;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.observation-media-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.video-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.assigned-badge {
+    position: absolute;
+    bottom: 5px;
+    left: 5px;
+    background: rgba(78, 205, 196, 0.9);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.observation-media-card.media-assigned {
+    opacity: 0.5;
+    cursor: not-allowed !important;
+}
+
+.observation-media-card.media-assigned:hover {
+    border-color: #555;
+    transform: none;
+}
+
+.observation-media-card:not(.media-assigned):hover {
+    border-color: #667eea;
+    transform: translateY(-2px);
+}
+
+.placeholder-selection-dialog {
+    animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+.placeholder-option:hover {
+    background: #2a2a2a !important;
+    transform: translateX(5px);
+    transition: all 0.2s;
+}
+
+.draft-selection-dialog {
+    animation: fadeIn 0.2s ease-in;
+}
+
+.draft-item:hover {
+    background: #2a2a2a !important;
+    border-color: #667eea !important;
+    transform: translateX(5px);
+    transition: all 0.2s;
+}
+
+.placeholder-table {
+    position: relative;
+}
+
+.placeholder-table.unassigned {
+    animation: pulseWarning 2s infinite;
+}
+
+@keyframes pulseWarning {
+    0%, 100% {
+        border-color: #ff6b6b;
+        background: rgba(255, 107, 107, 0.1);
+    }
+    50% {
+        border-color: #ff8787;
+        background: rgba(255, 107, 107, 0.15);
+    }
+}
+
+.media-cell {
+    transition: background-color 0.2s;
+}
+
+.media-cell:hover {
+    background-color: rgba(102, 126, 234, 0.1) !important;
+}
+
+.media-cell.drag-over {
+    background-color: rgba(102, 126, 234, 0.3) !important;
+    border: 2px dashed #667eea !important;
+}
+
+.remove-media-btn:hover {
+    background: #ff5252 !important;
+    transform: scale(1.1);
+}
+
+.unassigned-placeholder-container {
+    margin: 15px 0;
+}
+
+.observation-media-info {
+    font-size: 12px;
+    color: #e0e0e0;
+}
+
+.observation-media-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 4px;
+}
+
+.observation-media-size {
+    color: #999;
+    font-size: 11px;
+}
+
+.observation-text-editor {
+    width: 100%;
+    min-height: 300px;
+    background: #1e1e1e;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 15px;
+    font-family: monospace;
+    font-size: 14px;
+    resize: vertical;
+}
+
+.observation-preview {
+    background: #1e1e1e;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 15px;
+    min-height: 300px;
+    color: #e0e0e0;
+}
+
+:root {
+    --obs-font-size: 14px;
+}
+
+.font-size-big {
+    --obs-font-size: 18px;
+}
+
+.font-size-big .observation-text-editor,
+.font-size-big .observation-preview,
+.font-size-big .observation-media-name {
+    font-size: var(--obs-font-size);
+}
+
+/* Section styling */
+.observation-section {
+    margin: 10px 0;
+    border-radius: 6px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.observation-section-header {
+    padding: 12px 15px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.2s, opacity 0.2s;
+    user-select: none;
+}
+
+.observation-section-header:hover {
+    opacity: 0.9;
+}
+
+.observation-section-content {
+    padding: 15px;
+    transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+    overflow: hidden;
+    display: block;
+}
+
+.observation-section.collapsed .observation-section-content {
+    max-height: 0 !important;
+    padding: 0 15px !important;
+    opacity: 0 !important;
+    display: none !important;
+}
+
+.observation-section-icon {
+    transition: transform 0.3s ease;
+    font-size: 16px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.observation-section.collapsed .observation-section-icon {
+    transform: rotate(0deg);
+}
+</style>
+{% endblock %}
+

@@ -102,3 +102,102 @@ def parse_time_points(time_input):
     
     return sorted(time_points) if time_points else None
 
+
+def get_media_output_path(input_path: Path, output_base: Path, new_extension: str) -> Path:
+    """
+    Generate output path for media conversion, preserving subfolder structure.
+    Handles duplicate files by adding suffix (_1, _2, etc.)
+    
+    Args:
+        input_path: Path to input file
+        output_base: Base output folder
+        new_extension: New file extension (e.g., '.mp4', '.jpg')
+    
+    Returns:
+        Path to output file (with suffix if duplicate exists)
+    
+    Example:
+        Input: /input/folder1/video.mov
+        Output: /output/folder1/video.mp4
+        If exists: /output/folder1/video_1.mp4
+    """
+    from config import INPUT_FOLDER
+    
+    input_file = Path(input_path)
+    
+    # Get relative path from INPUT_FOLDER
+    try:
+        relative_path = input_file.relative_to(INPUT_FOLDER)
+    except ValueError:
+        # If file is not in INPUT_FOLDER, just use filename
+        output_path = output_base / f"{input_file.stem}{new_extension}"
+    else:
+        # Preserve subfolder structure
+        parent_folders = relative_path.parent
+        if parent_folders and str(parent_folders) != '.':
+            output_dir = output_base / parent_folders
+        else:
+            output_dir = output_base
+        
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"{input_file.stem}{new_extension}"
+    
+    # Handle duplicates
+    if output_path.exists():
+        counter = 1
+        while True:
+            if parent_folders and str(parent_folders) != '.':
+                new_path = output_base / parent_folders / f"{input_file.stem}_{counter}{new_extension}"
+            else:
+                new_path = output_base / f"{input_file.stem}_{counter}{new_extension}"
+            
+            if not new_path.exists():
+                return new_path
+            counter += 1
+    
+    return output_path
+
+
+def validate_input_path(file_path: str, input_folder: Path) -> tuple[bool, str]:
+    """
+    Validate that file path is within input folder (prevent path traversal)
+    
+    Returns:
+        (is_valid, error_message)
+    """
+    try:
+        file_path_obj = Path(file_path).resolve()
+        input_folder_obj = input_folder.resolve()
+        
+        # Check if path is within input folder
+        try:
+            file_path_obj.relative_to(input_folder_obj)
+            return True, ""
+        except ValueError:
+            return False, "File path is outside input folder"
+    
+    except Exception as e:
+        return False, f"Invalid path: {str(e)}"
+
+
+def validate_output_path(file_path: str, output_folder: Path) -> tuple[bool, str]:
+    """
+    Validate that file path is within output folder (prevent path traversal)
+    
+    Returns:
+        (is_valid, error_message)
+    """
+    try:
+        file_path_obj = Path(file_path).resolve()
+        output_folder_obj = output_folder.resolve()
+        
+        # Check if path is within output folder
+        try:
+            file_path_obj.relative_to(output_folder_obj)
+            return True, ""
+        except ValueError:
+            return False, "File path is outside output folder"
+    
+    except Exception as e:
+        return False, f"Invalid path: {str(e)}"
+
