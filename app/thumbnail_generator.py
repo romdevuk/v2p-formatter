@@ -68,7 +68,7 @@ def generate_image_thumbnail(image_path: Path, size: tuple = (120, 90)) -> bytes
             
             # Save to bytes
             output = io.BytesIO()
-            img.save(output, format='JPEG', quality=85, optimize=True)
+            img.save(output, format='JPEG', quality=100, optimize=True)
             return output.getvalue()
     
     except Exception as e:
@@ -126,7 +126,7 @@ def generate_video_thumbnail(video_path: Path, size: tuple = (120, 90), time_sec
             
             # Save to bytes
             output = io.BytesIO()
-            img.save(output, format='JPEG', quality=85, optimize=True)
+            img.save(output, format='JPEG', quality=100, optimize=True)
             return output.getvalue()
     
     except Exception as e:

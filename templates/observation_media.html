@@ -17,11 +17,15 @@
         </div>
     </div>
 
-    <h1 style="color: #e0e0e0; margin-bottom: 30px;">Observation Media</h1>
-
     <!-- Top Controls Bar -->
     <div style="background: #2a2a2a; border: 1px solid #555; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
         <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+            <!-- Current Draft Display -->
+            <div id="currentDraftDisplay" style="display: none; padding: 8px 12px; background: #1e1e1e; border: 1px solid #667eea; border-radius: 4px; color: #e0e0e0; font-size: 14px; flex: 0 0 auto;">
+                <span style="color: #999; margin-right: 8px;">📄 Current Draft:</span>
+                <span id="currentDraftName" style="color: #667eea; font-weight: bold;"></span>
+                <button onclick="clearCurrentDraft()" style="margin-left: 10px; padding: 4px 8px; background: #555; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">✕ Clear</button>
+            </div>
             <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 300px;">
                 <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Select Subfolder:</label>
                 <select id="observationSubfolderSelect" style="flex: 1; padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
@@ -61,11 +65,20 @@
         <div class="observation-media-container">
             <!-- Left Panel: Media Browser -->
             <div class="observation-media-left-panel">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <!-- Media Browser Header (Fixed) -->
+                <div class="media-browser-header">
                     <div style="color: #999;">
                         <span id="observationMediaCount">0 files</span>
                     </div>
                     <div style="display: flex; gap: 10px; align-items: center;">
+                        <button id="mediaBrowserSettingsBtn" onclick="openMediaBrowserSettings()" 
+                                style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px;">
+                            ⚙️ Settings
+                        </button>
+                        <button id="mediaBrowserExpandBtn" onclick="toggleMediaBrowserExpand()" 
+                                style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px;">
+                            <span id="expandBtnIcon">⬛</span> <span id="expandBtnText">Expand</span>
+                        </button>
                         <label style="color: #e0e0e0; font-size: 12px; cursor: pointer; display: none;" id="bulkSelectLabel">
                             <input type="checkbox" id="bulkSelectMode" onchange="toggleBulkSelectMode()" style="margin-right: 5px;">
                             Bulk Select
@@ -76,15 +89,17 @@
                         </button>
                     </div>
                 </div>
-                <div id="observationMediaGrid" style="flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0;">
+                <!-- Media Browser Content (Scrollable) -->
+                <div id="observationMediaGrid" class="media-browser-content">
                     <p style="color: #999; text-align: center; padding: 20px;">Select a subfolder to view media</p>
                 </div>
             </div>
             
             <!-- Right Panel: Preview & Text Editor -->
             <div class="observation-media-right-panel">
-                <div style="margin-bottom: 15px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <!-- Live Preview Section -->
+                <div class="preview-section">
+                    <div class="preview-section-header">
                         <h3 style="color: #e0e0e0; margin: 0;">Live Preview</h3>
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <div id="sectionControls" style="display: none; gap: 8px;">
@@ -104,16 +119,23 @@
                             </button>
                         </div>
                     </div>
-                    <div id="observationPreview" class="observation-preview" 
+                    <div id="observationPreview" class="observation-preview preview-section-content" 
                          ondrop="handlePreviewDrop(event)" 
-                         ondragover="handlePreviewDragOver(event)"
-                         style="min-height: 300px;">
+                         ondragover="handlePreviewDragOver(event)">
                         <p style="color: #999; text-align: center;">Start typing to see preview...</p>
                     </div>
                 </div>
-                <div style="margin-top: 20px; margin-bottom: 15px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <h3 style="color: #e0e0e0; margin: 0;">Text Editor</h3>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Text Editor Section (Independent, at bottom) -->
+    <div class="editor-section collapsed" style="margin-top: 20px;">
+        <div class="editor-section-header" onclick="toggleEditorSection()" style="cursor: pointer;">
+            <h3 style="color: #e0e0e0; margin: 0; display: flex; align-items: center; gap: 10px;">
+                <span class="editor-section-icon" style="font-size: 14px; transition: transform 0.3s ease;">▶</span>
+                <span>Text Editor</span>
+            </h3>
                         <div style="display: flex; gap: 10px; font-size: 12px; color: #999;">
                             <span>Placeholders: <span id="placeholderCount">0</span></span>
                             <span>Words: <span id="wordCount">0</span></span>
@@ -121,23 +143,236 @@
                             <span>Unassigned: <span id="unassignedCount" style="color: #ff6b6b;">0</span></span>
                         </div>
                     </div>
-                    <textarea id="observationTextEditor" class="observation-text-editor" placeholder="Enter text with placeholders like {{Placeholder_Name}}..."></textarea>
-                </div>
-            </div>
+        <div class="editor-section-content-wrapper">
+            <textarea id="observationTextEditor" class="observation-text-editor editor-section-content" placeholder="Enter text with placeholders like {{Placeholder_Name}}..."></textarea>
         </div>
     </div>
     
     <!-- Bottom Actions Bar -->
     <div style="background: #2a2a2a; border: 1px solid #555; border-radius: 6px; padding: 15px; margin-top: 20px;">
         <div style="display: flex; gap: 15px; align-items: center; justify-content: center; flex-wrap: wrap;">
-            <button id="saveDraftBtn" class="btn btn-secondary" onclick="showSaveDraftDialog()" 
+            <button id="saveDraftBtn" class="btn btn-secondary" onclick="handleSaveOrUpdateDraft()" 
                     style="padding: 10px 20px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
                 💾 Save Draft
             </button>
-            <button id="exportDocxBtn" class="btn btn-primary" onclick="exportObservationDocx()" 
+            <button id="previewDraftBtn" class="btn btn-secondary" onclick="showDraftPreview()" 
+                    style="padding: 10px 20px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                👁️ Preview Draft
+            </button>
+        </div>
+    </div>
+
+    <!-- Draft Preview Modal -->
+    <div id="draftPreviewModal" class="draft-preview-modal" style="display: none;" onclick="if(event.target === this) closeDraftPreview();">
+        <div class="draft-preview-content" style="background: #2a2a2a; border: 2px solid #667eea; border-radius: 8px; padding: 25px; width: 95vw; height: 95vh; max-width: 95vw; max-height: 95vh; display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" onclick="event.stopPropagation();">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 15px; flex-shrink: 0;">
+                <h2 style="color: #e0e0e0; margin: 0; font-size: 20px;">📄 Document Preview</h2>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button id="previewUndoBtn" onclick="previewUndo()" 
+                            style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; opacity: 0.5;" 
+                            disabled title="Undo">
+                        ↶ Undo
+                    </button>
+                    <button id="previewRedoBtn" onclick="previewRedo()" 
+                            style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; opacity: 0.5;" 
+                            disabled title="Redo">
+                        ↷ Redo
+                    </button>
+                    <div style="position: relative;">
+                        <button id="previewSettingsBtn" onclick="togglePreviewSettings()" 
+                                style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;" 
+                                title="Settings">
+                            ⚙️ Settings
+                        </button>
+                        <div id="previewSettingsMenu" class="preview-settings-menu" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 5px; background: #1e1e1e; border: 1px solid #555; border-radius: 6px; padding: 15px; min-width: 250px; z-index: 10001; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+                            <!-- Font Settings -->
+                            <div style="margin-bottom: 15px;">
+                                <label style="display: block; color: #e0e0e0; font-size: 12px; font-weight: 500; margin-bottom: 8px;">Font Settings:</label>
+                                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                                        <label style="color: #e0e0e0; font-size: 11px;">Size:</label>
+                                        <select id="previewFontSize" onchange="updatePreviewDisplay()" style="padding: 4px 8px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 12px;">
+                                            <option value="10pt">10pt</option>
+                                            <option value="11pt">11pt</option>
+                                            <option value="12pt">12pt</option>
+                                            <option value="13pt">13pt</option>
+                                            <option value="14pt">14pt</option>
+                                            <option value="16pt" selected>16pt</option>
+                                            <option value="18pt">18pt</option>
+                                        </select>
+                                    </div>
+                                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                                        <label style="color: #e0e0e0; font-size: 11px;">Type:</label>
+                                        <select id="previewFontType" onchange="updatePreviewDisplay()" style="padding: 4px 8px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 12px;">
+                                            <option value="'Times New Roman', serif" selected>Times New Roman</option>
+                                            <option value="Arial, sans-serif">Arial</option>
+                                            <option value="'Courier New', monospace">Courier New</option>
+                                            <option value="Georgia, serif">Georgia</option>
+                                            <option value="Verdana, sans-serif">Verdana</option>
+                                            <option value="'Calibri', sans-serif">Calibri</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Hide Elements -->
+                            <div id="hideElementsSection" style="border-top: 1px solid #555; padding-top: 15px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <label style="color: #e0e0e0; font-size: 12px; font-weight: 500;">Hide Elements:</label>
+                                    <div style="display: flex; gap: 6px;">
+                                        <button onclick="selectAllHideElements()" style="padding: 4px 8px; background: #555; color: #e0e0e0; border: 1px solid #666; border-radius: 3px; cursor: pointer; font-size: 11px;">Select All</button>
+                                        <button onclick="deselectAllHideElements()" style="padding: 4px 8px; background: #555; color: #e0e0e0; border: 1px solid #666; border-radius: 3px; cursor: pointer; font-size: 11px;">Deselect All</button>
+                                    </div>
+                                </div>
+                                <div id="hideElementsContent" style="display: flex; flex-direction: column; gap: 8px;">
+                                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
+                                        <input type="checkbox" id="hideSectionTitles" onchange="updatePreviewDisplay()" style="margin: 0;">
+                                        <span>Section Titles</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
+                                        <input type="checkbox" id="hideAcCovered" onchange="updatePreviewDisplay()" style="margin: 0;">
+                                        <span>AC covered</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
+                                        <input type="checkbox" id="hideImageSuggestion" onchange="updatePreviewDisplay()" style="margin: 0;">
+                                        <span>Image suggestion</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
+                                        <input type="checkbox" id="hideParagraphNumbers" onchange="updatePreviewDisplay()" style="margin: 0;">
+                                        <span>Paragraph numbers</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
+                                        <input type="checkbox" id="hideEmptyMediaFields" onchange="updatePreviewDisplay()" style="margin: 0;">
+                                        <span>Empty media fields</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="closeDraftPreview()" style="background: none; border: none; color: #e0e0e0; font-size: 28px; cursor: pointer; padding: 0; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; border-radius: 4px; transition: background 0.2s;" 
+                            onmouseover="this.style.background='#555'" onmouseout="this.style.background='none'">
+                        ✕
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Two Column Layout: Sections Navigation + Preview Content -->
+            <div id="previewColumnsContainer" style="display: flex; flex: 1; min-height: 0; gap: 0; position: relative;">
+                <!-- Left Column: Sections Navigation -->
+                <div id="previewSectionsNav" style="width: 250px; min-width: 200px; max-width: 400px; background: #1e1e1e; border: 1px solid #555; border-radius: 6px 0 0 6px; overflow-y: auto; flex-shrink: 0;">
+                    <div style="padding: 15px; border-bottom: 1px solid #555;">
+                        <h3 style="color: #e0e0e0; margin: 0; font-size: 14px; font-weight: 600;">Sections</h3>
+                    </div>
+                    <div id="previewSectionsList" style="padding: 10px;">
+                        <!-- Sections will be inserted here -->
+                    </div>
+                </div>
+                
+                <!-- Resizable Divider -->
+                <div id="previewResizer" style="width: 4px; background: #555; cursor: col-resize; flex-shrink: 0; position: relative;" 
+                     onmousedown="startResizePreview(event)">
+                    <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 2px; height: 30px; background: #999; border-radius: 1px;"></div>
+                </div>
+                
+                <!-- Right Column: Preview Content (Scrollable) - Dark Theme -->
+                <div id="draftPreviewContent" style="background: #1e1e1e; padding: 40px; min-height: 400px; color: #e0e0e0; font-family: 'Times New Roman', serif; font-size: 16pt; line-height: 1.5; overflow-y: auto; flex: 1; min-height: 0; border: 1px solid #555; border-left: none; border-radius: 0 6px 6px 0;">
+                    <!-- Preview content will be inserted here -->
+                </div>
+            </div>
+            
+            <!-- Bottom Actions -->
+            <div style="margin-top: 15px; text-align: right; border-top: 1px solid #555; padding-top: 15px; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
+                <button onclick="closeDraftPreview()" 
+                        style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                    Close
+                </button>
+                <div style="display: flex; gap: 10px;">
+                    <button id="updateDraftFromPreviewBtn" class="btn btn-primary" onclick="updateDraftFromPreview()" 
+                            style="padding: 10px 20px; background: #43e97b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                        💾 Update Draft
+                    </button>
+                    <button id="exportDocxFromPreviewBtn" class="btn btn-primary" onclick="exportObservationDocxFromPreview()" 
                     style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
                 📄 Export DOCX
             </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Media Browser Settings Modal -->
+    <div id="mediaBrowserSettingsModal" class="media-browser-settings-modal" style="display: none;">
+        <div class="media-browser-settings-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 15px;">
+                <h2 style="color: #e0e0e0; margin: 0; font-size: 18px;">Media Browser Settings</h2>
+                <button onclick="closeMediaBrowserSettings()" style="background: none; border: none; color: #e0e0e0; font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 4px;">
+                    ✕
+                </button>
+            </div>
+            
+            <div style="margin-bottom: 25px;">
+                <label style="display: block; color: #e0e0e0; font-size: 14px; font-weight: 500; margin-bottom: 12px;">
+                    Thumbnails Per Row (when collapsed):
+                </label>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; padding: 8px 12px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e;">
+                        <input type="radio" name="thumbnailsPerRow" value="2" id="thumbnailsPerRow2" style="margin: 0;">
+                        <span>2 columns</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; padding: 8px 12px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e;">
+                        <input type="radio" name="thumbnailsPerRow" value="3" id="thumbnailsPerRow3" style="margin: 0;">
+                        <span>3 columns</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; padding: 8px 12px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e;">
+                        <input type="radio" name="thumbnailsPerRow" value="4" id="thumbnailsPerRow4" style="margin: 0;">
+                        <span>4 columns</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; padding: 8px 12px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e;">
+                        <input type="radio" name="thumbnailsPerRow" value="5" id="thumbnailsPerRow5" style="margin: 0;">
+                        <span>5 columns</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; padding: 8px 12px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e;">
+                        <input type="radio" name="thumbnailsPerRow" value="6" id="thumbnailsPerRow6" style="margin: 0;">
+                        <span>6 columns</span>
+                    </label>
+                </div>
+                <p style="color: #999; font-size: 12px; margin-top: 8px; margin-bottom: 0;">Applies only when media browser is collapsed (50% width)</p>
+            </div>
+            
+            <div style="margin-bottom: 25px;">
+                <label style="display: block; color: #e0e0e0; font-size: 14px; font-weight: 500; margin-bottom: 12px;">
+                    Thumbnail Size:
+                </label>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; padding: 8px 12px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e;">
+                        <input type="radio" name="thumbnailSize" value="small" id="thumbnailSizeSmall" style="margin: 0;">
+                        <span>Small (120×90)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; padding: 8px 12px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e;">
+                        <input type="radio" name="thumbnailSize" value="medium" id="thumbnailSizeMedium" style="margin: 0;">
+                        <span>Medium (240×180)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; padding: 8px 12px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e;">
+                        <input type="radio" name="thumbnailSize" value="large" id="thumbnailSizeLarge" style="margin: 0;">
+                        <span>Large (360×270)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; padding: 8px 12px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e;">
+                        <input type="radio" name="thumbnailSize" value="xlarge" id="thumbnailSizeXLarge" style="margin: 0;">
+                        <span>Extra Large (480×360)</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid #555; padding-top: 15px;">
+                <button onclick="closeMediaBrowserSettings()" 
+                        style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                    Cancel
+                </button>
+                <button onclick="applyMediaBrowserSettings()" 
+                        style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                    Apply Settings
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -205,8 +440,264 @@ window.loadSelectedSubfolder = loadSelectedSubfolder;
 </script>
 <script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-media.js') }}"></script>
 <script>
+// Toggle editor section collapse/expand
+function toggleEditorSection() {
+    const editorSection = document.querySelector('.editor-section');
+    if (editorSection) {
+        editorSection.classList.toggle('collapsed');
+    }
+}
+
+// Make function globally available
+window.toggleEditorSection = toggleEditorSection;
+
+// Update panel layout when expand/collapse
+function updatePanelLayout() {
+    const leftPanel = document.querySelector('.observation-media-left-panel');
+    const rightPanel = document.querySelector('.observation-media-right-panel');
+    if (!leftPanel || !rightPanel) return;
+    
+    const isExpanded = leftPanel.classList.contains('expanded');
+    
+    if (isExpanded) {
+        leftPanel.style.width = '100%';
+        rightPanel.style.display = 'none';
+    } else {
+        leftPanel.style.width = '50%';
+        rightPanel.style.display = 'block';
+    }
+}
+
+// Media Browser Settings and Expand/Collapse Functions
+const THUMBNAIL_SIZES = {
+    "small": { width: 120, height: 90, size: "120x90" },
+    "medium": { width: 240, height: 180, size: "240x180" },
+    "large": { width: 360, height: 270, size: "360x270" },
+    "xlarge": { width: 480, height: 360, size: "480x360" }
+};
+
+// Load settings from localStorage
+function loadMediaBrowserSettings() {
+    const expanded = localStorage.getItem('mediaBrowser.expanded') === 'true';
+    const thumbnailsPerRow = parseInt(localStorage.getItem('mediaBrowser.thumbnailsPerRow')) || 3;
+    const thumbnailSize = localStorage.getItem('mediaBrowser.thumbnailSize') || 'medium';
+    
+    return { expanded, thumbnailsPerRow, thumbnailSize };
+}
+
+// Save settings to localStorage
+function saveMediaBrowserSettings(settings) {
+    if (settings.expanded !== undefined) {
+        localStorage.setItem('mediaBrowser.expanded', settings.expanded.toString());
+    }
+    if (settings.thumbnailsPerRow !== undefined) {
+        localStorage.setItem('mediaBrowser.thumbnailsPerRow', settings.thumbnailsPerRow.toString());
+    }
+    if (settings.thumbnailSize !== undefined) {
+        localStorage.setItem('mediaBrowser.thumbnailSize', settings.thumbnailSize);
+    }
+}
+
+// Toggle expand/collapse
+function toggleMediaBrowserExpand() {
+    const leftPanel = document.querySelector('.observation-media-left-panel');
+    const rightPanel = document.querySelector('.observation-media-right-panel');
+    const expandBtnIcon = document.getElementById('expandBtnIcon');
+    const expandBtnText = document.getElementById('expandBtnText');
+    
+    if (!leftPanel || !rightPanel) return;
+    
+    const isExpanded = leftPanel.classList.contains('expanded');
+    
+    if (isExpanded) {
+        // Collapse: return to 50% width
+        leftPanel.classList.remove('expanded');
+        if (expandBtnIcon) expandBtnIcon.textContent = '⬛';
+        if (expandBtnText) expandBtnText.textContent = 'Expand';
+        saveMediaBrowserSettings({ expanded: false });
+    } else {
+        // Expand: go to 100% width
+        leftPanel.classList.add('expanded');
+        if (expandBtnIcon) expandBtnIcon.textContent = '⬜';
+        if (expandBtnText) expandBtnText.textContent = 'Collapse';
+        saveMediaBrowserSettings({ expanded: true });
+    }
+    
+    // Update panel layout
+    updatePanelLayout();
+    
+    // Update grid layout
+    updateMediaBrowserGridLayout();
+    
+    // Update all subfolder content grids
+    if (typeof updateAllSubfolderGrids === 'function') {
+        updateAllSubfolderGrids();
+    }
+}
+
+// Update grid layout based on state and settings
+function updateMediaBrowserGridLayout() {
+    const grid = document.getElementById('observationMediaGrid');
+    const leftPanel = document.querySelector('.observation-media-left-panel');
+    
+    if (!grid || !leftPanel) return;
+    
+    const isExpanded = leftPanel.classList.contains('expanded');
+    const settings = loadMediaBrowserSettings();
+    
+    if (isExpanded) {
+        grid.classList.remove('collapsed-state');
+        grid.classList.add('expanded-state');
+        // Auto-calculate columns in expanded state
+        grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(240px, 1fr))';
+    } else {
+        grid.classList.remove('expanded-state');
+        grid.classList.add('collapsed-state');
+        // Use user-selected column count
+        grid.style.gridTemplateColumns = `repeat(${settings.thumbnailsPerRow}, 1fr)`;
+    }
+}
+
+// Open settings modal
+function openMediaBrowserSettings() {
+    const modal = document.getElementById('mediaBrowserSettingsModal');
+    if (!modal) return;
+    
+    const settings = loadMediaBrowserSettings();
+    
+    // Set current values
+    const thumbnailsPerRowRadio = document.getElementById(`thumbnailsPerRow${settings.thumbnailsPerRow}`);
+    if (thumbnailsPerRowRadio) {
+        thumbnailsPerRowRadio.checked = true;
+    }
+    
+    // Map size values to IDs: small -> Small, medium -> Medium, etc.
+    const sizeIdMap = {
+        'small': 'Small',
+        'medium': 'Medium',
+        'large': 'Large',
+        'xlarge': 'XLarge'
+    };
+    const thumbnailSizeRadio = document.getElementById(`thumbnailSize${sizeIdMap[settings.thumbnailSize] || 'Medium'}`);
+    if (thumbnailSizeRadio) {
+        thumbnailSizeRadio.checked = true;
+    }
+    
+    modal.style.display = 'flex';
+}
+
+// Close settings modal
+function closeMediaBrowserSettings() {
+    const modal = document.getElementById('mediaBrowserSettingsModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('mediaBrowserSettingsModal');
+    if (modal && modal.style.display === 'flex') {
+        const content = modal.querySelector('.media-browser-settings-content');
+        if (content && !content.contains(event.target) && !event.target.closest('#mediaBrowserSettingsBtn')) {
+            closeMediaBrowserSettings();
+        }
+    }
+});
+
+// Apply settings
+function applyMediaBrowserSettings() {
+    const thumbnailsPerRow = document.querySelector('input[name="thumbnailsPerRow"]:checked')?.value;
+    const thumbnailSize = document.querySelector('input[name="thumbnailSize"]:checked')?.value;
+    
+    if (!thumbnailsPerRow || !thumbnailSize) {
+        alert('Please select all settings');
+        return;
+    }
+    
+    // Save settings
+    saveMediaBrowserSettings({
+        thumbnailsPerRow: parseInt(thumbnailsPerRow),
+        thumbnailSize: thumbnailSize
+    });
+    
+    // Update grid layout
+    updateMediaBrowserGridLayout();
+    
+    // Update all subfolder content grids
+    if (typeof updateAllSubfolderGrids === 'function') {
+        updateAllSubfolderGrids();
+    }
+    
+    // Reload media to apply new thumbnail size
+    const subfolder = document.getElementById('observationSubfolderSelect')?.value;
+    if (subfolder && typeof loadObservationMedia === 'function') {
+        loadObservationMedia();
+    }
+    
+    // Close modal
+    closeMediaBrowserSettings();
+}
+
+// Get current thumbnail size for URL generation
+function getThumbnailSizeString() {
+    const settings = loadMediaBrowserSettings();
+    const sizeObj = THUMBNAIL_SIZES[settings.thumbnailSize] || THUMBNAIL_SIZES.medium;
+    return sizeObj.size;
+}
+
+// Initialize settings on page load
+function initializeMediaBrowserSettings() {
+    const settings = loadMediaBrowserSettings();
+    
+    // Restore expanded state
+    const leftPanel = document.querySelector('.observation-media-left-panel');
+    const expandBtnIcon = document.getElementById('expandBtnIcon');
+    const expandBtnText = document.getElementById('expandBtnText');
+    
+    if (settings.expanded && leftPanel) {
+        leftPanel.classList.add('expanded');
+        if (expandBtnIcon) expandBtnIcon.textContent = '⬜';
+        if (expandBtnText) expandBtnText.textContent = 'Collapse';
+    } else {
+        if (leftPanel) leftPanel.classList.remove('expanded');
+        if (expandBtnIcon) expandBtnIcon.textContent = '⬛';
+        if (expandBtnText) expandBtnText.textContent = 'Expand';
+    }
+    
+    // Update panel layout
+    updatePanelLayout();
+    
+    // Update grid layout after a short delay to ensure DOM is ready
+    setTimeout(function() {
+        updateMediaBrowserGridLayout();
+        // Update all subfolder content grids if they exist
+        if (typeof updateAllSubfolderGrids === 'function') {
+            updateAllSubfolderGrids();
+        }
+    }, 150);
+}
+
+// Make functions globally available
+window.toggleMediaBrowserExpand = toggleMediaBrowserExpand;
+window.openMediaBrowserSettings = openMediaBrowserSettings;
+window.closeMediaBrowserSettings = closeMediaBrowserSettings;
+window.applyMediaBrowserSettings = applyMediaBrowserSettings;
+window.getThumbnailSizeString = getThumbnailSizeString;
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize media browser settings
+    initializeMediaBrowserSettings();
+    
+    // Initialize current draft display
+    if (typeof updateCurrentDraftDisplay === 'function') {
+        updateCurrentDraftDisplay();
+    }
+    
+    // Update panel layout
+    updatePanelLayout();
+    
     // Auto-select subfolder from query parameter if present
     const urlParams = new URLSearchParams(window.location.search);
     const selectedSubfolder = urlParams.get('subfolder');
@@ -340,29 +831,47 @@ document.addEventListener('DOMContentLoaded', function() {
 .observation-media-container {
     display: flex;
     gap: 20px;
-    min-height: 500px;
     width: 100%;
+    position: relative;
+    /* Calculate height: viewport - navigation tabs (30px) - top controls bar (70px) - bottom bar (70px) - margins (50px) */
+    height: calc(100vh - 220px);
+    min-height: 500px;
+    max-height: calc(100vh - 120px);
 }
 
 .observation-media-left-panel {
     flex: 1;
+    width: 50%;
     background: #2a2a2a;
     border: 1px solid #555;
     border-radius: 6px;
-    padding: 20px;
+    padding: 15px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    max-height: calc(100vh - 200px);
+    transition: width 0.3s ease-in-out;
+    height: 100%;
+    /* Independent height - not constrained by right panel */
+}
+
+.observation-media-left-panel.expanded {
+    z-index: 200;                  /* Above right panel when expanded */
 }
 
 .observation-media-right-panel {
     flex: 1;
+    width: 50%;
     background: #2a2a2a;
     border: 1px solid #555;
     border-radius: 6px;
-    padding: 20px;
-    overflow-y: auto;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100%;
+    /* Independent height - not constrained by left panel */
+    /* Ensure children (preview and editor) split space equally */
+    gap: 0;
 }
 
 .observation-media-header {
@@ -420,15 +929,159 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 #observationMediaGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 15px;
-    margin-top: 20px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    flex: 1;
+    display: block;
+    padding: 0;
+    /* Changed from grid to block - sections are block elements, not grid items */
+    width: 100%;
+    height: auto;
+}
+
+#observationMediaGrid.collapsed-state {
+    /* Column count set dynamically by JavaScript */
+}
+
+#observationMediaGrid.expanded-state {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+/* Collapsible Subfolder Sections */
+/* Media Subfolder Section - Fixed to prevent overlap and height issues */
+.media-subfolder-section {
+    /* Remove grid-column - use block layout instead */
+    display: block;
+    width: 100%;
+    margin-bottom: 2px;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #1e1e1e;
+    /* Height management - auto when expanded, minimal when collapsed */
+    height: auto;
     min-height: 0;
-    -webkit-overflow-scrolling: touch;
+    max-height: none;
+    overflow: hidden;
+    /* Ensure proper block layout - no overlap */
+    position: relative;
+    clear: both;
+}
+
+.media-subfolder-header {
+    background: #1e1e1e;
+    padding: 4px 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+    border-left: 2px solid #667eea;
+    border-radius: 3px;
+    transition: background 0.2s;
+    /* Compact header - no extra height */
+    line-height: 1.2;
+    height: auto;
+    min-height: 0;
+}
+
+.media-subfolder-header:hover {
+    background: #2a2a2a;
+}
+
+/* Collapsed state - header only, no content, minimal height */
+.media-subfolder-section.collapsed {
+    margin-bottom: 2px;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    /* Ensure collapsed section only shows header */
+    overflow: hidden;
+}
+
+.media-subfolder-section.collapsed .media-subfolder-content {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    border: none !important;
+    /* Ensure no space is taken */
+    line-height: 0;
+    font-size: 0;
+}
+
+.media-subfolder-section.collapsed .media-subfolder-header {
+    border-bottom: none;
+    margin-bottom: 0;
+    /* Compact header - single line only */
+    height: auto;
+    min-height: 0;
+    line-height: 1.2;
+}
+
+/* Expanded state - show content */
+.media-subfolder-section:not(.collapsed) .media-subfolder-header {
+    border-bottom: 1px solid #555;
+    border-radius: 3px 3px 0 0;
+}
+
+.media-subfolder-content {
+    padding: 10px;
+    display: grid;
+    gap: 15px;
+    /* Proper height management - contained within section */
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+    /* Ensure content is within section boundaries - no overlap */
+    width: 100%;
+    box-sizing: border-box;
+    /* Grid columns set dynamically by JavaScript */
+}
+
+.media-subfolder-section.collapsed .media-subfolder-content {
+    display: none !important;
+    padding: 0;
+    margin: 0;
+    height: 0;
+    min-height: 0;
+    max-height: 0;
+    overflow: hidden;
+}
+
+.media-subfolder-header .section-icon {
+    color: #667eea;
+    font-size: 10px;
+    transition: transform 0.2s;
+    min-width: 10px;
+    line-height: 1;
+}
+
+.media-subfolder-header .folder-icon {
+    color: #667eea;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.media-subfolder-header .subfolder-name {
+    color: #e0e0e0;
+    font-weight: 500;
+    font-size: 14px;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+}
+
+.media-subfolder-header .file-count {
+    color: #999;
+    font-size: 10px;
+    font-weight: normal;
+    white-space: nowrap;
+    margin-left: 6px;
+    line-height: 1.2;
 }
 
 .observation-media-card {
@@ -480,6 +1133,7 @@ document.addEventListener('DOMContentLoaded', function() {
     color: white;
     padding: 4px 8px;
     border-radius: 3px;
+    border: 1px solid;
     font-size: 11px;
     font-weight: bold;
 }
@@ -591,7 +1245,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .observation-text-editor {
     width: 100%;
-    min-height: 300px;
     background: #1e1e1e;
     color: #e0e0e0;
     border: 1px solid #555;
@@ -599,7 +1252,10 @@ document.addEventListener('DOMContentLoaded', function() {
     padding: 15px;
     font-family: monospace;
     font-size: 14px;
-    resize: vertical;
+    resize: none;
+    height: 100%;
+    min-height: 200px;
+    box-sizing: border-box;
 }
 
 .observation-preview {
@@ -607,8 +1263,193 @@ document.addEventListener('DOMContentLoaded', function() {
     border: 1px solid #555;
     border-radius: 4px;
     padding: 15px;
-    min-height: 300px;
     color: #e0e0e0;
+    width: 100%;
+    box-sizing: border-box;
+    /* Allow content to expand naturally within scrollable container */
+    min-height: 200px;
+    /* Don't set overflow here - let preview-section-content handle scrolling */
+    overflow: visible;
+}
+
+/* When observation-preview is also the scrollable container (has preview-section-content class) */
+.observation-preview.preview-section-content {
+    overflow-y: scroll !important;
+    overflow-x: hidden !important;
+}
+
+/* Media Browser Header */
+.media-browser-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+}
+
+/* Media Browser Content */
+.media-browser-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Preview Section */
+.preview-section {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    /* Preview takes full height of right panel */
+}
+
+.preview-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.preview-section-content {
+    flex: 1 1 0;
+    overflow-y: scroll !important;
+    overflow-x: hidden !important;
+    min-height: 0;
+    max-height: 100%;
+    /* Use all available flex space for scrolling - independent from editor */
+    -webkit-overflow-scrolling: touch;
+    /* Ensure all content is scrollable */
+    position: relative;
+    /* Ensure scrolling works properly */
+    overscroll-behavior: contain;
+    /* Add padding at bottom so last section is fully visible when scrolled */
+    padding-bottom: 20px;
+    box-sizing: border-box;
+    /* Force scrollbar to be visible - add border to indicate scrollable area */
+    border-right: 2px solid transparent;
+}
+
+/* Ensure scrollbar takes space when visible */
+.preview-section-content:not(:hover)::-webkit-scrollbar-thumb {
+    background: #444 !important;
+}
+
+/* Custom scrollbar styling to make it clearly visible */
+.preview-section-content::-webkit-scrollbar,
+.observation-preview.preview-section-content::-webkit-scrollbar {
+    width: 14px !important;
+}
+
+.preview-section-content::-webkit-scrollbar-track,
+.observation-preview.preview-section-content::-webkit-scrollbar-track {
+    background: #1e1e1e !important;
+    border-radius: 7px;
+}
+
+.preview-section-content::-webkit-scrollbar-thumb,
+.observation-preview.preview-section-content::-webkit-scrollbar-thumb {
+    background: #666 !important;
+    border-radius: 7px;
+    border: 2px solid #1e1e1e;
+}
+
+.preview-section-content::-webkit-scrollbar-thumb:hover,
+.observation-preview.preview-section-content::-webkit-scrollbar-thumb:hover {
+    background: #777 !important;
+}
+
+/* Firefox scrollbar */
+.preview-section-content,
+.observation-preview.preview-section-content {
+    scrollbar-width: auto !important;
+    scrollbar-color: #666 #1e1e1e !important;
+}
+
+/* Editor Section (Independent, at bottom of page) */
+.editor-section {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 50px;
+    max-height: 600px;
+    overflow: hidden;
+    background: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 6px;
+    padding: 15px;
+    /* Independent section at bottom, not constrained by preview */
+    transition: max-height 0.3s ease, min-height 0.3s ease;
+}
+
+.editor-section.collapsed {
+    min-height: auto;
+    max-height: 60px;
+}
+
+.editor-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+    padding: 5px 0;
+    user-select: none;
+}
+
+.editor-section-icon {
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
+
+.editor-section.collapsed .editor-section-icon {
+    transform: rotate(0deg);
+}
+
+.editor-section:not(.collapsed) .editor-section-icon {
+    transform: rotate(90deg);
+}
+
+.editor-section-content-wrapper {
+    flex: 1 1 0;
+    overflow: hidden;
+    min-height: 300px;
+    max-height: 550px;
+    transition: opacity 0.3s ease, max-height 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    margin-top: 10px;
+}
+
+.editor-section.collapsed .editor-section-content-wrapper {
+    display: none !important;
+    max-height: 0 !important;
+    opacity: 0;
+    overflow: hidden;
+}
+
+.editor-section:not(.collapsed) .editor-section-content-wrapper {
+    display: flex;
+    opacity: 1;
+}
+
+.editor-section-content {
+    width: 100%;
+    height: 100%;
+    min-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    /* Ensure textarea is visible and scrolls independently from preview */
+    box-sizing: border-box;
+    resize: none;
 }
 
 :root {
@@ -670,6 +1511,193 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .observation-section.collapsed .observation-section-icon {
     transform: rotate(0deg);
+}
+
+/* Media count badge styling */
+.section-media-count {
+    background: rgba(102, 126, 234, 0.3);
+    border: 1px solid;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: normal;
+    white-space: nowrap;
+    transition: opacity 0.2s;
+}
+
+.section-media-count.zero-media {
+    background: rgba(153, 153, 153, 0.2);
+    border-color: #666;
+    color: #999;
+}
+
+.dialog-section .section-media-count {
+    font-size: 11px;
+    padding: 3px 6px;
+}
+
+/* Media Browser Settings Modal */
+.media-browser-settings-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease-in;
+}
+
+.media-browser-settings-content {
+    background: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 8px;
+    padding: 25px;
+    width: 500px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.media-browser-settings-content label:hover {
+    background: #333 !important;
+}
+
+.media-browser-settings-content input[type="radio"]:checked + span {
+    color: #667eea;
+    font-weight: bold;
+}
+
+.media-browser-settings-content input[type="radio"] {
+    accent-color: #667eea;
+}
+
+.media-browser-settings-content button:hover {
+    opacity: 0.9;
+}
+
+.media-browser-settings-content button:active {
+    transform: scale(0.98);
+}
+
+/* Draft Preview Modal */
+.draft-preview-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+        width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease-in;
+}
+
+.draft-preview-content {
+    position: relative;
+}
+
+.draft-preview-content h2 {
+    font-size: 20px;
+}
+
+.draft-preview-content table {
+    page-break-inside: avoid;
+}
+
+.draft-preview-content img {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+#previewResizer {
+    transition: background 0.2s;
+}
+
+#previewResizer:hover {
+    background: #667eea;
+}
+
+#previewResizer:active {
+    background: #5568d3;
+}
+
+.preview-section-nav-item {
+    user-select: none;
+}
+
+.hide-elements-section {
+    transition: all 0.3s ease;
+}
+
+.hide-elements-header {
+    transition: background 0.2s;
+}
+
+.hide-elements-header:hover {
+    background: #2a2a2a;
+}
+
+.hide-elements-content {
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.hide-elements-section.expanded .hide-elements-content {
+    display: block !important;
+}
+
+.preview-settings-menu {
+    animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive behavior for media browser */
+@media (max-width: 1023px) {
+    .observation-media-container {
+        flex-direction: column;
+        height: auto;
+        min-height: auto;
+    }
+    
+    .observation-media-left-panel {
+        width: 100%;
+        height: 400px;
+        margin-bottom: 20px;
+    }
+    
+    .observation-media-right-panel {
+        width: 100%;
+        height: auto;
+        min-height: 400px;
+    }
+}
+
+@media (max-width: 767px) {
+    .observation-media-left-panel {
+        height: 300px;
+    }
+    
+    .observation-media-right-panel {
+        min-height: 300px;
+    }
 }
 </style>
 {% endblock %}

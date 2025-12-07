@@ -22,6 +22,17 @@ def page_with_media_assigned(page: Page):
             # Clear and add test content with placeholder
             text_editor.fill("Test content with {{Test_Placeholder}} for reshuffle testing.")
             time.sleep(0.5)
+            
+            # Assign media to make reshuffle button visible
+            page.evaluate("""
+                window.assignMediaToPlaceholder('Test_Placeholder', {
+                    path: '/path/to/test_image.jpg', 
+                    name: 'test_image.jpg', 
+                    type: 'image'
+                });
+                window.updatePreview();
+            """)
+            time.sleep(0.5)
         
         return page
     except Exception as e:
@@ -128,7 +139,7 @@ class TestReshuffleFunctionality:
             
             if initial_count > 0:
                 # Get initial border style of first cell
-                first_cell = media_cells.first()
+                first_cell = media_cells.first
                 initial_border = first_cell.evaluate("el => window.getComputedStyle(el).border")
                 print(f"Initial border: {initial_border}")
                 
@@ -195,4 +206,67 @@ class TestReshuffleFunctionality:
                 pytest.skip("Dialog did not open")
         else:
             pytest.skip("No media cards to open dialog")
+
+    def test_actual_reshuffle_drag_drop(self, page_with_media_assigned):
+        """Test actual drag and drop reordering and take screenshots"""
+        page = page_with_media_assigned
+        
+        # Ensure screenshots directory exists
+        import os
+        os.makedirs("reports/screenshots", exist_ok=True)
+        
+        # 1. Setup: Assign 2 distinct images so we can see the swap
+        print("Setting up 2 images for swap test...")
+        page.evaluate("""
+            window.observationMediaAssignments['Test_Placeholder'] = [];
+            window.assignMediaToPlaceholder('Test_Placeholder', {
+                path: 'tests/test_data/img1.jpg', 
+                name: 'img1.jpg', 
+                type: 'image'
+            });
+            window.assignMediaToPlaceholder('Test_Placeholder', {
+                path: 'tests/test_data/img2.jpg', 
+                name: 'img2.jpg', 
+                type: 'image'
+            });
+            window.updatePreview();
+        """)
+        time.sleep(1)
+        
+        reshuffle_btn = page.locator("#reshuffleBtn")
+        
+        if reshuffle_btn.count() > 0 and reshuffle_btn.is_visible():
+            # 2. Enable Reshuffle
+            reshuffle_btn.click()
+            time.sleep(1)
+            
+            # Take "Before" Screenshot
+            page.screenshot(path="reports/screenshots/01_before_reshuffle.png")
+            print("Captured 01_before_reshuffle.png")
+            
+            # 3. Perform Drag and Drop
+            # We need to find the draggable cells
+            cells = page.locator(".media-cell")
+            count = cells.count()
+            print(f"Found {count} cells")
+            
+            if count >= 2:
+                # Drag cell 0 to cell 1
+                source = cells.nth(0)
+                target = cells.nth(1)
+                
+                print("Performing drag and drop...")
+                source.drag_to(target)
+                time.sleep(1)
+                
+                # Take "After" Screenshot
+                page.screenshot(path="reports/screenshots/02_after_reshuffle.png")
+                print("Captured 02_after_reshuffle.png")
+                
+            else:
+                pytest.fail("Not enough cells to test swap")
+                
+        else:
+            pytest.skip("Reshuffle button not visible")
+
 

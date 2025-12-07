@@ -1106,13 +1106,19 @@ def export_observation_docx():
         text_content = data.get('text', '')
         assignments = data.get('assignments', {})
         filename = data.get('filename', 'observation_document.docx')
+        font_size = data.get('font_size', 16)  # Default 16pt
+        font_name = data.get('font_name', 'Times New Roman')  # Default Times New Roman
         
-        # Validate filename
-        if not filename.endswith('.docx'):
-            filename += '.docx'
-        
-        # Sanitize filename
+        # Sanitize filename first (before adding extension)
         import re
+        filename = re.sub(r'[^\w\-_\.]', '_', filename)
+        
+        # Ensure filename has .docx extension
+        if not filename.lower().endswith('.docx'):
+            # Remove any existing extension before adding .docx
+            filename = filename.rsplit('.', 1)[0] + '.docx'
+        
+        # Final sanitization to ensure no invalid characters remain
         filename = re.sub(r'[^\w\-_\.]', '_', filename)
         
         # Set output path
@@ -1120,7 +1126,7 @@ def export_observation_docx():
         
         # Generate DOCX
         from app.observation_docx_generator import create_observation_docx
-        result = create_observation_docx(text_content, assignments, output_path)
+        result = create_observation_docx(text_content, assignments, output_path, font_size=font_size, font_name=font_name)
         
         if result['success']:
             return jsonify({
@@ -1281,4 +1287,72 @@ def delete_observation_draft(draft_id):
         return jsonify({
             'success': False,
             'error': f'Failed to delete draft: {str(e)}'
+        }), 500
+
+
+@bp.route('/media-converter/observation-media/rename-file', methods=['POST'])
+def rename_observation_media_file():
+    """Rename a media file (only the name part, not the extension)"""
+    try:
+        data = request.get_json()
+        file_path = data.get('file_path')
+        new_name = data.get('new_name')
+        
+        if not file_path or not new_name:
+            return jsonify({
+                'success': False,
+                'error': 'File path and new name are required'
+            }), 400
+        
+        # Validate new name (no path separators, no extension)
+        import re
+        if not re.match(r'^[^/\\<>:"|?*\x00-\x1f]+$', new_name):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid file name. Name cannot contain path separators or special characters.'
+            }), 400
+        
+        # Get file path
+        file_path_obj = Path(file_path)
+        
+        if not file_path_obj.exists():
+            return jsonify({
+                'success': False,
+                'error': 'File not found'
+            }), 404
+        
+        # Get original extension
+        original_extension = file_path_obj.suffix
+        
+        # Create new path with new name but same extension
+        new_path = file_path_obj.parent / f"{new_name}{original_extension}"
+        
+        # Check if new file already exists
+        if new_path.exists() and new_path != file_path_obj:
+            return jsonify({
+                'success': False,
+                'error': 'A file with this name already exists'
+            }), 400
+        
+        # Rename the file
+        file_path_obj.rename(new_path)
+        
+        # Return success with new path and name
+        return jsonify({
+            'success': True,
+            'new_path': str(new_path),
+            'new_name': new_path.name,
+            'message': 'File renamed successfully'
+        })
+        
+    except PermissionError:
+        return jsonify({
+            'success': False,
+            'error': 'Permission denied. Cannot rename file.'
+        }), 403
+    except Exception as e:
+        logger.error(f"Error renaming file: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Failed to rename file: {str(e)}'
         }), 500

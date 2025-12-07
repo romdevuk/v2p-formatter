@@ -2,6 +2,243 @@
 
 All notable changes to the Video to Image Formatter (v2p-formatter) project will be documented in this file.
 
+## [1.4.0] - 2025-01-XX
+
+### Added
+- **Preview Draft Modal - Two-Column Layout with Section Navigation**:
+  - Split Document Preview into two resizable columns
+  - Left column: Section navigation sidebar (200-400px resizable width)
+  - Right column: Preview content area
+  - Resizable divider between columns with visual feedback
+  - Section navigation automatically built from document sections
+  - Color-coded section navigation items matching section titles
+  - Click-to-scroll functionality - clicking a section navigates to it in the preview
+  - Smooth scrolling with brief highlight animation when navigating to sections
+  - Navigation updates automatically after undo/redo operations
+
+- **Hide Elements - Bulk Select/Apply**:
+  - Added "Select All" and "Deselect All" buttons for Hide Elements options
+  - Removed toggle functionality - section is always visible
+  - Quick way to show/hide all elements at once
+
+- **Hide Empty Media Fields Option**:
+  - New checkbox option: "Empty media fields" in Hide Elements section
+  - When checked, empty placeholder tables are hidden in preview
+  - Empty tables are excluded from DOCX export when option is enabled
+  - Original text preserved when updating draft (empty tables remain in source)
+
+- **Font Settings in DOCX Export**:
+  - Font size and font type settings from preview are now applied to exported DOCX files
+  - Font settings read from preview controls and passed to backend
+  - Default: 16pt Times New Roman (if not specified)
+  - All text in exported DOCX uses the selected font settings
+
+### Changed
+- **Text Editor Placement**:
+  - Moved Text Editor to independent field at bottom of page (above "Update Draft" button)
+  - Text Editor and Live Preview are now completely independent sections
+  - Live Preview section is full height when Text Editor is collapsed
+
+- **Hide Elements Behavior**:
+  - Hide Elements settings now only affect preview display and export
+  - When updating draft, hidden elements are preserved in original text
+  - Hidden elements are excluded from DOCX export when options are checked
+  - Original text structure is maintained regardless of hide settings
+
+### Fixed
+- **Text Formatting in Draft Updates**:
+  - Fixed issue where updating draft from preview lost all line breaks
+  - Text now preserves proper formatting with line breaks between paragraphs
+  - Section titles, AC covered lines, and paragraphs maintain proper spacing
+  - Placeholders remain on their own lines
+
+- **AC Covered Line Formatting**:
+  - Fixed extra blank line between paragraphs and AC covered lines in DOCX export
+  - AC covered lines now appear directly after paragraphs with no blank line
+  - Fixed AC covered label and values breaking across two lines
+  - Label and values now stay together on single line when updating draft
+
+- **Preview Draft Button**:
+  - Fixed "Preview Draft" button not working (was throwing ReferenceError)
+  - Fixed placeholder name not being defined for empty tables
+
+- **Paragraph Number Hiding**:
+  - Fixed paragraph numbers not hiding correctly when on their own line
+  - Improved regex pattern to handle numbers followed by empty lines
+  - Paragraph numbers now correctly detected and hidden/shown
+
+- **Media Table Image Visibility**:
+  - Fixed images not showing in media tables in preview
+  - Added CSS rules to force image visibility in preview content
+
+- **Draft Loading**:
+  - Removed popup alert when loading a draft
+  - Draft name now displayed silently in "Current Draft" UI element
+
+### Technical Details
+
+#### Frontend Changes
+- **`templates/observation_media.html`**:
+  - Restructured preview modal to two-column layout with resizable divider
+  - Added section navigation sidebar with color-coded items
+  - Added "Hide empty media fields" checkbox to Hide Elements section
+  - Added bulk select/deselect buttons for Hide Elements
+  - Updated Text Editor placement and styling
+
+- **`static/js/observation-media.js`**:
+  - `extractTextFromPreview()`: Added `preserveHiddenElements` parameter
+    - When `true` (Update Draft): Preserves all elements in original text
+    - When `false` (Export): Removes hidden elements and empty tables
+  - `generateDocxPreview()`: Added section IDs and color-coded borders
+  - `buildPreviewSectionNavigation()`: Builds section navigation from preview content
+  - `scrollToPreviewSection()`: Smooth scroll to section with highlight
+  - `startResizePreview()`, `handleResizePreview()`, `stopResizePreview()`: Column resizing
+  - `exportObservationDocxFromPreview()`: Extracts text with hidden elements excluded
+  - `selectAllHideElements()`, `deselectAllHideElements()`: Bulk operations
+  - `updatePreviewDisplay()`: Added empty table hiding logic
+  - Improved text extraction to preserve line breaks and formatting
+  - Fixed AC covered line extraction to keep label and values together
+  - Added cleanup regex to remove blank lines before AC covered lines
+
+#### Backend Changes
+- **`app/routes.py`**:
+  - `export_observation_docx()`: Added `font_size` and `font_name` parameters
+  - Default values: `font_size=16`, `font_name='Times New Roman'`
+
+- **`app/observation_docx_generator.py`**:
+  - `create_observation_docx()`: Added `font_size` and `font_name` parameters
+  - Sets document Normal style font to specified font name and size
+  - Applies font settings to all text runs in paragraphs
+  - Default font: 16pt Times New Roman
+
+#### CSS Improvements
+- Added resizer hover effects (color change on hover)
+- Section navigation item styling with hover effects
+- Color-coded section title borders matching navigation
+
+---
+
+## [1.3.1] - 2025-01-XX
+
+### Changed
+- **Observation Media Page Layout Improvements**:
+  - Made Live Preview and Text Editor sections fully independent with separate scrolling
+  - Both sections now share space equally (50/50 split) and scroll independently
+  - Fixed Live Preview scrolling to ensure all sections are visible and accessible
+  - Added visible scrollbar styling for the Live Preview section (14px width, custom colors)
+  - Improved flex layout so sections don't affect each other's sizing or scrolling
+
+### Added
+- **Text Editor Collapse/Expand Functionality**:
+  - Text Editor section is now collapsible and collapsed by default to save screen space
+  - Click on "Text Editor" header to expand/collapse the textarea
+  - Smooth CSS transitions for collapse/expand animations
+  - Icon indicator (▶/▼) shows collapse/expand state with rotation animation
+  - When expanded, textarea properly fills available space with minimum height of 300px
+  - Header remains visible when collapsed, showing placeholder/word statistics
+
+### Fixed
+- Fixed Live Preview sections being cut off - all sections now scroll properly within viewport
+- Fixed scrollbar not being visible in Live Preview - added custom webkit and Firefox scrollbar styling
+- Fixed textarea appearing too small (0.5 line) when editor section is expanded
+- Improved CSS flex properties to ensure proper space allocation between preview and editor sections
+- Fixed editor section content wrapper to properly expand when section is opened
+
+### Technical Details
+
+#### Frontend Changes
+- **`templates/observation_media.html`**:
+  - Added `.editor-section.collapsed` class for collapse/expand functionality
+  - Added `.editor-section-content-wrapper` for proper content area management
+  - Enhanced `.preview-section-content` with custom scrollbar styling
+  - Updated flex properties for both sections to ensure independence
+  - Added `toggleEditorSection()` JavaScript function for collapse/expand
+
+- **CSS Improvements**:
+  - Custom scrollbar styling: 14px width, dark theme colors (#666 thumb, #1e1e1e track)
+  - Proper min-height constraints for expanded editor section (300px)
+  - Smooth transitions for collapse/expand animations (0.3s ease)
+  - Flex: 1 1 0 for equal space sharing between preview and editor
+
+---
+
+## [1.3.0] - 2025-01-XX
+
+### Fixed
+- **DOCX Media Table Formatting**: Fixed critical issues with media table layout in exported DOCX files
+  - Fixed table width calculation from `Length` objects to twips conversion
+  - Corrected conversion: Length → inches → twips (1 inch = 1440 twips)
+  - Added sanity checks to prevent invalid width values
+  - Set table layout to `fixed` to properly respect width settings
+  - Ensured tables span full available page width (minus margins)
+  - Default table width: 9000 twips (~6.25 inches for A4 with margins)
+
+- **Column Width Configuration**: Fixed 2-column layout in DOCX media tables
+  - Set equal column widths (50% each of available width)
+  - Columns properly configured via `table.columns[0].width` and `table.columns[1].width`
+  - Removed redundant cell width settings that caused conflicts
+  - Columns now properly visible and correctly sized
+
+- **Image Embedding in DOCX**: Fixed images not appearing in exported DOCX tables
+  - Fixed placeholder name extraction to properly strip braces (was including `{{` and `}}`)
+  - Improved path resolution to handle multiple path formats:
+    - Absolute file paths (from observation media scanner)
+    - Static URL paths (from frontend)
+    - Relative paths with automatic resolution
+    - Fallback search in OUTPUT_FOLDER when path not found
+  - Images now successfully embedded in table cells with proper sizing
+  - Maintains aspect ratio and fits within cell boundaries
+  - Added comprehensive error handling with placeholder text for missing images
+
+- **Placeholder Matching**: Fixed placeholder extraction in DOCX generation
+  - Corrected regex pattern handling to properly extract placeholder names
+  - Fixed case-insensitive matching between placeholders and assignments
+  - Placeholders like `{{Image1}}` now correctly match assignment keys like `'image1'`
+
+### Enhanced
+- **Path Resolution**: Improved image path resolution in DOCX generation
+  - Multiple resolution strategies: absolute paths, static URLs, OUTPUT_FOLDER search
+  - Recursive filename search when direct path not found
+  - Better error messages with path debugging information
+  - Graceful fallback to placeholder text when images cannot be found
+
+- **Error Handling**: Enhanced error handling and logging in DOCX generation
+  - Added comprehensive logging for image processing
+  - Better error messages for debugging path resolution issues
+  - Placeholder text added to cells when images cannot be loaded
+  - Detailed logging at each step of image processing pipeline
+
+### Technical Details
+
+#### Backend Changes
+- **`app/observation_docx_generator.py`**:
+  - `_set_table_width()`: Fixed width conversion with proper Length object handling
+  - `_add_media_table_to_doc()`: Improved width calculation and column width setting
+  - Enhanced image path resolution with multiple fallback strategies
+  - Fixed placeholder name extraction using `.strip('{}')` method
+  - Added comprehensive logging throughout image processing
+
+- **Image Processing**:
+  - Images properly sized to fit within cell boundaries
+  - Maintains aspect ratio while respecting max width/height constraints
+  - Supports images from various sources and path formats
+  - Error handling with informative placeholder text
+
+#### Testing
+- Added `test_docx_direct.py`: Direct DOCX generation test script
+- Added `test_docx_images.py`: Test script for image embedding verification
+- Created `test_docx_with_browser.py`: Browser-based export testing
+- All tests verify table structure, column widths, and image embedding
+
+### Test Results
+- ✅ **Tables created with correct width**: 9000 twips (~6.25 inches)
+- ✅ **Equal column widths**: 4154 twips each (50% of available width)
+- ✅ **Images successfully embedded**: All assigned images appear in DOCX tables
+- ✅ **Path resolution working**: Handles absolute paths, static URLs, and OUTPUT_FOLDER searches
+- ✅ **File size verification**: DOCX files properly sized with embedded images (~400KB with images)
+
+---
+
 ## [1.2.0] - 2025-12-06
 
 ### Added
