@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, send_file, send_from_directory
 import os
+import logging
 from pathlib import Path
 from werkzeug.utils import secure_filename
 from app.utils import allowed_file, create_output_folder, get_pdf_output_path, parse_time_points
@@ -7,11 +8,19 @@ from app.video_processor import get_video_info, extract_frames_at_times
 from app.pdf_generator import create_pdf
 from app.image_editor import adjust_quality
 from app.file_scanner import scan_mp4_files, organize_files_by_folder
+from app.image_scanner import scan_image_files, organize_images_by_folder
+from app.image_pdf_generator import create_image_pdf
+from app.image_docx_generator import create_image_docx
 from config import UPLOAD_FOLDER, DEFAULT_IMAGE_QUALITY, DEFAULT_RESOLUTION, RESOLUTION_PRESETS, INPUT_FOLDER, OUTPUT_FOLDER
-from app.observation_media_scanner import list_output_subfolders, scan_media_subfolder
+from app.observation_media_scanner import list_output_subfolders, scan_media_subfolder, list_qualifications, list_learners
 from app.placeholder_parser import extract_placeholders, validate_placeholders, assign_placeholder_colors
+from app.observation_report_scanner import scan_media_files
+from app.observation_report_placeholder_parser import extract_placeholders as obs_extract_placeholders, validate_placeholder, assign_placeholder_colors as obs_assign_placeholder_colors
+from app.observation_report_draft_manager import save_draft, load_draft, list_drafts, delete_draft
+from app.observation_report_docx_generator import generate_docx as obs_generate_docx
 
 bp = Blueprint('v2p_formatter', __name__)
+logger = logging.getLogger(__name__)
 
 @bp.route('/static/<path:filename>')
 def serve_static(filename):
@@ -30,24 +39,121 @@ def serve_cache(filename):
 @bp.route('/')
 def index():
     """Main page"""
-    return render_template('index.html')
+    from config import OUTPUT_FOLDER
+    
+    # Get qualifications (top-level folders) from OUTPUT_FOLDER
+    qualifications = list_qualifications(OUTPUT_FOLDER)
+    
+    # Get selected qualification and learner from query parameters
+    selected_qualification = request.args.get('qualification', '')
+    selected_learner = request.args.get('learner', '')
+    
+    # Get learners for selected qualification (if any)
+    learners = []
+    if selected_qualification:
+        learners = list_learners(OUTPUT_FOLDER, selected_qualification)
+    
+    return render_template('index.html',
+                         qualifications=qualifications,
+                         learners=learners,
+                         selected_qualification=selected_qualification,
+                         selected_learner=selected_learner)
+
+@bp.route('/qualifications', methods=['GET'])
+def get_qualifications():
+    """List all top-level folders in the output directory (qualifications)"""
+    from config import OUTPUT_FOLDER
+    try:
+        qualifications = list_qualifications(OUTPUT_FOLDER)
+        return jsonify({'success': True, 'qualifications': qualifications})
+    except Exception as e:
+        logger.error(f"Error listing qualifications: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/learners', methods=['GET'])
+def get_input_learners():
+    """List subfolders (learners) within a selected qualification for output folder"""
+    from config import OUTPUT_FOLDER
+    qualification = request.args.get('qualification')
+    if not qualification:
+        return jsonify({'success': False, 'error': 'Qualification not provided'}), 400
+    try:
+        learners = list_learners(OUTPUT_FOLDER, qualification)
+        return jsonify({'success': True, 'learners': learners})
+    except Exception as e:
+        logger.error(f"Error listing learners for qualification {qualification}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @bp.route('/list_files', methods=['GET'])
 def list_files():
-    """List all MP4 files in the input directory"""
-    from config import INPUT_FOLDER
+    """List all MP4 files in the output directory, optionally filtered by qualification/learner"""
+    from config import OUTPUT_FOLDER
+    from pathlib import Path
+    
+    # Get filter parameters
+    qualification = request.args.get('qualification', '')
+    learner = request.args.get('learner', '')
     
     try:
-        files = scan_mp4_files(str(INPUT_FOLDER))
-        tree = organize_files_by_folder(files)
+        # Only scan when both qualification and learner are selected
+        if qualification and learner:
+            # Scan only within qualification/learner folder and all its subfolders
+            scan_path = OUTPUT_FOLDER / qualification / learner
+            if not scan_path.exists():
+                return jsonify({
+                    'success': True,
+                    'files': [],
+                    'tree': {},
+                    'count': 0,
+                    'input_folder': str(INPUT_FOLDER),
+                    'output_folder': str(OUTPUT_FOLDER)
+                })
+            # Scan files recursively from the specific qualification/learner path
+            # scan_mp4_files uses rglob which recursively scans all subfolders
+            all_files = scan_mp4_files(str(scan_path))
+            
+            # Update relative paths to be relative to OUTPUT_FOLDER (not scan_path)
+            base_path = OUTPUT_FOLDER
+            filtered_files = []
+            for file_info in all_files:
+                file_path = Path(file_info['path'])
+                try:
+                    # Calculate relative path from OUTPUT_FOLDER
+                    relative_to_base = file_path.relative_to(base_path)
+                    rel_str = str(relative_to_base)
+                    file_info['relative_path'] = rel_str
+                    # Update folder to be relative to OUTPUT_FOLDER as well
+                    # The folder should be the path relative to OUTPUT_FOLDER, excluding filename
+                    folder_path = relative_to_base.parent
+                    file_info['folder'] = str(folder_path) if folder_path != Path('.') else 'root'
+                    filtered_files.append(file_info)
+                except ValueError:
+                    # Path not relative to base, skip
+                    continue
+        else:
+            # No learner selected - return empty (only show files when learner is selected)
+            return jsonify({
+                'success': True,
+                'files': [],
+                'tree': {},
+                'count': 0,
+                'input_folder': str(INPUT_FOLDER),
+                'output_folder': str(OUTPUT_FOLDER)
+            })
+        
+        tree = organize_files_by_folder(filtered_files)
         
         return jsonify({
             'success': True,
-            'files': files,
+            'files': filtered_files,
             'tree': tree,
-            'count': len(files),
+            'count': len(filtered_files),
             'input_folder': str(INPUT_FOLDER),
-            'output_folder': str(OUTPUT_FOLDER)
+            'output_folder': str(OUTPUT_FOLDER),
+            'qualification': qualification,
+            'learner': learner
         })
     except Exception as e:
         import logging
@@ -78,13 +184,13 @@ def select_file():
         
         logger.info(f"📁 File selected: {file_path}")
         
-        # Validate file exists and is within input folder
+        # Validate file exists and is within output folder
         file_path = os.path.abspath(file_path)
-        input_path = os.path.abspath(str(INPUT_FOLDER))
+        output_path = os.path.abspath(str(OUTPUT_FOLDER))
         
-        if not file_path.startswith(input_path):
-            logger.error(f"❌ File path outside input folder: {file_path}")
-            return jsonify({'error': 'File path must be within input folder'}), 403
+        if not file_path.startswith(output_path):
+            logger.error(f"❌ File path outside output folder: {file_path}")
+            return jsonify({'error': 'File path must be within output folder'}), 403
         
         if not os.path.exists(file_path):
             logger.error(f"❌ File not found: {file_path}")
@@ -278,6 +384,362 @@ def generate_docx():
         logging.error(f"Error generating DOCX: {str(e)}", exc_info=True)
         return jsonify({'error': f'Failed to generate DOCX: {str(e)}'}), 500
 
+@bp.route('/batch_video_info', methods=['POST'])
+def batch_video_info():
+    """Get video information for multiple videos at once"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        data = request.json
+        video_paths = data.get('video_paths', [])
+        
+        if not video_paths:
+            return jsonify({'error': 'No video paths provided'}), 400
+        
+        if not isinstance(video_paths, list):
+            return jsonify({'error': 'video_paths must be an array'}), 400
+        
+        # Limit batch size to prevent abuse
+        if len(video_paths) > 20:
+            return jsonify({'error': 'Maximum 20 videos allowed per batch'}), 400
+        
+        results = []
+        errors = []
+        
+        for idx, video_path in enumerate(video_paths):
+            try:
+                # Validate file path
+                video_path = os.path.abspath(str(video_path))
+                output_path = os.path.abspath(str(OUTPUT_FOLDER))
+                
+                if not video_path.startswith(output_path):
+                    errors.append({
+                        'index': idx,
+                        'video_path': video_path,
+                        'error': 'File path must be within output folder'
+                    })
+                    continue
+                
+                if not os.path.exists(video_path):
+                    errors.append({
+                        'index': idx,
+                        'video_path': video_path,
+                        'error': 'File not found'
+                    })
+                    continue
+                
+                if not video_path.lower().endswith('.mp4'):
+                    errors.append({
+                        'index': idx,
+                        'video_path': video_path,
+                        'error': 'Invalid file type. Only MP4 files are allowed.'
+                    })
+                    continue
+                
+                # Get video info
+                video_info = get_video_info(video_path)
+                
+                if not video_info:
+                    errors.append({
+                        'index': idx,
+                        'video_path': video_path,
+                        'error': 'Failed to read video file'
+                    })
+                    continue
+                
+                results.append({
+                    'video_path': video_path,
+                    'filename': os.path.basename(video_path),
+                    'duration': round(video_info['duration'], 2),
+                    'width': video_info['width'],
+                    'height': video_info['height'],
+                    'fps': round(video_info['fps'], 2),
+                    'frame_count': video_info.get('frame_count', 0)
+                })
+                
+            except Exception as e:
+                logger.error(f"Error processing video {idx}: {str(e)}", exc_info=True)
+                errors.append({
+                    'index': idx,
+                    'video_path': str(video_path) if video_path else 'unknown',
+                    'error': f'Error processing video: {str(e)}'
+                })
+        
+        return jsonify({
+            'success': True,
+            'videos': results,
+            'errors': errors,
+            'total_requested': len(video_paths),
+            'successful': len(results),
+            'failed': len(errors)
+        })
+        
+    except Exception as e:
+        logger.error(f"Batch video info error: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Failed to get video info: {str(e)}'}), 500
+
+@bp.route('/validate_batch_time_points', methods=['POST'])
+def validate_batch_time_points():
+    """Validate time points against multiple videos' durations"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        data = request.json
+        video_paths = data.get('video_paths', [])
+        time_points = data.get('time_points', [])
+        
+        if not video_paths:
+            return jsonify({'error': 'No video paths provided'}), 400
+        
+        if not isinstance(video_paths, list):
+            return jsonify({'error': 'video_paths must be an array'}), 400
+        
+        if not time_points:
+            return jsonify({'error': 'No time points provided'}), 400
+        
+        if not isinstance(time_points, list):
+            return jsonify({'error': 'time_points must be an array'}), 400
+        
+        # Limit batch size
+        if len(video_paths) > 20:
+            return jsonify({'error': 'Maximum 20 videos allowed per batch'}), 400
+        
+        # Validate time_points are numbers
+        try:
+            time_points = [float(t) for t in time_points]
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid time_points format. Must be array of numbers.'}), 400
+        
+        validation_results = []
+        overall_valid = True
+        tolerance = 0.1  # Allow small tolerance for floating point precision
+        
+        for idx, video_path in enumerate(video_paths):
+            try:
+                # Validate file path
+                video_path = os.path.abspath(str(video_path))
+                output_path = os.path.abspath(str(OUTPUT_FOLDER))
+                
+                if not video_path.startswith(output_path):
+                    validation_results.append({
+                        'video_path': video_path,
+                        'valid': False,
+                        'error': 'File path must be within output folder',
+                        'warnings': []
+                    })
+                    overall_valid = False
+                    continue
+                
+                if not os.path.exists(video_path):
+                    validation_results.append({
+                        'video_path': video_path,
+                        'valid': False,
+                        'error': 'File not found',
+                        'warnings': []
+                    })
+                    overall_valid = False
+                    continue
+                
+                # Get video info
+                video_info = get_video_info(video_path)
+                
+                if not video_info:
+                    validation_results.append({
+                        'video_path': video_path,
+                        'valid': False,
+                        'error': 'Failed to read video file',
+                        'warnings': []
+                    })
+                    overall_valid = False
+                    continue
+                
+                duration = video_info['duration']
+                max_time = duration
+                
+                # Check each time point
+                invalid_times = []
+                warnings = []
+                
+                for time_point in time_points:
+                    if time_point < -tolerance or time_point > (max_time + tolerance):
+                        invalid_times.append(time_point)
+                
+                if invalid_times:
+                    warnings.append({
+                        'type': 'time_points_exceed_duration',
+                        'message': f'Time points exceed video duration ({duration:.2f}s)',
+                        'invalid_times': invalid_times,
+                        'video_duration': duration
+                    })
+                    # Still valid, but with warnings (will be clamped during extraction)
+                    validation_results.append({
+                        'video_path': video_path,
+                        'filename': os.path.basename(video_path),
+                        'valid': True,
+                        'duration': duration,
+                        'warnings': warnings,
+                        'invalid_time_points': invalid_times
+                    })
+                else:
+                    validation_results.append({
+                        'video_path': video_path,
+                        'filename': os.path.basename(video_path),
+                        'valid': True,
+                        'duration': duration,
+                        'warnings': []
+                    })
+                
+            except Exception as e:
+                logger.error(f"Error validating video {idx}: {str(e)}", exc_info=True)
+                validation_results.append({
+                    'video_path': str(video_path) if video_path else 'unknown',
+                    'valid': False,
+                    'error': f'Error validating video: {str(e)}',
+                    'warnings': []
+                })
+                overall_valid = False
+        
+        return jsonify({
+            'success': True,
+            'valid': overall_valid,
+            'results': validation_results,
+            'total_videos': len(video_paths),
+            'has_warnings': any(r.get('warnings') for r in validation_results)
+        })
+        
+    except Exception as e:
+        logger.error(f"Batch time points validation error: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Failed to validate time points: {str(e)}'}), 500
+
+@bp.route('/open_folder', methods=['POST'])
+def open_folder():
+    """Open folder in macOS Finder"""
+    import subprocess
+    import platform
+    
+    try:
+        data = request.json
+        folder_path = data.get('path')
+        
+        if not folder_path:
+            return jsonify({
+                'success': False,
+                'error': 'No folder path provided'
+            }), 400
+        
+        folder_path_obj = Path(folder_path)
+        
+        # Validate path exists
+        if not folder_path_obj.exists() or not folder_path_obj.is_dir():
+            return jsonify({
+                'success': False,
+                'error': 'Folder does not exist'
+            }), 400
+        
+        # On macOS, use 'open' command to open Finder
+        if platform.system() == 'Darwin':
+            try:
+                subprocess.Popen(['open', str(folder_path_obj)])
+                return jsonify({
+                    'success': True,
+                    'message': 'Folder opened in Finder'
+                })
+            except Exception as e:
+                logger.error(f"Error opening folder in Finder: {e}", exc_info=True)
+                return jsonify({
+                    'success': False,
+                    'error': f'Failed to open folder: {str(e)}'
+                }), 500
+        else:
+            # For other platforms, return success but don't open (could implement Windows/Linux later)
+            return jsonify({
+                'success': True,
+                'message': 'Folder path returned (open not supported on this platform)'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error in open_folder: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Failed to open folder: {str(e)}'
+        }), 500
+
+@bp.route('/open_file', methods=['POST'])
+def open_file():
+    """Open file in macOS Preview (PDF) or default app"""
+    import subprocess
+    import platform
+    
+    try:
+        data = request.json
+        file_path = data.get('path')
+        
+        if not file_path:
+            return jsonify({
+                'success': False,
+                'error': 'No file path provided'
+            }), 400
+        
+        # Handle both relative and absolute paths
+        if os.path.isabs(file_path):
+            file_path_abs = Path(file_path)
+        else:
+            # Relative path - join with OUTPUT_FOLDER
+            file_path_abs = OUTPUT_FOLDER / file_path
+        
+        file_path_abs = file_path_abs.resolve()
+        
+        # Validate path exists
+        if not file_path_abs.exists() or not file_path_abs.is_file():
+            return jsonify({
+                'success': False,
+                'error': 'File does not exist'
+            }), 400
+        
+        # Security: validate path is within OUTPUT_FOLDER
+        try:
+            file_path_abs.relative_to(OUTPUT_FOLDER.resolve())
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid file path - must be in output folder'
+            }), 403
+        
+        # On macOS, use 'open -a Preview' for PDFs, 'open' for others
+        if platform.system() == 'Darwin':
+            try:
+                if file_path_abs.suffix.lower() == '.pdf':
+                    # Open PDF in Preview
+                    subprocess.Popen(['open', '-a', 'Preview', str(file_path_abs)])
+                else:
+                    # Open other files with default app
+                    subprocess.Popen(['open', str(file_path_abs)])
+                return jsonify({
+                    'success': True,
+                    'message': 'File opened in Preview' if file_path_abs.suffix.lower() == '.pdf' else 'File opened'
+                })
+            except Exception as e:
+                logger.error(f"Error opening file: {e}", exc_info=True)
+                return jsonify({
+                    'success': False,
+                    'error': f'Failed to open file: {str(e)}'
+                }), 500
+        else:
+            # For other platforms, return success but don't open (could implement Windows/Linux later)
+            return jsonify({
+                'success': True,
+                'message': 'File path returned (open not supported on this platform)'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error in open_file: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Failed to open file: {str(e)}'
+        }), 500
+
 @bp.route('/download')
 def download_file():
     """Download generated file from output folder"""
@@ -285,15 +747,22 @@ def download_file():
     if not filepath:
         return jsonify({'error': 'No file path provided'}), 400
     
-    # Security: validate path is within output directory
-    filepath = os.path.abspath(filepath)
+    # Handle both relative and absolute paths
+    if os.path.isabs(filepath):
+        # Absolute path provided
+        filepath_abs = os.path.abspath(filepath)
+    else:
+        # Relative path - join with OUTPUT_FOLDER
+        filepath_abs = os.path.abspath(os.path.join(str(OUTPUT_FOLDER), filepath))
+    
     output_path = os.path.abspath(str(OUTPUT_FOLDER))
     
-    if not filepath.startswith(output_path):
+    # Security: validate path is within output directory
+    if not filepath_abs.startswith(output_path):
         return jsonify({'error': 'Invalid file path - must be in output folder'}), 403
     
-    if os.path.exists(filepath) and os.path.isfile(filepath):
-        return send_file(filepath, as_attachment=True)
+    if os.path.exists(filepath_abs) and os.path.isfile(filepath_abs):
+        return send_file(filepath_abs, as_attachment=True)
     return jsonify({'error': 'File not found'}), 404
 
 @bp.route('/video_file')
@@ -303,11 +772,11 @@ def serve_video_file():
     if not filepath:
         return jsonify({'error': 'No file path provided'}), 400
     
-    # Security: validate path is within input directory
+    # Security: validate path is within output directory
     filepath = os.path.abspath(filepath)
-    input_path = os.path.abspath(str(INPUT_FOLDER))
+    output_path = os.path.abspath(str(OUTPUT_FOLDER))
     
-    if not filepath.startswith(input_path):
+    if not filepath.startswith(output_path):
         return jsonify({'error': 'Invalid file path'}), 403
     
     if os.path.exists(filepath) and os.path.isfile(filepath):
@@ -326,10 +795,10 @@ def get_video_thumbnail():
     if not file_path:
         return jsonify({'error': 'No file path provided'}), 400
     
-    file_path_obj = Path(file_path)
+    file_path_obj = Path(file_path).resolve()  # Resolve to handle absolute paths
     
-    # Validate path is within INPUT_FOLDER
-    is_valid, error_msg = validate_input_path(str(file_path_obj), INPUT_FOLDER)
+    # Validate path is within OUTPUT_FOLDER
+    is_valid, error_msg = validate_input_path(str(file_path_obj), OUTPUT_FOLDER)
     if not is_valid:
         return jsonify({'error': error_msg}), 403
     
@@ -337,18 +806,25 @@ def get_video_thumbnail():
     if not file_path_obj.exists() or not file_path_obj.is_file():
         return jsonify({'error': 'File not found'}), 404
     
-    # Check if it's an MP4 file
+    # Check file type
     ext = file_path_obj.suffix.lower()
-    if ext != '.mp4':
-        return jsonify({'error': 'Only MP4 files are supported'}), 400
+    file_type = None
     
-    # Get size parameter (optional)
-    size_str = request.args.get('size', '120x90')
+    if ext == '.mp4':
+        file_type = 'mp4'
+    elif ext in {'.jpg', '.jpeg', '.png', '.gif', '.webp'}:
+        # Pass the extension without the dot (e.g., 'jpg', 'png')
+        file_type = ext.lstrip('.')
+    else:
+        return jsonify({'error': f'File type {ext} not supported for thumbnails'}), 400
+    
+    # Get size parameter (optional) - increased default for better quality
+    size_str = request.args.get('size', '640x480')
     try:
         width, height = map(int, size_str.split('x'))
         size = (width, height)
     except:
-        size = (120, 90)
+        size = (640, 480)
     
     # Check if cache is stale
     cache_path = get_thumbnail_cache_path(file_path_obj, size)
@@ -363,7 +839,7 @@ def get_video_thumbnail():
     
     try:
         # Generate thumbnail (will use cache if valid, or create new)
-        thumbnail_data = get_thumbnail(file_path_obj, 'mp4', size)
+        thumbnail_data = get_thumbnail(file_path_obj, file_type, size)
         
         return Response(
             thumbnail_data,
@@ -376,12 +852,10 @@ def get_video_thumbnail():
         )
     except Exception as e:
         import logging
-        logging.error(f"Error generating thumbnail: {e}", exc_info=True)
-        return jsonify({'error': f'Failed to generate thumbnail: {str(e)}'}), 500
-    
-    if os.path.exists(filepath) and os.path.isfile(filepath) and filepath.lower().endswith('.mp4'):
-        return send_file(filepath, mimetype='video/mp4')
-    return jsonify({'error': 'File not found'}), 404
+        import traceback
+        error_details = traceback.format_exc()
+        logging.error(f"Error generating thumbnail for {file_path}: {e}\n{error_details}", exc_info=True)
+        return jsonify({'error': f'Failed to generate thumbnail: {str(e)}', 'details': str(e)}), 500
 
 
 # ============================================================================
@@ -391,42 +865,137 @@ def get_video_thumbnail():
 @bp.route('/media-converter')
 def media_converter():
     """Media converter main page"""
-    return render_template('media_converter.html')
+    from config import MEDIA_CONVERTER_INPUT_FOLDER
+    
+    # Get qualifications (top-level folders)
+    qualifications = list_qualifications(MEDIA_CONVERTER_INPUT_FOLDER)
+    
+    # Get selected qualification and learner from query parameters
+    selected_qualification = request.args.get('qualification', '')
+    selected_learner = request.args.get('learner', '')
+    
+    # Get learners for selected qualification (if any)
+    learners = []
+    if selected_qualification:
+        learners = list_learners(MEDIA_CONVERTER_INPUT_FOLDER, selected_qualification)
+    
+    return render_template('media_converter.html',
+                         qualifications=qualifications,
+                         learners=learners,
+                         selected_qualification=selected_qualification,
+                         selected_learner=selected_learner)
 
 
-@bp.route('/observation-media')
-def observation_media():
-    """Observation Media standalone page"""
-    # Get subfolders for Observation Media (API-free approach - pass data in template)
-    subfolders = list_output_subfolders(OUTPUT_FOLDER)
-    
-    # Get selected subfolder from query parameter (for auto-selection after reload)
-    selected_subfolder = request.args.get('subfolder', '')
-    
-    # Get media for each subfolder (API-free - all data in template)
-    # This re-scans ALL subfolders on every page load
-    subfolder_media = {}
-    for subfolder in subfolders:
-        subfolder_media[subfolder] = scan_media_subfolder(OUTPUT_FOLDER, subfolder)
-    
-    return render_template('observation_media.html', 
-                         observation_subfolders=subfolders,
-                         observation_subfolder_media=subfolder_media,
-                         selected_subfolder=selected_subfolder)
+@bp.route('/media-converter/qualifications', methods=['GET'])
+def get_media_converter_qualifications():
+    """List all top-level folders in the input directory (qualifications)"""
+    from config import MEDIA_CONVERTER_INPUT_FOLDER
+    try:
+        qualifications = list_qualifications(MEDIA_CONVERTER_INPUT_FOLDER)
+        return jsonify({'success': True, 'qualifications': qualifications})
+    except Exception as e:
+        logger.error(f"Error listing qualifications: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/media-converter/learners', methods=['GET'])
+def get_media_converter_learners():
+    """List subfolders (learners) within a selected qualification"""
+    from config import MEDIA_CONVERTER_INPUT_FOLDER
+    qualification = request.args.get('qualification')
+    if not qualification:
+        return jsonify({'success': False, 'error': 'Qualification not provided'}), 400
+    try:
+        learners = list_learners(MEDIA_CONVERTER_INPUT_FOLDER, qualification)
+        return jsonify({'success': True, 'learners': learners})
+    except Exception as e:
+        logger.error(f"Error listing learners for qualification {qualification}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @bp.route('/media-converter/list', methods=['GET'])
 def list_media_files():
-    """List all MOV, JPG, JPEG, and PNG files in input folder"""
+    """List all MOV, JPG, JPEG, and PNG files in input folder, optionally filtered by qualification/learner"""
     from config import MEDIA_CONVERTER_INPUT_FOLDER
     from app.media_file_scanner import scan_media_files, get_file_info
     from pathlib import Path
     
+    # Get filter parameters
+    qualification = request.args.get('qualification', '')
+    learner = request.args.get('learner', '')
+    
     try:
-        result = scan_media_files(str(MEDIA_CONVERTER_INPUT_FOLDER))
+        # Determine scan path based on filters
+        if qualification and learner:
+            # Scan only within qualification/learner folder
+            scan_path = MEDIA_CONVERTER_INPUT_FOLDER / qualification / learner
+            if not scan_path.exists():
+                return jsonify({
+                    'success': True,
+                    'videos': [],
+                    'images': [],
+                    'video_count': 0,
+                    'image_count': 0,
+                    'input_folder': str(MEDIA_CONVERTER_INPUT_FOLDER),
+                    'output_folder': str(OUTPUT_FOLDER)
+                })
+        elif qualification:
+            # If only qualification selected, return empty (per requirements)
+            return jsonify({
+                'success': True,
+                'videos': [],
+                'images': [],
+                'video_count': 0,
+                'image_count': 0,
+                'input_folder': str(MEDIA_CONVERTER_INPUT_FOLDER),
+                'output_folder': str(OUTPUT_FOLDER)
+            })
+        else:
+            # No filters - return empty (per requirements: show no files until both selected)
+            return jsonify({
+                'success': True,
+                'videos': [],
+                'images': [],
+                'video_count': 0,
+                'image_count': 0,
+                'input_folder': str(MEDIA_CONVERTER_INPUT_FOLDER),
+                'output_folder': str(OUTPUT_FOLDER)
+            })
+        
+        result = scan_media_files(str(scan_path))
+        
+        # Filter files to ensure they're within the qualification/learner path
+        # and update relative_path to be relative to INPUT_FOLDER for output path calculation
+        base_path = MEDIA_CONVERTER_INPUT_FOLDER
+        filtered_videos = []
+        filtered_images = []
+        
+        for video in result['videos']:
+            video_path = Path(video['path'])
+            try:
+                relative_to_base = video_path.relative_to(base_path)
+                # Ensure it starts with qualification/learner
+                if str(relative_to_base).startswith(f"{qualification}/{learner}/") or str(relative_to_base) == f"{qualification}/{learner}":
+                    video['relative_path'] = str(relative_to_base)
+                    filtered_videos.append(video)
+            except ValueError:
+                # Path not relative to base, skip
+                continue
+        
+        for image in result['images']:
+            image_path = Path(image['path'])
+            try:
+                relative_to_base = image_path.relative_to(base_path)
+                # Ensure it starts with qualification/learner
+                if str(relative_to_base).startswith(f"{qualification}/{learner}/") or str(relative_to_base) == f"{qualification}/{learner}":
+                    image['relative_path'] = str(relative_to_base)
+                    filtered_images.append(image)
+            except ValueError:
+                # Path not relative to base, skip
+                continue
         
         # Add file info (width, height, duration) to each file
-        for video in result['videos']:
+        for video in filtered_videos:
             file_info = get_file_info(Path(video['path']))
             video.update({
                 'width': file_info.get('width', 0),
@@ -434,7 +1003,7 @@ def list_media_files():
                 'duration': file_info.get('duration', 0)
             })
         
-        for image in result['images']:
+        for image in filtered_images:
             file_info = get_file_info(Path(image['path']))
             image.update({
                 'width': file_info.get('width', 0),
@@ -443,12 +1012,14 @@ def list_media_files():
         
         return jsonify({
             'success': True,
-            'videos': result['videos'],
-            'images': result['images'],
-            'video_count': len(result['videos']),
-            'image_count': len(result['images']),
+            'videos': filtered_videos,
+            'images': filtered_images,
+            'video_count': len(filtered_videos),
+            'image_count': len(filtered_images),
             'input_folder': str(MEDIA_CONVERTER_INPUT_FOLDER),
-            'output_folder': str(OUTPUT_FOLDER)
+            'output_folder': str(OUTPUT_FOLDER),
+            'qualification': qualification,
+            'learner': learner
         })
     except Exception as e:
         import logging
@@ -1046,20 +1617,24 @@ def get_thumbnail():
         file_type = 'mov'
     elif ext == '.mp4':
         file_type = 'mp4'
+    elif ext == '.mp3':
+        file_type = 'mp3'  # Audio files - will return placeholder
     elif ext in ('.jpg', '.jpeg'):
         file_type = 'jpg'
     elif ext == '.png':
         file_type = 'png'
+    elif ext == '.pdf':
+        file_type = 'pdf'
     else:
         return jsonify({'error': 'Unsupported file type'}), 400
     
-    # Get size parameter (optional)
-    size_str = request.args.get('size', '120x90')
+    # Get size parameter (optional) - increased default for better quality
+    size_str = request.args.get('size', '640x480')
     try:
         width, height = map(int, size_str.split('x'))
         size = (width, height)
     except:
-        size = (120, 90)
+        size = (640, 480)
     
     # Check if cache is stale (file was modified after cache was created)
     cache_path = get_thumbnail_cache_path(file_path_obj, size)
@@ -1093,266 +1668,286 @@ def get_thumbnail():
 
 
 
-
 # ============================================================================
 # Observation Media DOCX Export
 # ============================================================================
 
-@bp.route('/media-converter/observation-media/export-docx', methods=['POST'])
-def export_observation_docx():
-    """Export observation media document to DOCX"""
+@bp.route('/media-converter/audio-file', methods=['GET'])
+def serve_audio_file():
+    """Serve audio file for preview"""
+    filepath = request.args.get('path')
+    if not filepath:
+        return jsonify({'error': 'No file path provided'}), 400
+    
+    # Security: validate path is within output directory
+    filepath = os.path.abspath(filepath)
+    output_path = os.path.abspath(str(OUTPUT_FOLDER))
+    
+    if not filepath.startswith(output_path):
+        return jsonify({'error': 'Invalid file path - must be in output folder'}), 403
+    
+    if os.path.exists(filepath) and os.path.isfile(filepath):
+        return send_file(filepath, mimetype='audio/mpeg')
+    return jsonify({'error': 'File not found'}), 404
+
+# ============================================================================
+# Image to PDF Module Routes
+# ============================================================================
+
+@bp.route('/image-to-pdf', methods=['GET'])
+def image_to_pdf_index():
+    """Image to PDF main page"""
+    from config import OUTPUT_FOLDER
+    
+    # Get qualifications (top-level folders) from OUTPUT_FOLDER
+    qualifications = list_qualifications(OUTPUT_FOLDER)
+    
+    # Get selected qualification and learner from query parameters
+    selected_qualification = request.args.get('qualification', '')
+    selected_learner = request.args.get('learner', '')
+    
+    # Get learners for selected qualification (if any)
+    learners = []
+    if selected_qualification:
+        learners = list_learners(OUTPUT_FOLDER, selected_qualification)
+    
+    return render_template('image_to_pdf.html',
+                         qualifications=qualifications,
+                         selected_qualification=selected_qualification,
+                         learners=learners,
+                         selected_learner=selected_learner)
+
+
+@bp.route('/list_images', methods=['GET'])
+def list_images():
+    """List all image files in the output directory, optionally filtered by qualification/learner"""
+    from config import OUTPUT_FOLDER
+    from pathlib import Path
+    
+    # Get filter parameters
+    qualification = request.args.get('qualification', '')
+    learner = request.args.get('learner', '')
+    
     try:
-        data = request.get_json()
-        text_content = data.get('text', '')
-        assignments = data.get('assignments', {})
-        filename = data.get('filename', 'observation_document.docx')
-        font_size = data.get('font_size', 16)  # Default 16pt
-        font_name = data.get('font_name', 'Times New Roman')  # Default Times New Roman
-        
-        # Sanitize filename first (before adding extension)
-        import re
-        filename = re.sub(r'[^\w\-_\.]', '_', filename)
-        
-        # Ensure filename has .docx extension
-        if not filename.lower().endswith('.docx'):
-            # Remove any existing extension before adding .docx
-            filename = filename.rsplit('.', 1)[0] + '.docx'
-        
-        # Final sanitization to ensure no invalid characters remain
-        filename = re.sub(r'[^\w\-_\.]', '_', filename)
-        
-        # Set output path
-        output_path = OUTPUT_FOLDER / filename
-        
-        # Generate DOCX
-        from app.observation_docx_generator import create_observation_docx
-        result = create_observation_docx(text_content, assignments, output_path, font_size=font_size, font_name=font_name)
-        
-        if result['success']:
+        # Only scan when both qualification and learner are selected
+        if qualification and learner:
+            # Scan only within qualification/learner folder and all its subfolders
+            scan_path = OUTPUT_FOLDER / qualification / learner
+            if not scan_path.exists():
+                return jsonify({
+                    'success': True,
+                    'files': [],
+                    'tree': {},
+                    'count': 0,
+                    'output_folder': str(OUTPUT_FOLDER)
+                })
+            
+            # Scan images recursively from the specific qualification/learner path
+            all_files = scan_image_files(str(scan_path))
+            
+            # Update relative paths to be relative to OUTPUT_FOLDER (for downloads)
+            # But folder paths should be relative to the learner folder (scan_path)
+            base_path = OUTPUT_FOLDER
+            filtered_files = []
+            for file_info in all_files:
+                file_path = Path(file_info['path'])
+                try:
+                    # Calculate relative path from OUTPUT_FOLDER (for download links)
+                    relative_to_base = file_path.relative_to(base_path)
+                    rel_str = str(relative_to_base)
+                    file_info['relative_path'] = rel_str
+                    
+                    # Calculate folder relative to scan_path (learner folder) for UI display
+                    relative_to_learner = file_path.relative_to(scan_path)
+                    folder_path = relative_to_learner.parent
+                    # If image is directly in learner folder, it's 'root', otherwise use folder name
+                    file_info['folder'] = str(folder_path) if folder_path != Path('.') else 'root'
+                    
+                    filtered_files.append(file_info)
+                except ValueError:
+                    # Path not relative to base, skip
+                    continue
+            
+            # Sort files: subfolders first, then root, then alphabetical within each
+            filtered_files.sort(key=lambda x: (
+                1 if x['folder'] == 'root' else 0,  # Root last
+                x['folder'],  # Then by folder name
+                x['name']  # Then by filename
+            ))
+            
+            # Organize files by folder for tree structure
+            tree = organize_images_by_folder(filtered_files)
+            
             return jsonify({
                 'success': True,
-                'file_path': result['file_path'],
-                'file_name': result['file_name'],
-                'download_url': f'/v2p-formatter/media-converter/observation-media/download-docx/{result["file_name"]}'
+                'files': filtered_files,
+                'tree': tree,
+                'count': len(filtered_files),
+                'output_folder': str(OUTPUT_FOLDER)
             })
         else:
+            # No learner selected - return empty (only show files when learner is selected)
+            return jsonify({
+                'success': True,
+                'files': [],
+                'tree': {},
+                'count': 0,
+                'output_folder': str(OUTPUT_FOLDER)
+            })
+    except Exception as e:
+        logger.error(f"Error listing images: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Failed to list images: {str(e)}'
+        }), 500
+
+
+@bp.route('/generate_image_documents', methods=['POST'])
+def generate_image_documents():
+    """Generate PDF and/or DOCX documents from selected images"""
+    from config import OUTPUT_FOLDER, RESOLUTION_PRESETS
+    from pathlib import Path
+    import tempfile
+    
+    try:
+        data = request.json
+        image_paths = data.get('image_paths', [])
+        image_order = data.get('image_order', image_paths)  # Use custom order if provided
+        quality = int(data.get('quality', 95))
+        max_size = data.get('max_size', '640x480')
+        output_format = data.get('output_format', 'both')  # 'pdf', 'docx', or 'both'
+        layout = data.get('layout', 'grid')
+        images_per_page = int(data.get('images_per_page', 2))
+        
+        if not image_paths:
             return jsonify({
                 'success': False,
-                'error': result.get('error', 'Unknown error')
+                'error': 'No images provided'
+            }), 400
+        
+        # Validate paths
+        validated_paths = []
+        for path in image_order if image_order else image_paths:
+            img_path = Path(path)
+            
+            # Validate path is within OUTPUT_FOLDER
+            try:
+                img_path.resolve().relative_to(OUTPUT_FOLDER.resolve())
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'error': f'Invalid image path: {path}'
+                }), 400
+            
+            if img_path.exists():
+                validated_paths.append(str(img_path.resolve()))
+        
+        if not validated_paths:
+            return jsonify({
+                'success': False,
+                'error': 'No valid images found'
+            }), 400
+        
+        # Extract filenames (without extension)
+        image_names = []
+        for path in validated_paths:
+            filename = Path(path).stem  # Get filename without extension
+            image_names.append(filename)
+        
+        # Get resolution settings
+        max_width = None
+        max_height = None
+        if max_size and max_size != 'original' and max_size in RESOLUTION_PRESETS:
+            if RESOLUTION_PRESETS[max_size]:
+                max_width, max_height = RESOLUTION_PRESETS[max_size]
+        elif max_size and max_size != 'original':
+            # Try to parse custom size (e.g., "800x600")
+            try:
+                parts = max_size.split('x')
+                if len(parts) == 2:
+                    max_width = int(parts[0])
+                    max_height = int(parts[1])
+            except:
+                pass
+        
+        # Determine output location (use learner folder if provided, otherwise use first image's directory)
+        qualification = data.get('qualification', '')
+        learner = data.get('learner', '')
+        
+        if qualification and learner:
+            # Output to learner folder: OUTPUT_FOLDER/qualification/learner
+            output_dir = OUTPUT_FOLDER / qualification / learner
+            output_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            # Fallback: use first image's directory
+            output_dir = Path(validated_paths[0]).parent
+        
+        output_base_name = 'images_document'
+        
+        results = {}
+        
+        # Generate PDF if requested
+        if output_format in ('pdf', 'both'):
+            pdf_path = output_dir / f'{output_base_name}.pdf'
+            try:
+                create_image_pdf(
+                    images=validated_paths,
+                    image_names=image_names,
+                    output_path=str(pdf_path),
+                    layout=layout,
+                    images_per_page=images_per_page,
+                    quality=quality,
+                    max_width=max_width,
+                    max_height=max_height
+                )
+                results['pdf_path'] = str(pdf_path)
+                results['pdf_url'] = f'/v2p-formatter/download?path={pdf_path.relative_to(OUTPUT_FOLDER)}'
+            except Exception as e:
+                logger.error(f"Error generating PDF: {e}", exc_info=True)
+                results['pdf_error'] = str(e)
+        
+        # Generate DOCX if requested
+        if output_format in ('docx', 'both'):
+            docx_path = output_dir / f'{output_base_name}.docx'
+            try:
+                create_image_docx(
+                    images=validated_paths,
+                    image_names=image_names,
+                    output_path=str(docx_path),
+                    images_per_page=images_per_page,
+                    quality=quality,
+                    max_width=max_width,
+                    max_height=max_height
+                )
+                results['docx_path'] = str(docx_path)
+                results['docx_relative_path'] = str(docx_path.relative_to(OUTPUT_FOLDER))
+                results['docx_url'] = f'/v2p-formatter/download?path={docx_path.relative_to(OUTPUT_FOLDER)}'
+            except Exception as e:
+                logger.error(f"Error generating DOCX: {e}", exc_info=True)
+                results['docx_error'] = str(e)
+        
+        # Determine primary file path
+        if 'pdf_path' in results:
+            results['file_path'] = results['pdf_path']
+        elif 'docx_path' in results:
+            results['file_path'] = results['docx_path']
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to generate any documents'
             }), 500
-            
-    except Exception as e:
-        logger.error(f"Error exporting DOCX: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': f'Failed to export DOCX: {str(e)}'
-        }), 500
-
-
-@bp.route('/media-converter/observation-media/download-docx/<filename>', methods=['GET'])
-def download_observation_docx(filename):
-    """Download generated DOCX file"""
-    try:
-        # Security: validate filename
-        import re
-        if not re.match(r'^[\w\-_\.]+\.docx$', filename):
-            return jsonify({'error': 'Invalid filename'}), 400
         
-        file_path = OUTPUT_FOLDER / filename
+        # Add output folder path to response
+        results['output_folder_path'] = str(output_dir)
         
-        if not file_path.exists():
-            return jsonify({'error': 'File not found'}), 404
-        
-        return send_file(
-            str(file_path),
-            as_attachment=True,
-            download_name=filename,
-            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        )
-        
-    except Exception as e:
-        logger.error(f"Error downloading DOCX: {e}", exc_info=True)
-        return jsonify({
-            'error': f'Failed to download file: {str(e)}'
-        }), 500
-
-
-# ============================================================================
-# Observation Media Draft Management
-# ============================================================================
-
-@bp.route('/media-converter/observation-media/drafts', methods=['GET'])
-def list_observation_drafts():
-    """List all available drafts"""
-    try:
-        from app.draft_manager import list_drafts
-        drafts = list_drafts()
         return jsonify({
             'success': True,
-            'drafts': drafts
-        })
-    except Exception as e:
-        logger.error(f"Error listing drafts: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': f'Failed to list drafts: {str(e)}'
-        }), 500
-
-
-@bp.route('/media-converter/observation-media/drafts', methods=['POST'])
-def save_observation_draft():
-    """Save a new draft"""
-    try:
-        from app.draft_manager import save_draft
-        data = request.get_json()
-        name = data.get('name', 'Untitled Draft')
-        text_content = data.get('text_content', '')
-        assignments = data.get('assignments', {})
-        selected_subfolder = data.get('selected_subfolder')
-        
-        result = save_draft(name, text_content, assignments, selected_subfolder)
-        
-        if result['success']:
-            return jsonify(result)
-        else:
-            return jsonify(result), 500
-            
-    except Exception as e:
-        logger.error(f"Error saving draft: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': f'Failed to save draft: {str(e)}'
-        }), 500
-
-
-@bp.route('/media-converter/observation-media/drafts/<draft_id>', methods=['GET'])
-def load_observation_draft(draft_id):
-    """Load a draft"""
-    try:
-        from app.draft_manager import load_draft
-        result = load_draft(draft_id)
-        
-        if result['success']:
-            return jsonify(result)
-        else:
-            return jsonify(result), 404
-            
-    except Exception as e:
-        logger.error(f"Error loading draft: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': f'Failed to load draft: {str(e)}'
-        }), 500
-
-
-@bp.route('/media-converter/observation-media/drafts/<draft_id>', methods=['PUT'])
-def update_observation_draft(draft_id):
-    """Update an existing draft"""
-    try:
-        from app.draft_manager import update_draft
-        data = request.get_json()
-        text_content = data.get('text_content', '')
-        assignments = data.get('assignments', {})
-        selected_subfolder = data.get('selected_subfolder')
-        
-        result = update_draft(draft_id, text_content, assignments, selected_subfolder)
-        
-        if result['success']:
-            return jsonify(result)
-        else:
-            return jsonify(result), 500
-            
-    except Exception as e:
-        logger.error(f"Error updating draft: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': f'Failed to update draft: {str(e)}'
-        }), 500
-
-
-@bp.route('/media-converter/observation-media/drafts/<draft_id>', methods=['DELETE'])
-def delete_observation_draft(draft_id):
-    """Delete a draft"""
-    try:
-        from app.draft_manager import delete_draft
-        result = delete_draft(draft_id)
-        
-        if result['success']:
-            return jsonify(result)
-        else:
-            return jsonify(result), 404
-            
-    except Exception as e:
-        logger.error(f"Error deleting draft: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': f'Failed to delete draft: {str(e)}'
-        }), 500
-
-
-@bp.route('/media-converter/observation-media/rename-file', methods=['POST'])
-def rename_observation_media_file():
-    """Rename a media file (only the name part, not the extension)"""
-    try:
-        data = request.get_json()
-        file_path = data.get('file_path')
-        new_name = data.get('new_name')
-        
-        if not file_path or not new_name:
-            return jsonify({
-                'success': False,
-                'error': 'File path and new name are required'
-            }), 400
-        
-        # Validate new name (no path separators, no extension)
-        import re
-        if not re.match(r'^[^/\\<>:"|?*\x00-\x1f]+$', new_name):
-            return jsonify({
-                'success': False,
-                'error': 'Invalid file name. Name cannot contain path separators or special characters.'
-            }), 400
-        
-        # Get file path
-        file_path_obj = Path(file_path)
-        
-        if not file_path_obj.exists():
-            return jsonify({
-                'success': False,
-                'error': 'File not found'
-            }), 404
-        
-        # Get original extension
-        original_extension = file_path_obj.suffix
-        
-        # Create new path with new name but same extension
-        new_path = file_path_obj.parent / f"{new_name}{original_extension}"
-        
-        # Check if new file already exists
-        if new_path.exists() and new_path != file_path_obj:
-            return jsonify({
-                'success': False,
-                'error': 'A file with this name already exists'
-            }), 400
-        
-        # Rename the file
-        file_path_obj.rename(new_path)
-        
-        # Return success with new path and name
-        return jsonify({
-            'success': True,
-            'new_path': str(new_path),
-            'new_name': new_path.name,
-            'message': 'File renamed successfully'
+            **results
         })
         
-    except PermissionError:
-        return jsonify({
-            'success': False,
-            'error': 'Permission denied. Cannot rename file.'
-        }), 403
     except Exception as e:
-        logger.error(f"Error renaming file: {e}", exc_info=True)
+        logger.error(f"Error generating image documents: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': f'Failed to rename file: {str(e)}'
+            'error': f'Failed to generate documents: {str(e)}'
         }), 500

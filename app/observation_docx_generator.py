@@ -14,7 +14,7 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 
-def create_observation_docx(text_content: str, assignments: dict, output_path: Path, font_size: int = 16, font_name: str = 'Times New Roman') -> dict:
+def create_observation_docx(text_content: str, assignments: dict, output_path: Path, font_size: int = 16, font_name: str = 'Times New Roman', header_data: dict = None, assessor_feedback: str = None) -> dict:
     """
     Create a DOCX file from observation media text and assignments.
     
@@ -24,6 +24,8 @@ def create_observation_docx(text_content: str, assignments: dict, output_path: P
         output_path: Path where DOCX file should be saved
         font_size: Font size in points (default: 16)
         font_name: Font name (default: 'Times New Roman')
+        header_data: Dictionary with header fields (learner, assessor, visit_date, location, address) (optional)
+        assessor_feedback: Assessor feedback text (optional)
         
     Returns:
         Dictionary with success status and file path
@@ -57,6 +59,83 @@ def create_observation_docx(text_content: str, assignments: dict, output_path: P
         section.page_height = Inches(11.69)  # A4 height
         section.page_width = Inches(8.27)   # A4 width
         # Default margins are 1 inch on each side
+        
+        # Add header section if header_data is provided
+        if header_data:
+            # Format date from YYYY-MM-DD to readable format
+            def format_date(date_string):
+                if not date_string:
+                    return ''
+                try:
+                    from datetime import datetime
+                    date_obj = datetime.strptime(date_string, '%Y-%m-%d')
+                    months = ['January', 'February', 'March', 'April', 'May', 'June',
+                             'July', 'August', 'September', 'October', 'November', 'December']
+                    return f"{date_obj.day} {months[date_obj.month - 1]} {date_obj.year}"
+                except:
+                    return date_string
+            
+            # Add "Assessment Report" heading
+            heading1 = doc.add_paragraph('Assessment Report')
+            heading1.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            heading1_run = heading1.runs[0]
+            heading1_run.font.name = font_name
+            heading1_run.font.size = Pt(18)
+            heading1_run.font.bold = True
+            heading1.paragraph_format.space_after = Pt(12)
+            
+            # Add header table
+            header_table = doc.add_table(rows=5, cols=2)
+            header_table.style = 'Light Grid Accent 1'  # Basic table style
+            
+            # Set table borders to 1pt solid black (sz='8' = 1pt in Word XML)
+            for row in header_table.rows:
+                for cell in row.cells:
+                    cell_borders = cell._element.get_or_add_tcPr().get_or_add_tcBorders()
+                    for border_name in ['top', 'left', 'bottom', 'right']:
+                        border = OxmlElement(f'{qn("w")}{border_name}')
+                        border.set(qn('w:val'), 'single')
+                        border.set(qn('w:sz'), '8')  # 1pt (Word XML sz is in eighths of a point)
+                        border.set(qn('w:space'), '0')
+                        border.set(qn('w:color'), '000000')
+                        cell_borders.append(border)
+            
+            # Fill header table
+            header_rows = [
+                ('Learner', header_data.get('learner', '')),
+                ('Assessor', header_data.get('assessor', '')),
+                ('Visit Date', format_date(header_data.get('visit_date', ''))),
+                ('Location', header_data.get('location', '')),
+                ('Address', header_data.get('address', ''))
+            ]
+            
+            for idx, (label, value) in enumerate(header_rows):
+                header_table.rows[idx].cells[0].text = label
+                header_table.rows[idx].cells[1].text = value
+                
+                # Set font for both cells
+                for cell in header_table.rows[idx].cells:
+                    for paragraph in cell.paragraphs:
+                        for run in paragraph.runs:
+                            run.font.name = font_name
+                            run.font.size = Pt(font_size)
+            
+            # Set first column width
+            header_table.columns[0].width = Inches(1.5)
+            header_table.columns[1].width = Inches(5.5)
+            
+            # Add spacing after header table
+            doc.add_paragraph()  # Blank paragraph
+            
+            # Add "Observation Report" heading
+            heading2 = doc.add_paragraph('Observation Report')
+            heading2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            heading2_run = heading2.runs[0]
+            heading2_run.font.name = font_name
+            heading2_run.font.size = Pt(18)
+            heading2_run.font.bold = True
+            heading2.paragraph_format.space_before = Pt(12)
+            heading2.paragraph_format.space_after = Pt(12)
         
         # Parse text and replace placeholders with tables
         import re
@@ -136,6 +215,42 @@ def create_observation_docx(text_content: str, assignments: dict, output_path: P
         if not has_paragraphs and not has_tables:
             logger.warning("Document has no content, adding default paragraph")
             doc.add_paragraph("Document content")
+        
+        # Add assessor feedback table at the bottom if provided
+        if assessor_feedback:
+            # Add blank paragraph before assessor feedback
+            doc.add_paragraph()
+            
+            # Add assessor feedback table
+            feedback_table = doc.add_table(rows=2, cols=1)
+            feedback_table.style = 'Light Grid Accent 1'
+            
+            # Set table borders to 1pt solid black
+            for row in feedback_table.rows:
+                for cell in row.cells:
+                    cell_borders = cell._element.get_or_add_tcPr().get_or_add_tcBorders()
+                    for border_name in ['top', 'left', 'bottom', 'right']:
+                        border = OxmlElement(f'{qn("w")}{border_name}')
+                        border.set(qn('w:val'), 'single')
+                        border.set(qn('w:sz'), '8')  # 1pt
+                        border.set(qn('w:space'), '0')
+                        border.set(qn('w:color'), '000000')
+                        cell_borders.append(border)
+            
+            # Fill assessor feedback table
+            feedback_table.rows[0].cells[0].text = 'Assessor Feedback'
+            feedback_table.rows[1].cells[0].text = assessor_feedback
+            
+            # Set font for both cells
+            for row in feedback_table.rows:
+                for cell in row.cells:
+                    for paragraph in cell.paragraphs:
+                        for run in paragraph.runs:
+                            run.font.name = font_name
+                            run.font.size = Pt(font_size)
+            
+            # Set table width
+            feedback_table.columns[0].width = Inches(7)
         
         # Ensure output path has .docx extension
         if not str(output_path).lower().endswith('.docx'):
@@ -375,6 +490,13 @@ def _add_media_table_to_doc(doc: Document, media_list: list):
                 logger.warning(f"Error adding image {media['path']}: {e}", exc_info=True)
                 paragraph = cell.paragraphs[0]
                 paragraph.add_run(f"[Error loading image: {media['name']}]")
+        elif media['type'] == 'document':
+            # PDF - just add filename (like video)
+            paragraph = cell.paragraphs[0]
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = paragraph.add_run(media['name'])
+            run.font.size = Pt(11)
+            run.font.color.rgb = RGBColor(0, 0, 0)
         else:
             # Video - just add filename
             paragraph = cell.paragraphs[0]

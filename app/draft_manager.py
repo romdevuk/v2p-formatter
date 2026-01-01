@@ -15,7 +15,7 @@ DRAFTS_FOLDER = Path('/Users/rom/Documents/nvq/v2p-formatter-output/.drafts')
 DRAFTS_FOLDER.mkdir(parents=True, exist_ok=True)
 
 
-def save_draft(name: str, text_content: str, assignments: Dict, selected_subfolder: Optional[str] = None) -> Dict:
+def save_draft(name: str, text_content: str, assignments: Dict, selected_subfolder: Optional[str] = None, qualification: Optional[str] = None, learner: Optional[str] = None, json_file_id: Optional[str] = None, selected_unit_ids: Optional[List[str]] = None, header_data: Optional[Dict] = None, assessor_feedback: Optional[str] = None) -> Dict:
     """
     Save a draft to disk.
     
@@ -24,6 +24,12 @@ def save_draft(name: str, text_content: str, assignments: Dict, selected_subfold
         text_content: Text content with placeholders
         assignments: Dictionary mapping placeholder names to media lists
         selected_subfolder: Currently selected subfolder (optional)
+        qualification: Selected qualification (optional)
+        learner: Selected learner (optional)
+        json_file_id: JSON Standards File ID (optional)
+        selected_unit_ids: List of selected unit IDs (optional)
+        header_data: Dictionary with header fields (learner, assessor, visit_date, location, address) (optional)
+        assessor_feedback: Assessor feedback text (optional)
         
     Returns:
         Dictionary with success status and draft info
@@ -46,6 +52,12 @@ def save_draft(name: str, text_content: str, assignments: Dict, selected_subfold
             'text_content': text_content,
             'assignments': assignments,
             'selected_subfolder': selected_subfolder,
+            'qualification': qualification,
+            'learner': learner,
+            'json_file_id': json_file_id,
+            'selected_unit_ids': selected_unit_ids or [],
+            'header_data': header_data or {},
+            'assessor_feedback': assessor_feedback or '',
             'created_at': datetime.now().isoformat(),
             'updated_at': datetime.now().isoformat()
         }
@@ -198,7 +210,7 @@ def delete_draft(draft_id: str) -> Dict:
         }
 
 
-def update_draft(draft_id: str, text_content: str, assignments: Dict, selected_subfolder: Optional[str] = None) -> Dict:
+def update_draft(draft_id: str, text_content: str, assignments: Dict, selected_subfolder: Optional[str] = None, qualification: Optional[str] = None, learner: Optional[str] = None, json_file_id: Optional[str] = None, selected_unit_ids: Optional[List[str]] = None, name: Optional[str] = None, header_data: Optional[Dict] = None, assessor_feedback: Optional[str] = None) -> Dict:
     """
     Update an existing draft.
     
@@ -207,6 +219,13 @@ def update_draft(draft_id: str, text_content: str, assignments: Dict, selected_s
         text_content: Updated text content
         assignments: Updated assignments
         selected_subfolder: Updated selected subfolder
+        qualification: Updated qualification (optional)
+        learner: Updated learner (optional)
+        json_file_id: Updated JSON Standards File ID (optional)
+        selected_unit_ids: Updated selected unit IDs (optional)
+        name: Updated (for renaming draft)
+        header_data: Updated header fields (optional)
+        assessor_feedback: Updated assessor feedback (optional)
         
     Returns:
         Dictionary with success status
@@ -223,6 +242,20 @@ def update_draft(draft_id: str, text_content: str, assignments: Dict, selected_s
         draft_data['text_content'] = text_content
         draft_data['assignments'] = assignments
         draft_data['selected_subfolder'] = selected_subfolder
+        if qualification is not None:
+            draft_data['qualification'] = qualification
+        if learner is not None:
+            draft_data['learner'] = learner
+        if json_file_id is not None:
+            draft_data['json_file_id'] = json_file_id
+        if selected_unit_ids is not None:
+            draft_data['selected_unit_ids'] = selected_unit_ids
+        if name is not None:
+            draft_data['name'] = name
+        if header_data is not None:
+            draft_data['header_data'] = header_data
+        if assessor_feedback is not None:
+            draft_data['assessor_feedback'] = assessor_feedback
         draft_data['updated_at'] = datetime.now().isoformat()
         
         # Save updated draft

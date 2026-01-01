@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('v2p_formatter.serve_static', filename='css/ac-matrix.css') }}">
+<div class="ac-matrix-container">
+    <!-- Navigation Tabs -->
+    <div style="margin-bottom: 30px; border-bottom: 2px solid #555;">
+        <div style="display: flex; gap: 10px;">
+            <a href="/v2p-formatter/" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Video to Image
+            </a>
+            <a href="/v2p-formatter/media-converter" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Media Converter
+            </a>
+            <a href="/v2p-formatter/ac-matrix" style="padding: 12px 24px; background: #1e1e1e; color: #667eea; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #667eea; border-bottom: none; font-weight: bold;">
+                AC Matrix
+            </a>
+            <a href="/v2p-formatter/observation-media" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Observation Media
+            </a>
+            <a href="/v2p-formatter/observation-report" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Observation Report
+            </a>
+        </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <section class="settings-panel">
+        <h2>Settings</h2>
+        <div class="json-file-selector">
+            <label for="json-file-selector">JSON Standards File:</label>
+            <select id="json-file-selector">
+                <option value="">Select a standards file...</option>
+            </select>
+            <button id="upload-json-btn" class="btn btn-secondary" style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Add New File</button>
+            <button id="delete-json-btn" class="btn btn-danger" style="padding: 8px 16px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; display: none;">Delete File</button>
+        </div>
+        
+        <!-- Unit Selector -->
+        <div id="unit-selector-container" class="unit-selector-container" style="display: none; margin-top: 20px;">
+            <div class="unit-selector-header">
+                <label style="color: #e0e0e0; font-weight: 500; display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="filter-units-toggle" style="margin-right: 8px; cursor: pointer; width: 18px; height: 18px;">
+                    <span>Filter Units (Optional)</span>
+                </label>
+                <div id="unit-selector-controls" style="display: none; margin-top: 10px;">
+                    <button id="select-all-units-btn" class="btn btn-secondary" style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 10px;">Select All</button>
+                    <button id="deselect-all-units-btn" class="btn btn-secondary" style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Deselect All</button>
+                </div>
+            </div>
+            <div id="unit-selection-list" class="unit-selection-list" style="display: none;">
+                <div id="unit-checkboxes-container" style="max-height: 300px; overflow-y: auto; border: 1px solid #444; border-radius: 4px; padding: 10px; background: #1a1a1a;"></div>
+                <div id="unit-selection-counter" class="unit-selection-counter" style="margin-top: 10px; color: #999; font-size: 0.9em;"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Input Section -->
+    <section class="input-section">
+        <h2>Observation Reports</h2>
+        <div style="margin-bottom: 15px;">
+            <label>
+                <input type="radio" name="report-mode" value="single" checked style="margin-right: 8px;">
+                Single Report
+            </label>
+            <label style="margin-left: 20px;">
+                <input type="radio" name="report-mode" value="bulk" style="margin-right: 8px;">
+                Bulk Reports (Multiple reports to analyze together)
+            </label>
+        </div>
+        
+        <!-- Single Report Mode -->
+        <div id="single-report-mode">
+            <div class="draft-loader">
+                <label for="draft-selector">Load from Draft:</label>
+                <select id="draft-selector">
+                    <option value="">Select a draft...</option>
+                    {% for draft in drafts %}
+                    <option value="{{ draft.id }}" data-text-content="{{ draft.text_content|e }}" data-assignments='{{ draft.assignments|tojson|e }}' data-subfolder="{{ draft.selected_subfolder|e }}" data-json-file-id="{{ draft.json_file_id|e }}" data-selected-unit-ids='{{ draft.selected_unit_ids|tojson|e }}'>{{ draft.name }} ({{ draft.created_at[:10] }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="live-preview-wrapper">
+                <div class="preview-section">
+                    <div class="preview-section-header">
+                        <h3 style="color: #e0e0e0; margin: 0;">Live Preview</h3>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <div id="sectionControls" style="display: none; gap: 8px;">
+                                <button onclick="expandAllSections()" 
+                                        style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    ▼ Expand All
+                                </button>
+                                <button onclick="collapseAllSections()" 
+                                        style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    ▶ Collapse All
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="live-preview-content" class="observation-preview preview-section-content">
+                        <p style="color: #999; text-align: center;">Select a draft to see the live preview</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bulk Reports Mode -->
+        <div id="bulk-reports-mode" style="display: none;">
+            <div class="bulk-drafts-selector" style="margin-bottom: 20px; padding: 15px; background: #1e1e1e; border-radius: 6px; border: 1px solid #555;">
+                <label style="color: #e0e0e0; font-weight: 500; margin-bottom: 10px; display: block;">Add from Drafts:</label>
+                <div class="drafts-checkbox-container" style="max-height: 200px; overflow-y: auto; border: 1px solid #444; border-radius: 4px; padding: 10px; background: #1a1a1a;">
+                    {% for draft in drafts %}
+                    <label style="display: block; padding: 8px; cursor: pointer; color: #e0e0e0; border-radius: 4px; margin-bottom: 4px;" onmouseover="this.style.background='#2a2a2a'" onmouseout="this.style.background='transparent'">
+                        <input type="checkbox" class="draft-checkbox" value="{{ draft.id }}" data-name="{{ draft.name }}" data-text-content="{{ draft.text_content|e }}" data-assignments='{{ draft.assignments|tojson|e }}' data-subfolder="{{ draft.selected_subfolder|e }}" data-json-file-id="{{ draft.json_file_id|e }}" data-selected-unit-ids='{{ draft.selected_unit_ids|tojson|e }}' style="margin-right: 8px;">
+                        <span>{{ draft.name }} ({{ draft.created_at[:10] }})</span>
+                    </label>
+                    {% endfor %}
+                    {% if not drafts %}
+                    <p style="color: #999; text-align: center; padding: 20px;">No drafts available</p>
+                    {% endif %}
+                </div>
+                <button id="add-selected-drafts-btn" class="btn btn-secondary" style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-top: 10px;">Add Selected Drafts</button>
+            </div>
+            <div class="bulk-reports-container">
+                <div class="bulk-reports-list" id="bulk-reports-list">
+                    <!-- Reports will be added here dynamically -->
+                </div>
+                <p style="color: #999; margin-top: 8px;">Selected drafts will be analyzed and previewed below.</p>
+            </div>
+        </div>
+        
+        <button id="analyze-btn" class="btn btn-primary" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-top: 15px;">Analyze Report(s)</button>
+    </section>
+
+    <!-- Matrix Display -->
+    <section class="matrix-section" id="matrix-section" style="display: none;">
+        <h2>AC Coverage Matrix</h2>
+        <div class="matrix-controls" style="margin-bottom: 15px;">
+            <button id="expand-all-btn" class="btn btn-secondary" style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Expand All</button>
+            <button id="collapse-all-btn" class="btn btn-secondary" style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Collapse All</button>
+        </div>
+        <div class="matrix-summary" id="matrix-summary"></div>
+        <div class="matrix-content" id="matrix-content"></div>
+    </section>
+
+    <!-- Actions Panel -->
+    <section class="actions-panel">
+        <button id="save-matrix-btn" class="btn btn-secondary" style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Save Matrix</button>
+        <div class="load-matrix-dropdown">
+            <button id="load-matrix-btn" class="btn btn-secondary" style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Load Matrix ▼</button>
+            <div id="load-matrix-menu" class="dropdown-menu" style="display: none;"></div>
+        </div>
+        <button id="delete-matrix-btn" class="btn btn-danger" style="padding: 8px 16px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Delete Matrix</button>
+    </section>
+
+    <!-- Missing ACs Section -->
+    <section class="matrix-section" id="missing-acs-section" style="display: none;">
+        <h2>ACs Missing</h2>
+        <label for="missing-acs-field" style="display: block; color: #e0e0e0; margin-bottom: 10px; font-weight: 500;">Copy the missing ACs in the format below:</label>
+        <textarea id="missing-acs-field" readonly style="width: 100%; min-height: 120px; padding: 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 6px; font-size: 13px; font-family: monospace; resize: vertical; box-sizing: border-box;"></textarea>
+        <button id="copy-missing-acs-btn" class="btn btn-secondary" style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-top: 10px;">Copy to Clipboard</button>
+    </section>
+
+    <!-- Prompts Section -->
+    <section class="matrix-section" id="prompts-section" style="display: none;">
+        <h2>Prompts</h2>
+        <div class="prompt-container">
+            <div class="prompt-controls" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
+                <select id="prompt-selector" style="min-width: 240px; padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 6px; font-size: 14px;">
+                    <option value="">Select a prompt...</option>
+                </select>
+                <button id="add-prompt-btn" class="btn btn-secondary" style="padding: 8px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">Add Prompt</button>
+                <button id="edit-prompt-btn" class="btn btn-secondary" style="padding: 8px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;" disabled>Edit Prompt</button>
+                <button id="delete-prompt-btn" class="btn btn-danger" style="padding: 8px 12px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;" disabled>Delete</button>
+            </div>
+
+            <!-- Placeholders Tip -->
+            <div style="margin-bottom: 15px; padding: 12px; background: #2a2a2a; border: 1px solid #555; border-radius: 6px;">
+                <div style="color: #e0e0e0; font-weight: 500; margin-bottom: 10px; font-size: 13px;">Available Placeholders:</div>
+                <div style="color: #e0e0e0; font-size: 13px; line-height: 1.8;">
+                    <div style="margin-bottom: 8px;">
+                        {% raw %}
+                        <code style="color: #667eea; background: #1e1e1e; padding: 4px 8px; border-radius: 4px; font-size: 13px; font-family: monospace; cursor: pointer; border: 1px solid #555;" onclick="copyPlaceholder('{{draft_text}}', this)" title="Click to copy">{{draft_text}}</code>
+                        {% endraw %}
+                        <span style="color: #999; margin-left: 8px; font-size: 12px;">- The current draft's text content</span>
+                    </div>
+                    <div>
+                        {% raw %}
+                        <code style="color: #667eea; background: #1e1e1e; padding: 4px 8px; border-radius: 4px; font-size: 13px; font-family: monospace; cursor: pointer; border: 1px solid #555;" onclick="copyPlaceholder('{{ac_missing}}', this)" title="Click to copy">{{ac_missing}}</code>
+                        {% endraw %}
+                        <span style="color: #999; margin-left: 8px; font-size: 12px;">- The missing ACs text from above</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add/Edit Prompt Form (hidden by default) -->
+            <div id="prompt-form" style="display: none; margin-bottom: 15px; padding: 12px; background: #1e1e1e; border: 1px solid #555; border-radius: 6px;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+                    <input id="prompt-name-input" type="text" placeholder="Prompt name" style="flex: 1; min-width: 220px; padding: 8px 10px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 6px; font-size: 14px;">
+                    <div style="display: flex; gap: 8px;">
+                        <button id="prompt-save-btn" class="btn btn-primary" style="padding: 8px 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">Save</button>
+                        <button id="prompt-cancel-btn" class="btn btn-secondary" style="padding: 8px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">Cancel</button>
+                    </div>
+                </div>
+                <textarea id="prompt-body-input" placeholder="Enter prompt text here..." style="width: 100%; min-height: 100px; padding: 10px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 6px; font-size: 13px; font-family: inherit; resize: vertical;"></textarea>
+            </div>
+
+            <label for="prompt-body-view" style="display: block; color: #e0e0e0; margin-bottom: 6px; font-weight: 500;">Prompt Text</label>
+            <textarea id="prompt-body-view" readonly style="width: 100%; min-height: 120px; padding: 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 6px; font-size: 13px; font-family: inherit; resize: vertical;"></textarea>
+        </div>
+    </section>
+</div>
+
+<!-- Save Matrix Dialog -->
+<div id="save-matrix-dialog" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3>Save Matrix</h3>
+        <label for="matrix-name-input">Matrix Name:</label>
+        <input type="text" id="matrix-name-input" placeholder="Enter matrix name...">
+        <div class="modal-actions">
+            <button id="save-dialog-confirm-btn" class="btn-primary">Save</button>
+            <button id="save-dialog-cancel-btn" class="btn-secondary">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Draft data available in JavaScript (no API needed) -->
+<script>
+    // Drafts data loaded server-side
+    const draftsData = {{ drafts|tojson }};
+    
+    // Copy placeholder to clipboard
+    function copyPlaceholder(text, element) {
+        navigator.clipboard.writeText(text).then(() => {
+            const originalBg = element.style.background;
+            const originalColor = element.style.color;
+            element.style.background = '#4a8a4a';
+            element.style.color = '#fff';
+            setTimeout(() => {
+                element.style.background = originalBg;
+                element.style.color = originalColor;
+            }, 500);
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.opacity = '0';
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                const originalBg = element.style.background;
+                element.style.background = '#4a8a4a';
+                setTimeout(() => {
+                    element.style.background = originalBg;
+                }, 500);
+            } catch (e) {
+                console.error('Fallback copy failed:', e);
+            }
+            document.body.removeChild(textArea);
+        });
+    }
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('v2p_formatter.serve_static', filename='js/preview-renderer.js') }}"></script>
+<script src="{{ url_for('v2p_formatter.serve_static', filename='js/ac-matrix.js') }}"></script>
+{% endblock %}
+

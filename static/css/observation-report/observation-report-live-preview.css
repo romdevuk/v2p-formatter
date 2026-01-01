@@ -1,0 +1,346 @@
+/**
+ * Observation Report - Live Preview Component CSS
+ * 
+ * ROBUST VERSION: All styles scoped to .obs-report-page-wrapper
+ * This ensures complete isolation from base.html styles
+ * 
+ * Author: UX Designer (Robust Fix)
+ * Created: CSS Isolation Strategy
+ */
+
+/* ============================================================================
+   SCOPED CSS VARIABLES - Dark Theme (from spec)
+   ============================================================================ */
+.obs-report-page-wrapper {
+    --obs-live-preview-bg: #1e1e1e;
+    --obs-live-preview-text: #e0e0e0;
+    --obs-live-preview-bg-secondary: #2a2a2a;
+    --obs-live-preview-border: #555;
+    --obs-live-preview-accent: #667eea;
+}
+
+/* ============================================================================
+   Live Preview Container - SCOPED STYLES
+   ============================================================================ */
+/* HIGH SPECIFICITY: Container > Column > Element */
+.obs-report-page-wrapper #livePreview,
+.obs-report-page-wrapper .live-preview-container,
+.obs-report-page-wrapper #livePreviewColumn #livePreview,
+.obs-report-page-wrapper #livePreviewColumn .live-preview-container,
+.obs-report-page-wrapper .observation-report-column #livePreview {
+    /* Container */
+    width: 100% !important;
+    height: 100% !important;
+    overflow-y: auto !important;
+    
+    /* Dark Theme Background - EXPLICIT */
+    background: #1e1e1e !important;
+    background-color: #1e1e1e !important;
+    color: #e0e0e0 !important;
+    
+    /* Typography */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    font-size: 14px !important;
+    line-height: 1.6 !important;
+    
+    /* Spacing */
+    padding: 15px !important;
+    
+    /* Box model */
+    box-sizing: border-box !important;
+}
+
+/* ============================================================================
+   Preview Content Wrapper - SCOPED
+   ============================================================================ */
+.obs-report-page-wrapper .live-preview-container .preview-content,
+.obs-report-page-wrapper #livePreview .preview-content {
+    /* Layout */
+    width: 100% !important;
+    padding: 20px !important;
+    
+    /* Text formatting - preserve newlines */
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    
+    /* Colors - EXPLICIT */
+    background: transparent !important;
+    color: #e0e0e0 !important;
+    
+    /* Typography */
+    line-height: 1.6 !important;
+}
+
+/* Plain text content */
+.obs-report-page-wrapper .live-preview-container .preview-text,
+.obs-report-page-wrapper #livePreview .preview-text {
+    /* Preserve newlines */
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    
+    /* Layout */
+    display: inline-block !important;
+    width: 100% !important;
+    
+    /* Colors - EXPLICIT */
+    color: #e0e0e0 !important;
+}
+
+/* ============================================================================
+   Sections - Collapsible (Spec: Collapsed by default) - SCOPED
+   ============================================================================ */
+.obs-report-page-wrapper .live-preview-container .preview-section,
+.obs-report-page-wrapper #livePreview .preview-section {
+    /* Layout */
+    margin: 30px 0 !important;
+    padding-top: 20px !important;
+    
+    /* Border */
+    border-top: 2px solid #555 !important;
+}
+
+/* Section Header - Clickable - SCOPED */
+.obs-report-page-wrapper .live-preview-container .section-header,
+.obs-report-page-wrapper #livePreview .section-header {
+    /* Layout */
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 10px !important;
+    
+    /* Interaction */
+    cursor: pointer !important;
+    user-select: none !important;
+    
+    /* Hover state */
+    transition: background 0.2s !important;
+    border-radius: 4px !important;
+    background: transparent !important;
+}
+
+.obs-report-page-wrapper .live-preview-container .section-header:hover,
+.obs-report-page-wrapper #livePreview .section-header:hover {
+    background: #2a2a2a !important;
+}
+
+/* Toggle Icon - SCOPED */
+.obs-report-page-wrapper .live-preview-container .section-toggle,
+.obs-report-page-wrapper #livePreview .section-toggle {
+    font-size: 14px !important;
+    color: #999 !important;
+    font-weight: bold !important;
+}
+
+/* Section Title - Color coded (set inline by JS) - SCOPED */
+.obs-report-page-wrapper .live-preview-container .section-title,
+.obs-report-page-wrapper #livePreview .section-title {
+    margin: 0 !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    /* Default color - overridden by inline style from JS */
+    color: #e0e0e0 !important;
+}
+
+/* Section Content - Collapsed by default (Spec requirement) - SCOPED */
+.obs-report-page-wrapper .live-preview-container .section-content,
+.obs-report-page-wrapper #livePreview .section-content {
+    /* Layout */
+    padding: 15px !important;
+    margin-top: 10px !important;
+    
+    /* Default state: HIDDEN (collapsed) */
+    display: none !important;
+    
+    /* Colors - EXPLICIT */
+    color: #e0e0e0 !important;
+    background: transparent !important;
+}
+
+/* Expanded state - SCOPED */
+.obs-report-page-wrapper .live-preview-container .section-content[style*="display: block"],
+.obs-report-page-wrapper .live-preview-container .section-content.expanded,
+.obs-report-page-wrapper #livePreview .section-content[style*="display: block"],
+.obs-report-page-wrapper #livePreview .section-content.expanded {
+    display: block !important;
+}
+
+/* ============================================================================
+   Placeholders - Color Coded, 2-Column Tables (Spec requirement) - SCOPED
+   ============================================================================ */
+.obs-report-page-wrapper .live-preview-container .placeholder-container,
+.obs-report-page-wrapper #livePreview .placeholder-container {
+    /* Layout */
+    margin: 20px 0 !important;
+    padding: 15px !important;
+    
+    /* Styling - EXPLICIT */
+    background: #2a2a2a !important;
+    border: 1px solid #555 !important;
+    border-radius: 6px !important;
+}
+
+/* Placeholder Label - Color coded (set inline by JS) - SCOPED */
+.obs-report-page-wrapper .live-preview-container .placeholder-label,
+.obs-report-page-wrapper #livePreview .placeholder-label {
+    display: inline-block !important;
+    padding: 4px 8px !important;
+    border-radius: 4px !important;
+    font-weight: bold !important;
+    margin-bottom: 10px !important;
+    font-size: 14px !important;
+    /* Color set inline by JavaScript for color coding */
+}
+
+/* Placeholder Table - 2 columns (Spec requirement) - SCOPED */
+.obs-report-page-wrapper .live-preview-container .placeholder-table,
+.obs-report-page-wrapper #livePreview .placeholder-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-top: 10px !important;
+    background: #1e1e1e !important;
+    border: 1px solid #555 !important;
+}
+
+/* Table Cells - SCOPED */
+.obs-report-page-wrapper .live-preview-container .placeholder-table td,
+.obs-report-page-wrapper #livePreview .placeholder-table td {
+    padding: 10px !important;
+    border: 1px solid #555 !important;
+    vertical-align: top !important;
+    min-height: 100px !important;
+    background: #1e1e1e !important;
+    color: #e0e0e0 !important;
+}
+
+/* Drop Zone - Empty cells - SCOPED */
+.obs-report-page-wrapper .live-preview-container .drop-zone,
+.obs-report-page-wrapper #livePreview .drop-zone {
+    /* Layout */
+    min-height: 100px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    
+    /* Styling - EXPLICIT */
+    border: 2px dashed #555 !important;
+    border-radius: 4px !important;
+    background: transparent !important;
+    
+    /* Typography */
+    color: #999 !important;
+    font-size: 12px !important;
+    text-align: center !important;
+    
+    /* Interaction */
+    transition: all 0.2s !important;
+}
+
+/* Drop Zone - Drag over state - SCOPED */
+.obs-report-page-wrapper .live-preview-container .drop-zone.drag-over,
+.obs-report-page-wrapper #livePreview .drop-zone.drag-over {
+    border-color: #667eea !important;
+    background: rgba(102, 126, 234, 0.1) !important;
+    color: #667eea !important;
+}
+
+/* ============================================================================
+   Media Items in Tables - SCOPED
+   ============================================================================ */
+.obs-report-page-wrapper .live-preview-container .media-item,
+.obs-report-page-wrapper #livePreview .media-item {
+    /* Layout */
+    position: relative !important;
+    padding: 10px !important;
+    width: 100% !important;
+    display: block !important;
+    
+    /* Styling - EXPLICIT */
+    background: #2a2a2a !important;
+    border: 1px solid #555 !important;
+    border-radius: 4px !important;
+    
+    /* Interaction */
+    cursor: move !important;
+    transition: all 0.3s !important;
+}
+
+.obs-report-page-wrapper .live-preview-container .media-item:hover,
+.obs-report-page-wrapper #livePreview .media-item:hover {
+    border-color: #667eea !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Media Item Image - SCOPED */
+.obs-report-page-wrapper .live-preview-container .media-item img,
+.obs-report-page-wrapper #livePreview .media-item img {
+    max-width: 100% !important;
+    height: auto !important;
+    border-radius: 4px !important;
+    display: block !important;
+    margin: 0 auto !important;
+}
+
+/* Media Filename - SCOPED */
+.obs-report-page-wrapper .live-preview-container .media-filename,
+.obs-report-page-wrapper #livePreview .media-filename {
+    font-size: 12px !important;
+    color: #e0e0e0 !important;
+    margin-top: 5px !important;
+    text-align: center !important;
+    word-break: break-word !important;
+}
+
+/* ============================================================================
+   Reorder Buttons - SCOPED
+   ============================================================================ */
+.obs-report-page-wrapper .live-preview-container .remove-media,
+.obs-report-page-wrapper .live-preview-container .reorder-up,
+.obs-report-page-wrapper .live-preview-container .reorder-down,
+.obs-report-page-wrapper #livePreview .remove-media,
+.obs-report-page-wrapper #livePreview .reorder-up,
+.obs-report-page-wrapper #livePreview .reorder-down {
+    position: absolute !important;
+    background: #333 !important;
+    border: 1px solid #555 !important;
+    color: #e0e0e0 !important;
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    transition: all 0.2s !important;
+    z-index: 10 !important;
+}
+
+.obs-report-page-wrapper .live-preview-container .remove-media,
+.obs-report-page-wrapper #livePreview .remove-media {
+    top: 5px !important;
+    right: 5px !important;
+    background: #ff6b6b !important;
+    color: white !important;
+}
+
+.obs-report-page-wrapper .live-preview-container .reorder-up,
+.obs-report-page-wrapper #livePreview .reorder-up {
+    top: 5px !important;
+    left: 5px !important;
+}
+
+.obs-report-page-wrapper .live-preview-container .reorder-down,
+.obs-report-page-wrapper #livePreview .reorder-down {
+    top: 35px !important;
+    left: 5px !important;
+}
+
+.obs-report-page-wrapper .live-preview-container .reorder-up:hover:not(:disabled),
+.obs-report-page-wrapper .live-preview-container .reorder-down:hover:not(:disabled),
+.obs-report-page-wrapper #livePreview .reorder-up:hover:not(:disabled),
+.obs-report-page-wrapper #livePreview .reorder-down:hover:not(:disabled) {
+    background: #667eea !important;
+    border-color: #667eea !important;
+    color: white !important;
+}

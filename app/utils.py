@@ -14,59 +14,41 @@ def get_video_directory(video_path):
 
 def get_video_output_folder(video_path):
     """
-    Get the output subfolder for a video file, preserving input folder structure
+    Get the output folder for a video file - saves in the same directory as the video
     
     Example:
-        Input: /Users/rom/Documents/nvq/v2p-formatter-input/folder1/subfolder/video.mp4
-        Output: /Users/rom/Documents/nvq/v2p-formatter-output/folder1/subfolder/video/
+        Input: /Users/rom/Documents/nvq/v2p-formatter-output/Inter/lakhmaniuk/visit2/tasks/mp4/video.mp4
+        Output: /Users/rom/Documents/nvq/v2p-formatter-output/Inter/lakhmaniuk/visit2/tasks/mp4/video_frames/
     """
-    from config import INPUT_FOLDER, OUTPUT_FOLDER
     video_file = Path(video_path)
     
-    # Get relative path from INPUT_FOLDER
-    try:
-        relative_path = video_file.relative_to(INPUT_FOLDER)
-    except ValueError:
-        # If video is not in INPUT_FOLDER, just use filename
-        folder_name = video_file.stem
-        output_dir = OUTPUT_FOLDER / folder_name
-        output_dir.mkdir(parents=True, exist_ok=True)
-        return output_dir
+    # Get the directory containing the video file
+    video_dir = video_file.parent
     
-    # Get parent folder structure (if any)
-    parent_folders = relative_path.parent
-    
-    # Create output path: OUTPUT_FOLDER / parent_folders / video_name
-    folder_name = video_file.stem  # Filename without extension
-    if parent_folders and str(parent_folders) != '.':
-        # Preserve subfolder structure
-        output_dir = OUTPUT_FOLDER / parent_folders / folder_name
-    else:
-        # No subfolders, just use video name
-        output_dir = OUTPUT_FOLDER / folder_name
+    # Create folder name based on video filename (without extension)
+    folder_name = f"{video_file.stem}_frames"
+    output_dir = video_dir / folder_name
     
     output_dir.mkdir(parents=True, exist_ok=True)
     return output_dir
 
 def create_output_folder(video_path, output_base=None):
-    """Create output folder for frames in the video's subfolder"""
+    """Create output folder for frames in the same directory as the video"""
     output_dir = get_video_output_folder(video_path)
-    frames_dir = output_dir / 'frames'
-    frames_dir.mkdir(parents=True, exist_ok=True)
-    return frames_dir
+    return output_dir
 
 def get_pdf_output_path(video_path, output_base=None):
-    """Get PDF output path in the video's subfolder"""
-    output_dir = get_video_output_folder(video_path)
+    """Get PDF output path in the same directory as the video"""
     video_file = Path(video_path)
-    pdf_path = output_dir / f"{video_file.stem}.pdf"
+    video_dir = video_file.parent
+    pdf_path = video_dir / f"{video_file.stem}.pdf"
     return pdf_path
 
 def get_docx_output_path(video_path):
-    """Get DOCX output path in the video's subfolder"""
-    output_dir = get_video_output_folder(video_path)
+    """Get DOCX output path in the same directory as the video"""
     video_file = Path(video_path)
-    docx_path = output_dir / f"{video_file.stem}.docx"
+    video_dir = video_file.parent
+    docx_path = video_dir / f"{video_file.stem}.docx"
     return docx_path
 
 def parse_time_points(time_input):

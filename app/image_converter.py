@@ -18,6 +18,9 @@ def get_image_info(image_path: Path) -> Dict:
     """
     try:
         with Image.open(image_path) as img:
+            # Apply EXIF orientation to get correct dimensions
+            from PIL import ImageOps
+            img = ImageOps.exif_transpose(img)
             return {
                 'width': img.width,
                 'height': img.height,
@@ -70,6 +73,10 @@ def convert_image_to_jpeg(
     try:
         # Open image
         with Image.open(input_path) as img:
+            # Apply EXIF orientation first (if present) to get correct orientation
+            from PIL import ImageOps
+            img = ImageOps.exif_transpose(img)
+            
             original_size = input_path.stat().st_size
             original_width, original_height = img.size
             
@@ -95,7 +102,8 @@ def convert_image_to_jpeg(
                     # Stretch to exact dimensions
                     img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
             
-            # Save as JPEG
+            # Save as JPEG - EXIF orientation already applied via exif_transpose
+            # The image is now correctly oriented, so saving will preserve correct orientation
             img.save(
                 str(output_path),
                 'JPEG',

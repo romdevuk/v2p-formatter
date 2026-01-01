@@ -1,0 +1,648 @@
+/**
+ * Observation Report - Main CSS
+ * 
+ * ⚠️ IMPORTANT: This is a NEW module - no legacy code from old modules.
+ * The old observation-media module did not work properly and must be completely avoided.
+ * 
+ * Author: UX Designer (Agent-3)
+ * Created: Stage 3
+ */
+
+/* ============================================================================
+   CSS Variables - Dark Theme
+   ============================================================================ */
+:root {
+    --obs-bg-primary: #1e1e1e;
+    --obs-bg-secondary: #2a2a2a;
+    --obs-bg-tertiary: #333;
+    --obs-text-primary: #e0e0e0;
+    --obs-text-secondary: #999;
+    --obs-border: #555;
+    --obs-border-light: #444;
+    --obs-accent: #667eea;
+    --obs-accent-hover: #5568d3;
+    --obs-error: #ff6b6b;
+    --obs-success: #00b894;
+}
+
+/* ============================================================================
+   Page Layout - 95% viewport width, centered
+   ============================================================================ */
+.observation-report-container {
+    width: 95%;
+    max-width: 95vw;
+    margin: 0 auto;
+    padding: 20px;
+    background: var(--obs-bg-primary);
+    color: var(--obs-text-primary);
+    min-height: 100vh;
+}
+
+/* ============================================================================
+   Navigation Tabs
+   ============================================================================ */
+.observation-report-nav-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 30px;
+    border-bottom: 2px solid var(--obs-border);
+}
+
+.observation-report-nav-tabs .nav-tab {
+    padding: 12px 24px;
+    background: var(--obs-bg-secondary);
+    color: var(--obs-text-primary);
+    text-decoration: none;
+    border-radius: 6px 6px 0 0;
+    border: 1px solid var(--obs-border);
+    border-bottom: none;
+    transition: all 0.2s;
+}
+
+.observation-report-nav-tabs .nav-tab:hover {
+    background: var(--obs-bg-tertiary);
+}
+
+.observation-report-nav-tabs .nav-tab.active {
+    background: var(--obs-bg-primary);
+    color: var(--obs-accent);
+    border-color: var(--obs-accent);
+    font-weight: bold;
+}
+
+/* ============================================================================
+   Top Controls
+   ============================================================================ */
+.observation-report-top-controls {
+    background: var(--obs-bg-secondary);
+    border: 1px solid var(--obs-border);
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.top-controls-row {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.control-group label {
+    color: var(--obs-text-primary);
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.control-select {
+    padding: 8px 12px;
+    background: var(--obs-bg-primary);
+    color: var(--obs-text-primary);
+    border: 1px solid var(--obs-border);
+    border-radius: 4px;
+    font-size: 14px;
+    min-width: 150px;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.control-select:focus {
+    outline: none;
+    border-color: var(--obs-accent);
+    background: var(--obs-bg-secondary);
+}
+
+.control-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ============================================================================
+   3-Column Resizable Layout
+   ============================================================================ */
+.observation-report-main-layout {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    min-height: 500px;
+    background: var(--obs-bg-secondary);
+    border: 1px solid var(--obs-border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.observation-report-column {
+    flex: 1;
+    min-width: 200px;
+    overflow-y: auto;
+    padding: 15px;
+    background: var(--obs-bg-primary);
+}
+
+/* ============================================================================
+   Collapsible Sections
+   ============================================================================ */
+.observation-report-collapsible-section {
+    background: var(--obs-bg-secondary);
+    border: 1px solid var(--obs-border);
+    border-radius: 6px;
+    margin-bottom: 15px;
+}
+
+.section-header {
+    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.section-header:hover {
+    background: var(--obs-bg-tertiary);
+}
+
+.section-toggle {
+    font-size: 14px;
+    color: var(--obs-text-secondary);
+    transition: transform 0.2s;
+}
+
+.section-title {
+    margin: 0;
+    flex: 1;
+    font-size: 16px;
+    font-weight: bold;
+    /* Color will be set inline by JavaScript */
+}
+
+.section-stats {
+    color: var(--obs-text-secondary);
+    font-size: 12px;
+}
+
+.section-content {
+    padding: 20px;
+    border-top: 1px solid var(--obs-border);
+}
+
+/* ============================================================================
+   Form Elements
+   ============================================================================ */
+.header-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.form-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.form-row label {
+    min-width: 120px;
+    color: var(--obs-text-primary);
+    font-size: 14px;
+}
+
+.form-input {
+    flex: 1;
+    padding: 8px 12px;
+    background: var(--obs-bg-primary);
+    color: var(--obs-text-primary);
+    border: 1px solid var(--obs-border);
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--obs-accent);
+    background: var(--obs-bg-secondary);
+}
+
+.form-input::placeholder {
+    color: var(--obs-text-secondary);
+    opacity: 0.7;
+}
+
+.text-editor {
+    width: 100%;
+    min-height: 300px;
+    padding: 15px;
+    background: var(--obs-bg-primary);
+    color: var(--obs-text-primary);
+    border: 1px solid var(--obs-border);
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    resize: vertical;
+    transition: border-color 0.2s;
+}
+
+.text-editor:focus {
+    outline: none;
+    border-color: var(--obs-accent);
+}
+
+/* ============================================================================
+   Media Browser
+   ============================================================================ */
+#mediaBrowser {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--obs-bg-primary);
+    overflow: hidden;
+}
+
+.media-browser-header {
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--obs-border);
+    background: var(--obs-bg-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.media-browser-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--obs-text-primary);
+}
+
+.media-count {
+    font-size: 12px;
+    color: var(--obs-text-secondary);
+}
+
+.media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+    padding: 15px;
+    overflow-y: auto;
+    flex: 1;
+    align-content: start;
+}
+
+.media-card {
+    background: var(--obs-bg-secondary);
+    border: 2px solid var(--obs-border);
+    border-radius: 6px;
+    padding: 8px;
+    cursor: move;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.media-card:hover {
+    border-color: var(--obs-accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.media-card.assigned {
+    opacity: 0.6;
+    border-color: var(--obs-text-secondary);
+    cursor: not-allowed;
+}
+
+.media-card.assigned:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.media-card.selected {
+    border-color: var(--obs-accent);
+    background: var(--obs-bg-tertiary);
+}
+
+.media-card input[type="checkbox"] {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 10;
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+}
+
+.media-thumbnail {
+    width: 100%;
+    height: 120px;
+    background: var(--obs-bg-tertiary);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    margin-bottom: 8px;
+    position: relative;
+}
+
+.media-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.media-thumbnail:empty::before {
+    content: '🖼️';
+    font-size: 32px;
+    opacity: 0.5;
+}
+
+.media-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.media-filename {
+    font-size: 12px;
+    color: var(--obs-text-primary);
+    font-weight: 500;
+    word-break: break-word;
+    line-height: 1.3;
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    cursor: text;
+}
+
+.media-filename:focus {
+    outline: 2px solid var(--obs-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+.media-type {
+    font-size: 11px;
+    color: var(--obs-text-secondary);
+    text-align: center;
+    padding: 2px 6px;
+    background: var(--obs-bg-tertiary);
+    border-radius: 3px;
+    display: inline-block;
+    align-self: flex-start;
+}
+
+.media-folder-header {
+    padding: 10px 15px;
+    margin-top: 15px;
+    margin-bottom: 10px;
+    background: var(--obs-bg-tertiary);
+    border-left: 3px solid var(--obs-accent);
+    border-radius: 4px;
+    color: var(--obs-text-primary);
+    font-size: 14px;
+    font-weight: 600;
+    grid-column: 1 / -1;
+}
+
+.media-folder-header:first-child {
+    margin-top: 0;
+}
+
+.media-preview-image {
+    max-width: 100%;
+    max-height: 200px;
+    display: block;
+    margin: 0 auto;
+    border-radius: 4px;
+}
+
+.media-error {
+    color: var(--obs-error);
+    font-size: 12px;
+    padding: 10px;
+    text-align: center;
+    background: var(--obs-bg-tertiary);
+    border-radius: 4px;
+    margin: 5px 0;
+}
+
+/* ============================================================================
+   Buttons
+   ============================================================================ */
+.btn-primary,
+.btn-secondary {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: var(--obs-accent);
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background: var(--obs-accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: var(--obs-bg-secondary);
+    color: var(--obs-text-primary);
+    border: 1px solid var(--obs-border);
+}
+
+.btn-secondary:hover {
+    background: var(--obs-bg-tertiary);
+    border-color: var(--obs-accent);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ============================================================================
+   Actions Section
+   ============================================================================ */
+.observation-report-actions {
+    display: flex;
+    gap: 10px;
+    padding: 20px;
+    background: var(--obs-bg-secondary);
+    border: 1px solid var(--obs-border);
+    border-radius: 6px;
+    margin-top: 20px;
+}
+
+/* ============================================================================
+   Modal/Dialog
+   ============================================================================ */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.modal-dialog {
+    background: var(--obs-bg-secondary);
+    border: 1px solid var(--obs-border);
+    border-radius: 8px;
+    min-width: 500px;
+    max-width: 80%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--obs-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: var(--obs-text-primary);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--obs-text-primary);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.modal-close:hover {
+    background: var(--obs-bg-tertiary);
+}
+
+.modal-content {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.draft-item {
+    padding: 15px;
+    border: 1px solid var(--obs-border);
+    border-radius: 4px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+}
+
+.draft-item:hover {
+    background: var(--obs-bg-tertiary);
+}
+
+.draft-name {
+    font-weight: bold;
+    color: var(--obs-text-primary);
+}
+
+.draft-meta {
+    color: var(--obs-text-secondary);
+    font-size: 12px;
+}
+
+.btn-load-draft {
+    padding: 6px 12px;
+    background: var(--obs-accent);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.btn-load-draft:hover {
+    background: var(--obs-accent-hover);
+}
+
+/* ============================================================================
+   Scrollbars
+   ============================================================================ */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--obs-bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--obs-border);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--obs-bg-tertiary);
+}
+
+/* ============================================================================
+   Responsive Design
+   ============================================================================ */
+@media (max-width: 1200px) {
+    .observation-report-container {
+        width: 98%;
+    }
+    
+    .observation-report-main-layout {
+        flex-direction: column;
+    }
+    
+    .observation-report-column {
+        min-width: 100%;
+    }
+}
+
+/* Import component-specific CSS */
+@import url('observation-report/observation-report-media-browser.css');
+@import url('observation-report/observation-report-live-preview.css');
+@import url('observation-report/observation-report-standards.css');
+@import url('observation-report/observation-report-preview-draft.css');
+@import url('observation-report/observation-report-column-resizer.css');

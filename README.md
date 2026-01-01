@@ -4,12 +4,23 @@ A web-based application that converts MP4 video files to JPEG image sequences an
 
 ## Features
 
+### Video to Image Formatter
 - Upload MP4 videos
 - Select specific time points to extract frames
 - Preview frames before extraction
 - Configure image quality and resolution
 - Generate PDFs with configurable layouts (grid or custom)
 - Save images and PDFs in organized folders
+
+### Observation Report
+- Create professional observation reports with embedded media
+- Assign images, videos, PDFs, and audio to placeholders
+- Drag-and-drop media assignment
+- Reorder media within placeholders
+- Live preview of document
+- Export to DOCX format
+- Save and load drafts
+- Standards/Assessment Criteria integration
 
 ## Installation
 
@@ -91,19 +102,32 @@ v2p-formatter/
 │   ├── video_processor.py  # Video to image conversion
 │   ├── pdf_generator.py     # PDF creation
 │   ├── image_editor.py     # Image editing utilities
-│   └── utils.py            # Helper functions
+│   ├── utils.py            # Helper functions
+│   ├── observation_report_scanner.py          # Observation Report: Media scanning
+│   ├── observation_report_placeholder_parser.py  # Observation Report: Placeholder parsing
+│   ├── observation_report_draft_manager.py    # Observation Report: Draft management
+│   └── observation_report_docx_generator.py   # Observation Report: DOCX generation
 ├── static/
 │   ├── css/
-│   │   └── style.css
+│   │   ├── style.css
+│   │   ├── observation-report.css
+│   │   └── observation-report/  # Observation Report component CSS
 │   ├── js/
 │   │   ├── main.js
 │   │   ├── video-handler.js
 │   │   ├── timeline.js
-│   │   └── image-preview.js
+│   │   ├── image-preview.js
+│   │   ├── observation-report.js              # Observation Report: Main orchestrator
+│   │   └── observation-report/                # Observation Report: Standalone libraries
 │   └── uploads/            # Temporary upload storage
 ├── templates/
 │   ├── base.html
-│   └── index.html
+│   ├── index.html
+│   └── observation_report.html  # Observation Report: Main page
+├── docs/
+│   └── observation-report/      # Observation Report: Documentation
+├── tests/
+│   └── test_observation_report*.py  # Observation Report: Tests
 ├── config.py               # Configuration settings
 ├── requirements.txt
 └── README.md
@@ -147,12 +171,40 @@ cd tests
 HEADLESS=true pytest tests/
 ```
 
+## Modules
+
+### Video to Image Formatter
+The core module for converting MP4 videos to image sequences and PDFs.
+
+**Access**: Navigate to `/v2p-formatter/`
+
+### Observation Report
+Create professional observation reports with embedded media.
+
+**Access**: Navigate to `/v2p-formatter/observation-report`
+
+**Documentation**:
+- [User Guide](docs/observation-report/USER_GUIDE.md)
+- [Developer Guide](docs/observation-report/DEVELOPER_GUIDE.md)
+- [API Reference](docs/observation-report/API_REFERENCE.md)
+- [Testing Guide](docs/observation-report/TESTING_GUIDE.md)
+
+**Features**:
+- Drag-and-drop media assignment
+- Live document preview
+- Placeholder-based content structure
+- Media reordering within placeholders
+- DOCX export
+- Draft save/load functionality
+- Standards/Assessment Criteria integration
+
 ## Notes
 
 - The application processes videos synchronously for stability
 - Original video files are preserved
 - Output files are saved in the same directory as the source video
 - No file size limits (configurable in config.py)
+- Observation Report module requires media files organized by qualification/learner structure
 
 ## License
 

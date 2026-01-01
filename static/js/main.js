@@ -32,66 +32,85 @@ if (typeof window.debugOutput === 'undefined') {
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Video to Image Formatter initialized');
-    debugOutput('=== Application Initialized ===', 'success');
-    debugOutput('DOM Content Loaded event fired', 'info');
+    if (typeof window.debugOutput === 'function') {
+        window.debugOutput('=== Application Initialized ===', 'success');
+        window.debugOutput('DOM Content Loaded event fired', 'info');
+    }
     
-    // Set up choose file button - try multiple ways
+    // Set up choose file button - only if on the main video upload page
     const chooseFileBtn = document.getElementById('chooseFileBtn');
     const videoInput = document.getElementById('videoInput');
     
-    debugOutput(`Button found: ${!!chooseFileBtn}`, chooseFileBtn ? 'success' : 'error');
-    debugOutput(`Input found: ${!!videoInput}`, videoInput ? 'success' : 'error');
-    
-    if (!chooseFileBtn) {
-        debugOutput('❌ ERROR: Choose File button not found!', 'error');
+    // Check if we're on a page with video upload functionality
+    // If not, silently skip initialization (e.g., observation-media page)
+    if (!chooseFileBtn || !videoInput) {
+        // Not an error - this page doesn't have video upload functionality
+        if (typeof window.debugOutput === 'function') {
+            window.debugOutput('Video upload elements not found - skipping initialization (expected on some pages)', 'info');
+        }
         return;
     }
     
-    if (!videoInput) {
-        debugOutput('❌ ERROR: Video input element not found!', 'error');
-        return;
+    if (typeof window.debugOutput === 'function') {
+        window.debugOutput(`Button found: ${!!chooseFileBtn}`, 'success');
+        window.debugOutput(`Input found: ${!!videoInput}`, 'success');
     }
     
     // Method 1: Add click event listener
     chooseFileBtn.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        debugOutput('🔘 Choose File button clicked (addEventListener)', 'info');
+        if (typeof window.debugOutput === 'function') {
+            window.debugOutput('🔘 Choose File button clicked (addEventListener)', 'info');
+        }
         console.log('Button clicked, triggering file input...');
         
         try {
             videoInput.click();
-            debugOutput('✅ File input click() called successfully', 'success');
+            if (typeof window.debugOutput === 'function') {
+                window.debugOutput('✅ File input click() called successfully', 'success');
+            }
         } catch (error) {
-            debugOutput(`❌ Error clicking file input: ${error.message}`, 'error');
+            if (typeof window.debugOutput === 'function') {
+                window.debugOutput(`❌ Error clicking file input: ${error.message}`, 'error');
+            }
             console.error('Error:', error);
         }
     });
     
-    debugOutput('✅ Choose File button event listener attached', 'success');
+    if (typeof window.debugOutput === 'function') {
+        window.debugOutput('✅ Choose File button event listener attached', 'success');
+    }
     
     // Test file input
-    debugOutput('Testing file input...', 'info');
+    if (typeof window.debugOutput === 'function') {
+        window.debugOutput('Testing file input...', 'info');
+    }
     try {
-        debugOutput(`Input type: ${videoInput.type}`, 'info');
-        debugOutput(`Input accept: ${videoInput.accept}`, 'info');
-        debugOutput(`Input style.display: ${videoInput.style.display}`, 'info');
+        if (typeof window.debugOutput === 'function') {
+            window.debugOutput(`Input type: ${videoInput.type}`, 'info');
+            window.debugOutput(`Input accept: ${videoInput.accept}`, 'info');
+            window.debugOutput(`Input style.display: ${videoInput.style.display}`, 'info');
+        }
     } catch (err) {
-        debugOutput(`Error testing input: ${err.message}`, 'error');
+        if (typeof window.debugOutput === 'function') {
+            window.debugOutput(`Error testing input: ${err.message}`, 'error');
+        }
     }
 });
 
 // Utility functions
 function showSection(sectionId) {
+    debugger; // Debug breakpoint
     const section = document.getElementById(sectionId);
     if (section) {
         section.style.display = 'block';
-        if (typeof debugOutput !== 'undefined') {
-            debugOutput(`✅ Section shown: ${sectionId}`, 'success');
+        if (typeof window.debugOutput === 'function') {
+            window.debugOutput(`✅ Section shown: ${sectionId}`, 'success');
         }
     } else {
-        if (typeof debugOutput !== 'undefined') {
-            debugOutput(`❌ Section not found: ${sectionId}`, 'error');
+        if (typeof window.debugOutput === 'function') {
+            window.debugOutput(`❌ Section not found: ${sectionId}`, 'error');
         }
     }
 }

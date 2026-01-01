@@ -90,7 +90,13 @@ function highlightPlaceholdersInEditor() {
     updatePlaceholderStats();
 
     // Apply rainbow colors to placeholders in preview
-    updatePreview();
+    if (typeof window !== 'undefined' && typeof window.updatePreview === 'function') {
+        try {
+            window.updatePreview();
+        } catch (e) {
+            console.error('Error calling updatePreview:', e);
+        }
+    }
 }
 
 /**
@@ -157,9 +163,27 @@ function assignMediaToPlaceholder(placeholder, media, targetIndex = null) {
     }
 
     // Update UI
-    updateMediaCardStates();
-    updatePreview();
-    updatePlaceholderStats();
+    if (typeof window !== 'undefined' && typeof window.updateMediaCardStates === 'function') {
+        try {
+            window.updateMediaCardStates();
+        } catch (e) {
+            console.error('Error calling updateMediaCardStates:', e);
+        }
+    }
+    if (typeof window !== 'undefined' && typeof window.updatePreview === 'function') {
+        try {
+            window.updatePreview();
+        } catch (e) {
+            console.error('Error calling updatePreview:', e);
+        }
+    }
+    if (typeof window !== 'undefined' && typeof window.updatePlaceholderStats === 'function') {
+        try {
+            window.updatePlaceholderStats();
+        } catch (e) {
+            console.error('Error calling updatePlaceholderStats:', e);
+        }
+    }
 
     return true;
 }
@@ -178,9 +202,27 @@ function removeMediaFromPlaceholder(placeholder, mediaPath) {
         }
 
         // Update UI
-        updateMediaCardStates();
-        updatePreview();
-        updatePlaceholderStats();
+        if (typeof window !== 'undefined' && typeof window.updateMediaCardStates === 'function') {
+            try {
+                window.updateMediaCardStates();
+            } catch (e) {
+                console.error('Error calling updateMediaCardStates:', e);
+            }
+        }
+        if (typeof window !== 'undefined' && typeof window.updatePreview === 'function') {
+            try {
+                window.updatePreview();
+            } catch (e) {
+                console.error('Error calling updatePreview:', e);
+            }
+        }
+        if (typeof window !== 'undefined' && typeof window.updatePlaceholderStats === 'function') {
+            try {
+                window.updatePlaceholderStats();
+            } catch (e) {
+                console.error('Error calling updatePlaceholderStats:', e);
+            }
+        }
     }
 }
 
@@ -204,7 +246,21 @@ function updateMediaCardStates() {
             card.draggable = false;
 
             // Get section color for this media item
-            const sectionColor = getSectionColorForMedia(mediaPath, assignments, text);
+            let sectionColor = null;
+            if (typeof window !== 'undefined' && typeof window.getSectionColorForMedia === 'function') {
+                try {
+                    sectionColor = window.getSectionColorForMedia(mediaPath, assignments, text);
+                } catch (e) {
+                    console.error('Error calling getSectionColorForMedia:', e);
+                }
+            } else if (typeof getSectionColorForMedia === 'function') {
+                // Fallback to local function if available
+                try {
+                    sectionColor = getSectionColorForMedia(mediaPath, assignments, text);
+                } catch (e) {
+                    console.error('Error calling local getSectionColorForMedia:', e);
+                }
+            }
             
             // Update badge with section color
             let badge = card.querySelector('.assigned-badge');
@@ -360,7 +416,17 @@ function showPlaceholderSelectionDialog(media, placeholders) {
     const validation = validatePlaceholders(text, assignments);
     let previewHtml = '';
     if (sectionData.hasSections) {
-        previewHtml = renderSectionsForDialog(sectionData, placeholders, colorMap, assignments, validation, mediaList);
+        // Try to get renderSectionsForDialog from window or local scope
+        const renderFn = typeof window.renderSectionsForDialog === 'function' 
+            ? window.renderSectionsForDialog 
+            : (typeof renderSectionsForDialog === 'function' ? renderSectionsForDialog : null);
+        
+        if (renderFn) {
+            previewHtml = renderFn(sectionData, placeholders, colorMap, assignments, validation, mediaList);
+        } else {
+            console.error('[DIALOG] renderSectionsForDialog not available');
+            previewHtml = '<p>Error: Preview rendering function not available</p>';
+        }
     } else {
         // Render without sections (same logic as before)
         let previewHtmlTemp = '';
@@ -475,6 +541,7 @@ function showPlaceholderSelectionDialog(media, placeholders) {
                      draggable="false"
                      style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; user-select: none;">
                 ${media.type === 'video' ? '<span style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7); color: white; font-size: 8px; padding: 2px 4px; border-radius: 2px; pointer-events: none;">⏯</span>' : ''}
+                ${media.type === 'document' ? '<span style="position: absolute; top: 2px; right: 2px; background: rgba(200,0,0,0.8); color: white; font-size: 8px; padding: 2px 4px; border-radius: 2px; pointer-events: none;">📄</span>' : ''}
                 <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); color: white; font-size: 10px; padding: 2px 4px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; pointer-events: none;">${escapeHtml(media.name)}</div>
             </div>
         `;
@@ -502,6 +569,7 @@ function showPlaceholderSelectionDialog(media, placeholders) {
     dialogHTML += `
         <div style="margin-top: 15px; text-align: right; border-top: 1px solid #555; padding-top: 15px;">
             <button id="placeholderDialogCancelBtn" 
+                    onclick="if(window.currentPlaceholderDialog){window.currentPlaceholderDialog.remove();window.currentPlaceholderDialog=null;window.currentPlaceholderDialogMedia=null;}if(typeof window.closePlaceholderDialog==='function'){window.closePlaceholderDialog();}return false;"
                     style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer;">
                 Cancel
             </button>
@@ -571,21 +639,19 @@ function showPlaceholderSelectionDialog(media, placeholders) {
             const newCancelBtn = cancelBtn.cloneNode(true);
             cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
 
-            // Add fresh event listener
+            // Add fresh event listener - directly close the dialog
             newCancelBtn.addEventListener('click', function (e) {
                 e.preventDefault();
                 e.stopPropagation();
-                if (typeof closePlaceholderDialog === 'function') {
-                    closePlaceholderDialog();
-                } else if (typeof window.closePlaceholderDialog === 'function') {
-                    window.closePlaceholderDialog();
-                } else {
-                    // Fallback: directly remove dialog
+                // Directly close the dialog
                     if (window.currentPlaceholderDialog) {
                         window.currentPlaceholderDialog.remove();
                         window.currentPlaceholderDialog = null;
                         window.currentPlaceholderDialogMedia = null;
                     }
+                // Also try calling the function if available
+                if (typeof window.closePlaceholderDialog === 'function') {
+                    window.closePlaceholderDialog();
                 }
             });
         }
@@ -653,45 +719,11 @@ function closePlaceholderDialog() {
 }
 
 // Make functions globally available
+// Note: Most functions are assigned to window later in the file after they are defined
+// This early block only assigns functions that are already defined above
 if (typeof window !== 'undefined') {
-    window.extractPlaceholders = extractPlaceholders;
-    window.assignPlaceholderColors = assignPlaceholderColors;
-    window.validatePlaceholders = validatePlaceholders;
-    window.highlightPlaceholdersInEditor = highlightPlaceholdersInEditor;
-    window.updatePlaceholderStats = updatePlaceholderStats;
-    window.updatePreview = updatePreview;
-    window.generateMediaTable = generateMediaTable;
-    window.getCurrentAssignments = getCurrentAssignments;
-    window.assignMediaToPlaceholder = assignMediaToPlaceholder;
-    window.removeMediaFromPlaceholder = removeMediaFromPlaceholder;
-    window.updateMediaCardStates = updateMediaCardStates;
-    window.isMediaAssigned = isMediaAssigned;
-    window.showPlaceholderSelectionDialog = showPlaceholderSelectionDialog;
-    window.selectPlaceholderForMedia = selectPlaceholderForMedia;
-    window.closePlaceholderDialog = closePlaceholderDialog;
-    window.handleTableDrop = handleTableDrop;
-    window.handleTableDragOver = handleTableDragOver;
-    window.handleTableCellDragStart = handleTableCellDragStart;
-    window.handleTableCellClick = handleTableCellClick;
-    window.removeMediaFromTable = removeMediaFromTable;
-    window.reorderMediaInPlaceholder = reorderMediaInPlaceholder;
-    window.exportObservationDocx = exportObservationDocx;
-window.showDraftPreview = showDraftPreview;
-window.closeDraftPreview = closeDraftPreview;
-window.updatePreviewDisplay = updatePreviewDisplay;
-window.deleteEmptyTable = deleteEmptyTable;
-window.exportObservationDocxFromPreview = exportObservationDocxFromPreview;
-    window.showSaveDraftDialog = showSaveDraftDialog;
-    window.showLoadDraftDialog = showLoadDraftDialog;
-    window.saveDraft = saveDraft;
-    window.loadDraft = loadDraft;
-    window.deleteDraft = deleteDraft;
-    window.closeDraftDialog = closeDraftDialog;
-    window.loadObservationMedia = loadObservationMedia;
-    window.handleSaveOrUpdateDraft = handleSaveOrUpdateDraft;
-    window.updateDraft = updateDraft;
-    window.clearCurrentDraft = clearCurrentDraft;
-    window.updateCurrentDraftDisplay = updateCurrentDraftDisplay;
+    // Functions defined earlier in the file can be assigned here
+    // Functions defined later are assigned after their definitions
 }
 
 /**
@@ -735,8 +767,85 @@ function updateCurrentDraftDisplay() {
  * Clear current draft
  */
 function clearCurrentDraft() {
+    // Clear draft info
     window.currentDraft.id = null;
     window.currentDraft.name = null;
+    
+    // Clear localStorage
+    try {
+        localStorage.removeItem('observationMediaCurrentDraftId');
+    } catch (e) {
+        console.warn('Failed to clear draft ID from localStorage:', e);
+    }
+    
+    // Clear editor content
+    const editor = document.getElementById('observationTextEditor');
+    if (editor) {
+        editor.value = '';
+    }
+    
+    // Clear assignments
+    window.observationMediaAssignments = {};
+    
+    // Clear selected subfolder
+    const subfolderSelect = document.getElementById('observationSubfolderSelect');
+    if (subfolderSelect) {
+        subfolderSelect.value = '';
+    }
+    
+    // Directly clear the media browser grid - this is the key fix
+    const grid = document.getElementById('observationMediaGrid');
+    if (grid) {
+        // Clear all content immediately
+        grid.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;" id="mediaBrowserMessage">Please select both qualification and learner</p>';
+    }
+    const countEl = document.getElementById('observationMediaCount');
+    if (countEl) {
+        countEl.textContent = '0 files';
+    }
+    
+    // Clear any media-related state
+    if (window.observationMediaData) {
+        window.observationMediaData = {};
+    }
+    
+    // Don't reload media automatically - let the user manually reload if they want
+    // The grid is already cleared above, so it will show the empty state
+    // If qualification/learner are selected, the user can manually reload media if needed
+    
+    // Clear standards
+    if (typeof window !== 'undefined' && typeof window.clearStandards === 'function') {
+        try {
+            window.clearStandards();
+        } catch (e) {
+            console.error('Error calling clearStandards:', e);
+        }
+    }
+    
+    // Update UI to reflect cleared state
+    if (typeof window !== 'undefined' && typeof window.highlightPlaceholdersInEditor === 'function') {
+        try {
+            window.highlightPlaceholdersInEditor();
+        } catch (e) {
+            console.error('Error calling highlightPlaceholdersInEditor:', e);
+        }
+    }
+    if (typeof window !== 'undefined' && typeof window.updatePreview === 'function') {
+        try {
+            window.updatePreview();
+        } catch (e) {
+            console.error('Error calling updatePreview:', e);
+        }
+    }
+    if (typeof window !== 'undefined' && typeof window.updateMediaCardStates === 'function') {
+        try {
+            window.updateMediaCardStates();
+        } catch (e) {
+            console.error('Error calling updateMediaCardStates:', e);
+        }
+    }
+    
+    // Update current draft display (will hide the draft display)
     updateCurrentDraftDisplay();
 }
 
@@ -744,35 +853,318 @@ function clearCurrentDraft() {
  * Handle save or update draft
  */
 function handleSaveOrUpdateDraft() {
-    // If a draft is loaded, update it directly
+    // Show enhanced dialog exists, use it; otherwise fall back to simple prompt
+    if (typeof showEnhancedDraftDialog === 'function') {
+        showEnhancedDraftDialog();
+    } else {
+        // Fallback to old behavior
     if (window.currentDraft.id) {
         updateDraft(window.currentDraft.id);
     } else {
-        // Otherwise, show dialog to create new draft
         showSaveDraftDialog();
+        }
     }
 }
 
 /**
- * Show save draft dialog
+ * Show enhanced save/update draft dialog with JSON file and unit selection
+ */
+async function showEnhancedDraftDialog() {
+    const isUpdate = !!window.currentDraft.id;
+    const currentDraftName = window.currentDraft.name || '';
+    
+    // Get learner ID from dropdown
+    const learnerSelect = document.getElementById('learnerSelect');
+    const learnerId = learnerSelect ? learnerSelect.value : null;
+    
+    if (!learnerId && !isUpdate) {
+        alert('Please select a learner first before saving a draft first before saving a draft.');
+        return;
+    }
+    
+    // Create dialog
+    const dialog = document.createElement('div');
+    dialog.className = 'draft-dialog';
+    dialog.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+    dialog.onclick = function(e) {
+        if (e.target === dialog) {
+            dialog.remove();
+        }
+    };
+    
+    // Get current draft data if updating
+    let currentJsonFileId = '';
+    let currentSelectedUnitIds = [];
+    if (isUpdate && window.currentDraft.id) {
+        try {
+            const response = await fetch(`/v2p-formatter/media-converter/observation-media/drafts/${window.currentDraft.id}`);
+            const data = await response.json();
+            if (data.success && data.draft) {
+                currentJsonFileId = data.draft.json_file_id || '';
+                currentSelectedUnitIds = data.draft.selected_unit_ids || [];
+            }
+        } catch (e) {
+            console.warn('Could not load current draft data:', e);
+        }
+    }
+    
+    // Build dialog HTML
+    const prefix = learnerId ? `learner_${learnerId}_` : '';
+    const defaultName = isUpdate ? currentDraftName.replace(prefix, '') : 'My Draft';
+    
+    dialog.innerHTML = `
+        <div style="background: #2a2a2a; border: 2px solid #667eea; border-radius: 8px; padding: 25px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation();">
+            <h3 style="color: #e0e0e0; margin: 0 0 20px 0;">${isUpdate ? 'Update Draft' : 'Save Draft'}</h3>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="color: #e0e0e0; display: block; margin-bottom: 5px; font-weight: 500;">Draft Name:</label>
+                <input type="text" id="draftDialogName" value="${defaultName}" 
+                       style="width: 100%; padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px; box-sizing: border-box;">
+                ${learnerId ? `<div style="color: #999; font-size: 12px; margin-top: 4px;">Will be saved as: ${prefix}[name]</div>` : ''}
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="color: #e0e0e0; display: block; margin-bottom: 5px; font-weight: 500;">JSON Standards File (Optional):</label>
+                <select id="draftDialogJsonFile" 
+                        style="width: 100%; padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px; box-sizing: border-box;">
+                    <option value="">None (no JSON file assigned)</option>
+                </select>
+            </div>
+            
+            <div id="draftDialogUnitsContainer" style="margin-bottom: 15px; display: none;">
+                <label style="color: #e0e0e0; display: block; margin-bottom: 5px; font-weight: 500;">Select Units (Optional):</label>
+                <div id="draftDialogUnitsList" style="max-height: 200px; overflow-y: auto; border: 1px solid #555; border-radius: 4px; padding: 10px; background: #1a1a1a;">
+                    <p style="color: #999; text-align: center; padding: 10px;">Select a JSON file to load units</p>
+                </div>
+                <div style="margin-top: 10px; display: flex; gap: 10px;">
+                    <button onclick="selectAllDraftDialogUnits()" style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Select All</button>
+                    <button onclick="deselectAllDraftDialogUnits()" style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Deselect All</button>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px; text-align: right; border-top: 1px solid #555; padding-top: 15px;">
+                <button onclick="closeEnhancedDraftDialog()" 
+                        style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
+                    Cancel
+                </button>
+                <button onclick="saveDraftFromDialog()" 
+                        style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    ${isUpdate ? 'Update Draft' : 'Save Draft'}
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    window.currentDraftDialog = dialog;
+    
+    // Load JSON files
+    await loadJSONFilesForDraftDialog();
+    
+    // Set current JSON file if updating
+    if (currentJsonFileId) {
+        const jsonSelect = document.getElementById('draftDialogJsonFile');
+        if (jsonSelect) {
+            jsonSelect.value = currentJsonFileId;
+            jsonSelect.dispatchEvent(new Event('change'));
+        }
+    }
+    
+    // Setup JSON file change handler
+    const jsonSelect = document.getElementById('draftDialogJsonFile');
+    if (jsonSelect) {
+        jsonSelect.addEventListener('change', async function() {
+            const jsonFileId = this.value;
+            if (jsonFileId) {
+                await loadUnitsForDraftDialog(jsonFileId, currentSelectedUnitIds);
+            } else {
+                document.getElementById('draftDialogUnitsContainer').style.display = 'none';
+            }
+        });
+    }
+}
+
+/**
+ * Load JSON files for draft dialog
+ */
+async function loadJSONFilesForDraftDialog() {
+    try {
+        const response = await fetch('/v2p-formatter/ac-matrix/json-files');
+        const data = await response.json();
+        
+        if (data.success) {
+            const selector = document.getElementById('draftDialogJsonFile');
+            if (selector) {
+                data.files.forEach(file => {
+                    const option = document.createElement('option');
+                    option.value = file.id;
+                    option.textContent = file.qualification_name || file.name;
+                    selector.appendChild(option);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error loading JSON files:', error);
+    }
+}
+
+/**
+ * Load units for draft dialog
+ */
+async function loadUnitsForDraftDialog(jsonFileId, preselectedUnitIds = []) {
+    const container = document.getElementById('draftDialogUnitsContainer');
+    const unitsList = document.getElementById('draftDialogUnitsList');
+    
+    if (!container || !unitsList) return;
+    
+    container.style.display = 'block';
+    unitsList.innerHTML = '<p style="color: #999; text-align: center; padding: 10px;">Loading units...</p>';
+    
+    try {
+        const response = await fetch(`/v2p-formatter/ac-matrix/json-files/${jsonFileId}/units`);
+        const data = await response.json();
+        
+        if (data.success && data.units && data.units.length > 0) {
+            unitsList.innerHTML = '';
+            
+            data.units.forEach(unit => {
+                const label = document.createElement('label');
+                label.style.cssText = 'display: block; padding: 8px; cursor: pointer; color: #e0e0e0; border-radius: 4px; margin-bottom: 4px;';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = unit.unit_id;
+                checkbox.className = 'draft-dialog-unit-checkbox';
+                checkbox.checked = preselectedUnitIds.length === 0 || preselectedUnitIds.includes(unit.unit_id);
+                checkbox.style.cssText = 'margin-right: 8px; cursor: pointer;';
+                
+                const unitLabel = document.createElement('span');
+                unitLabel.textContent = `Unit ${unit.unit_id}: ${unit.unit_name || 'Unnamed Unit'}`;
+                
+                label.appendChild(checkbox);
+                label.appendChild(unitLabel);
+                unitsList.appendChild(label);
+            });
+        } else {
+            unitsList.innerHTML = '<p style="color: #999; text-align: center; padding: 10px;">No units found</p>';
+        }
+    } catch (error) {
+        console.error('Error loading units:', error);
+        unitsList.innerHTML = '<p style="color: #ff6b6b; text-align: center; padding: 10px;">Error loading units</p>';
+    }
+}
+
+/**
+ * Select all units in draft dialog
+ */
+function selectAllDraftDialogUnits() {
+    const checkboxes = document.querySelectorAll('.draft-dialog-unit-checkbox');
+    checkboxes.forEach(cb => cb.checked = true);
+}
+
+/**
+ * Deselect all units in draft dialog
+ */
+function deselectAllDraftDialogUnits() {
+    const checkboxes = document.querySelectorAll('.draft-dialog-unit-checkbox');
+    checkboxes.forEach(cb => cb.checked = false);
+}
+
+/**
+ * Close enhanced draft dialog
+ */
+function closeEnhancedDraftDialog() {
+    if (window.currentDraftDialog) {
+        window.currentDraftDialog.remove();
+        window.currentDraftDialog = null;
+    }
+}
+
+/**
+ * Save draft from dialog
+ */
+function saveDraftFromDialog() {
+    const nameInput = document.getElementById('draftDialogName');
+    const jsonSelect = document.getElementById('draftDialogJsonFile');
+    const unitCheckboxes = document.querySelectorAll('.draft-dialog-unit-checkbox:checked');
+    
+    if (!nameInput || !nameInput.value.trim()) {
+        alert('Please enter a draft name');
+        return;
+    }
+    
+    const learnerSelect = document.getElementById('learnerSelect');
+    const learnerId = learnerSelect ? learnerSelect.value : null;
+    const prefix = learnerId ? `learner_${learnerId}_` : '';
+    const draftName = nameInput.value.trim().startsWith(prefix) ? nameInput.value.trim() : `${prefix}${nameInput.value.trim()}`;
+    
+    const jsonFileId = jsonSelect ? jsonSelect.value : '';
+    const selectedUnitIds = Array.from(unitCheckboxes).map(cb => cb.value);
+    
+    closeEnhancedDraftDialog();
+    
+    if (window.currentDraft.id) {
+        updateDraft(window.currentDraft.id, draftName, jsonFileId, selectedUnitIds);
+    } else {
+        saveDraft(draftName, jsonFileId, selectedUnitIds);
+    }
+}
+
+/**
+ * Show save draft dialog (legacy - kept for compatibility)
  */
 function showSaveDraftDialog() {
-    const name = prompt('Enter draft name:', 'My Draft');
+    // Get learner ID from dropdown
+    const learnerSelect = document.getElementById('learnerSelect');
+    const learnerId = learnerSelect ? learnerSelect.value : null;
+    
+    if (!learnerId) {
+        alert('Please select a learner first before saving a draft.');
+        return;
+    }
+    
+    const name = prompt(`Enter draft name (will be prefixed with "learner_${learnerId}_"):`, 'My Draft');
     if (!name) return;
 
-    saveDraft(name);
+    // Add "learner_{learnerId}_" prefix to the name
+    const prefix = `learner_${learnerId}_`;
+    const prefixedName = name.startsWith(prefix) ? name : `${prefix}${name}`;
+    
+    saveDraft(prefixedName);
+}
+// Make function available globally immediately
+if (typeof window !== 'undefined') {
+    window.showSaveDraftDialog = showSaveDraftDialog;
 }
 
 /**
  * Save current draft (creates new)
  */
-function saveDraft(name) {
+function saveDraft(name, jsonFileId = '', selectedUnitIds = []) {
     const editor = document.getElementById('observationTextEditor');
     if (!editor) return;
 
     const text = editor.value;
     const assignments = getCurrentAssignments();
     const selectedSubfolder = document.getElementById('observationSubfolderSelect')?.value || null;
+    
+    // Get qualification and learner from dropdowns
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    const qualification = qualificationSelect ? qualificationSelect.value : null;
+    const learner = learnerSelect ? learnerSelect.value : null;
+    
+    // Get header fields
+    const headerData = {
+        learner: document.getElementById('headerLearner')?.value || '',
+        assessor: document.getElementById('headerAssessor')?.value || '',
+        visit_date: document.getElementById('headerVisitDate')?.value || '',
+        location: document.getElementById('headerLocation')?.value || '',
+        address: document.getElementById('headerAddress')?.value || ''
+    };
+    
+    // Get assessor feedback
+    const assessorFeedback = document.getElementById('assessorFeedback')?.value || '';
 
     // Show loading state
     const saveBtn = document.getElementById('saveDraftBtn');
@@ -788,7 +1180,13 @@ function saveDraft(name) {
             name: name,
             text_content: text,
             assignments: assignments,
-            selected_subfolder: selectedSubfolder
+            selected_subfolder: selectedSubfolder,
+            qualification: qualification,
+            learner: learner,
+            json_file_id: jsonFileId || null,
+            selected_unit_ids: selectedUnitIds,
+            header_data: headerData,
+            assessor_feedback: assessorFeedback
         })
     })
         .then(response => response.json())
@@ -797,6 +1195,14 @@ function saveDraft(name) {
                 // Store current draft info
                 window.currentDraft.id = data.draft_id;
                 window.currentDraft.name = data.draft_name;
+                
+                // Save draft ID to localStorage for persistence across page refreshes
+                try {
+                    localStorage.setItem('observationMediaCurrentDraftId', data.draft_id);
+                } catch (e) {
+                    console.warn('Failed to save draft ID to localStorage:', e);
+                }
+                
                 updateCurrentDraftDisplay();
                 alert(`Draft saved successfully!\n\nName: ${data.draft_name}`);
             } else {
@@ -813,17 +1219,39 @@ function saveDraft(name) {
             updateCurrentDraftDisplay();
         });
 }
+// Make function available globally immediately
+if (typeof window !== 'undefined') {
+    window.saveDraft = saveDraft;
+}
 
 /**
  * Update existing draft
  */
-function updateDraft(draftId) {
+function updateDraft(draftId, draftName = null, jsonFileId = '', selectedUnitIds = []) {
     const editor = document.getElementById('observationTextEditor');
     if (!editor) return;
 
     const text = editor.value;
     const assignments = getCurrentAssignments();
     const selectedSubfolder = document.getElementById('observationSubfolderSelect')?.value || null;
+    
+    // Get qualification and learner from dropdowns
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    const qualification = qualificationSelect ? qualificationSelect.value : null;
+    const learner = learnerSelect ? learnerSelect.value : null;
+    
+    // Get header fields
+    const headerData = {
+        learner: document.getElementById('headerLearner')?.value || '',
+        assessor: document.getElementById('headerAssessor')?.value || '',
+        visit_date: document.getElementById('headerVisitDate')?.value || '',
+        location: document.getElementById('headerLocation')?.value || '',
+        address: document.getElementById('headerAddress')?.value || ''
+    };
+    
+    // Get assessor feedback
+    const assessorFeedback = document.getElementById('assessorFeedback')?.value || '';
 
     // Show loading state
     const saveBtn = document.getElementById('saveDraftBtn');
@@ -831,15 +1259,29 @@ function updateDraft(draftId) {
     saveBtn.disabled = true;
     saveBtn.textContent = '⏳ Updating...';
 
+    // Build update payload
+    const payload = {
+        text_content: text,
+        assignments: assignments,
+        selected_subfolder: selectedSubfolder,
+        qualification: qualification,
+        learner: learner,
+        json_file_id: jsonFileId || null,
+        selected_unit_ids: selectedUnitIds,
+        header_data: headerData,
+        assessor_feedback: assessorFeedback
+    };
+    
+    // Include name if provided (for renaming)
+    if (draftName) {
+        payload.name = draftName;
+    }
+
     // Update draft via API
     fetch(`/v2p-formatter/media-converter/observation-media/drafts/${draftId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            text_content: text,
-            assignments: assignments,
-            selected_subfolder: selectedSubfolder
-        })
+        body: JSON.stringify(payload)
     })
         .then(response => response.json())
         .then(data => {
@@ -879,11 +1321,31 @@ function showLoadDraftDialog() {
             alert(`Error loading drafts: ${error.message}`);
         });
 }
+// Make function available globally immediately
+if (typeof window !== 'undefined') {
+    window.showLoadDraftDialog = showLoadDraftDialog;
+}
 
 /**
  * Show draft selection dialog
  */
 function showDraftSelectionDialog(drafts) {
+    // Create backdrop overlay
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 9999;
+    `;
+    backdrop.onclick = function() {
+        closeDraftDialog();
+    };
+    document.body.appendChild(backdrop);
+
     const dialog = document.createElement('div');
     dialog.className = 'draft-selection-dialog';
     dialog.style.cssText = `
@@ -894,17 +1356,20 @@ function showDraftSelectionDialog(drafts) {
         background: #2a2a2a;
         border: 2px solid #667eea;
         border-radius: 8px;
-        padding: 20px;
+        padding: 25px;
         z-index: 10000;
-        min-width: 500px;
+        min-width: 550px;
         max-width: 700px;
         max-height: 80vh;
         overflow-y: auto;
         box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     `;
+    dialog.onclick = function(e) {
+        e.stopPropagation();
+    };
 
     let dialogHTML = `
-        <h3 style="color: #e0e0e0; margin-bottom: 15px;">Load Draft</h3>
+        <h3 style="color: #e0e0e0; margin-bottom: 20px; font-size: 18px; border-bottom: 1px solid #555; padding-bottom: 10px;">Select a draft to load</h3>
         <div style="max-height: 400px; overflow-y: auto;">
     `;
 
@@ -914,10 +1379,9 @@ function showDraftSelectionDialog(drafts) {
 
         dialogHTML += `
             <div class="draft-item" 
-                 style="padding: 12px; margin-bottom: 8px; background: #1e1e1e; border: 1px solid #555; border-radius: 4px; cursor: pointer;"
-                 onclick="loadDraft('${draft.id}'); closeDraftDialog();">
+                 style="padding: 12px; margin-bottom: 8px; background: #1e1e1e; border: 1px solid #555; border-radius: 4px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
+                    <div style="flex: 1;">
                         <div style="color: #e0e0e0; font-weight: bold; margin-bottom: 4px;">${draft.name}</div>
                         <div style="color: #999; font-size: 11px;">
                             Updated: ${dateStr}
@@ -925,13 +1389,17 @@ function showDraftSelectionDialog(drafts) {
                             ${draft.placeholder_count ? ` • ${draft.placeholder_count} placeholders` : ''}
                         </div>
                     </div>
-                    <div style="display: flex; gap: 5px;">
+                    <div style="display: flex; gap: 8px; margin-left: 15px;">
                         <button onclick="event.stopPropagation(); loadDraft('${draft.id}'); closeDraftDialog();" 
-                                style="padding: 6px 12px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 0.2s;"
+                                onmouseover="this.style.background='#5568d3'"
+                                onmouseout="this.style.background='#667eea'">
                             Load
                         </button>
                         <button onclick="event.stopPropagation(); deleteDraft('${draft.id}'); closeDraftDialog(); showLoadDraftDialog();" 
-                                style="padding: 6px 12px; background: #ff6b6b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                style="padding: 8px 16px; background: #ff6b6b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 0.2s;"
+                                onmouseover="this.style.background='#ee5a5a'"
+                                onmouseout="this.style.background='#ff6b6b'">
                             Delete
                         </button>
                     </div>
@@ -953,8 +1421,9 @@ function showDraftSelectionDialog(drafts) {
     dialog.innerHTML = dialogHTML;
     document.body.appendChild(dialog);
 
-    // Store dialog reference
+    // Store dialog and backdrop references
     window.currentDraftDialog = dialog;
+    backdrop.className = 'draft-selection-backdrop';
 }
 
 /**
@@ -965,6 +1434,15 @@ function closeDraftDialog() {
         window.currentDraftDialog.remove();
         window.currentDraftDialog = null;
     }
+    // Remove backdrop if it exists
+    const backdrop = document.querySelector('.draft-selection-backdrop');
+    if (backdrop) {
+        backdrop.remove();
+    }
+}
+// Make function available globally immediately
+if (typeof window !== 'undefined') {
+    window.closeDraftDialog = closeDraftDialog;
 }
 
 /**
@@ -980,11 +1458,46 @@ function loadDraft(draftId) {
                 // Store current draft info
                 window.currentDraft.id = draftId;
                 window.currentDraft.name = draft.name;
+                
+                // Save draft ID to localStorage for persistence across page refreshes
+                try {
+                    localStorage.setItem('observationMediaCurrentDraftId', draftId);
+                } catch (e) {
+                    console.warn('Failed to save draft ID to localStorage:', e);
+                }
 
                 // Load text content
                 const editor = document.getElementById('observationTextEditor');
                 if (editor) {
                     editor.value = draft.text_content || '';
+                }
+
+                // Load header fields
+                if (draft.header_data) {
+                    const headerData = draft.header_data;
+                    if (document.getElementById('headerLearner')) {
+                        document.getElementById('headerLearner').value = headerData.learner || '';
+                    }
+                    if (document.getElementById('headerAssessor')) {
+                        document.getElementById('headerAssessor').value = headerData.assessor || '';
+                    }
+                    if (document.getElementById('headerVisitDate')) {
+                        document.getElementById('headerVisitDate').value = headerData.visit_date || '';
+                    }
+                    if (document.getElementById('headerLocation')) {
+                        document.getElementById('headerLocation').value = headerData.location || '';
+                    }
+                    if (document.getElementById('headerAddress')) {
+                        document.getElementById('headerAddress').value = headerData.address || '';
+                    }
+                }
+                
+                // Load assessor feedback
+                if (draft.assessor_feedback !== undefined) {
+                    const feedbackField = document.getElementById('assessorFeedback');
+                    if (feedbackField) {
+                        feedbackField.value = draft.assessor_feedback || '';
+                    }
                 }
 
                 // Load assignments
@@ -999,12 +1512,38 @@ function loadDraft(draftId) {
                     }
                 }
 
+                // Restore qualification and learner if saved in draft
+                if (draft.qualification) {
+                    const qualificationSelect = document.getElementById('qualificationSelect');
+                    if (qualificationSelect) {
+                        qualificationSelect.value = draft.qualification;
+                        // Trigger change event to load learners
+                        qualificationSelect.dispatchEvent(new Event('change'));
+                    }
+                }
+                
+                if (draft.learner) {
+                    const learnerSelect = document.getElementById('learnerSelect');
+                    if (learnerSelect) {
+                        // Wait a bit for learners to load if qualification was just set
+                        setTimeout(() => {
+                            learnerSelect.value = draft.learner;
+                            // Trigger change event to reload media
+                            learnerSelect.dispatchEvent(new Event('change'));
+                        }, 300);
+                    }
+                }
+
                 // Update UI
                 if (typeof highlightPlaceholdersInEditor === 'function') {
                     highlightPlaceholdersInEditor();
                 }
-                if (typeof updatePreview === 'function') {
-                    updatePreview();
+                if (typeof window !== 'undefined' && typeof window.updatePreview === 'function') {
+                    try {
+                        window.updatePreview();
+                    } catch (e) {
+                        console.error('Error calling updatePreview:', e);
+                    }
                 }
                 if (typeof updateMediaCardStates === 'function') {
                     updateMediaCardStates();
@@ -1013,15 +1552,57 @@ function loadDraft(draftId) {
                 // Update current draft display
                 updateCurrentDraftDisplay();
 
+                // Load standards if JSON file is assigned
+                if (draft.json_file_id) {
+                    if (typeof window !== 'undefined' && typeof window.loadStandardsFromDraft === 'function') {
+                        try {
+                            window.loadStandardsFromDraft(draft).catch(error => {
+                                console.error('Error loading standards:', error);
+                            });
+                        } catch (e) {
+                            console.error('Error calling loadStandardsFromDraft:', e);
+                        }
+                    }
+                } else {
+                    if (typeof window !== 'undefined' && typeof window.clearStandards === 'function') {
+                        try {
+                            window.clearStandards();
+                        } catch (e) {
+                            console.error('Error calling clearStandards:', e);
+                        }
+                    }
+                }
+
                 // No alert - draft is loaded silently (name shown in UI)
             } else {
+                // If draft failed to load (e.g., was deleted), clear localStorage
+                if (draftId === localStorage.getItem('observationMediaCurrentDraftId')) {
+                    try {
+                        localStorage.removeItem('observationMediaCurrentDraftId');
+                    } catch (e) {
+                        console.warn('Failed to clear draft ID from localStorage:', e);
+                    }
+                }
                 alert(`Error loading draft: ${data.error || 'Unknown error'}`);
             }
         })
         .catch(error => {
             console.error('Load draft error:', error);
+            // If draft failed to load, clear localStorage
+            try {
+                const savedDraftId = localStorage.getItem('observationMediaCurrentDraftId');
+                if (savedDraftId === draftId) {
+                    localStorage.removeItem('observationMediaCurrentDraftId');
+                }
+            } catch (e) {
+                console.warn('Failed to clear draft ID from localStorage:', e);
+            }
             alert(`Error loading draft: ${error.message}`);
         });
+}
+// Make function available globally immediately
+if (typeof window !== 'undefined') {
+    window.loadDraft = loadDraft;
 }
 
 /**
@@ -1038,6 +1619,10 @@ function deleteDraft(draftId) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                // If the deleted draft was the current one, clear it
+                if (window.currentDraft && window.currentDraft.id === draftId) {
+                    clearCurrentDraft();
+                }
                 // Dialog will be refreshed by caller
             } else {
                 alert(`Error deleting draft: ${data.error || 'Unknown error'}`);
@@ -1047,6 +1632,10 @@ function deleteDraft(draftId) {
             console.error('Delete draft error:', error);
             alert(`Error deleting draft: ${error.message}`);
         });
+}
+// Make function available globally immediately
+if (typeof window !== 'undefined') {
+    window.deleteDraft = deleteDraft;
 }
 
 /**
@@ -1238,7 +1827,8 @@ function selectAllHideElements() {
         document.getElementById('hideAcCovered'),
         document.getElementById('hideImageSuggestion'),
         document.getElementById('hideParagraphNumbers'),
-        document.getElementById('hideEmptyMediaFields')
+        document.getElementById('hideEmptyMediaFields'),
+        document.getElementById('trimEmptyParagraphs')
     ];
     
     checkboxes.forEach(checkbox => {
@@ -1260,7 +1850,10 @@ function deselectAllHideElements() {
         document.getElementById('hideAcCovered'),
         document.getElementById('hideImageSuggestion'),
         document.getElementById('hideParagraphNumbers'),
-        document.getElementById('hideEmptyMediaFields')
+        document.getElementById('hideEmptyMediaFields'),
+        document.getElementById('trimEmptyParagraphs'),
+        document.getElementById('showHeader'),
+        document.getElementById('showAssessorFeedback')
     ];
     
     checkboxes.forEach(checkbox => {
@@ -1555,6 +2148,18 @@ function updateDraftFromPreview() {
     const assignments = getCurrentAssignments();
     const selectedSubfolder = document.getElementById('observationSubfolderSelect')?.value || null;
     
+    // Get header fields
+    const headerData = {
+        learner: document.getElementById('headerLearner')?.value || '',
+        assessor: document.getElementById('headerAssessor')?.value || '',
+        visit_date: document.getElementById('headerVisitDate')?.value || '',
+        location: document.getElementById('headerLocation')?.value || '',
+        address: document.getElementById('headerAddress')?.value || ''
+    };
+    
+    // Get assessor feedback
+    const assessorFeedback = document.getElementById('assessorFeedback')?.value || '';
+    
     // Show loading state
     const updateBtn = document.getElementById('updateDraftFromPreviewBtn');
     const originalText = updateBtn.textContent;
@@ -1568,7 +2173,9 @@ function updateDraftFromPreview() {
         body: JSON.stringify({
             text_content: text,
             assignments: assignments,
-            selected_subfolder: selectedSubfolder
+            selected_subfolder: selectedSubfolder,
+            header_data: headerData,
+            assessor_feedback: assessorFeedback
         })
     })
         .then(response => response.json())
@@ -1599,25 +2206,7 @@ function updateDraftFromPreview() {
 /**
  * Toggle preview settings menu
  */
-function togglePreviewSettings() {
-    const menu = document.getElementById('previewSettingsMenu');
-    if (!menu) return;
-    
-    const isVisible = menu.style.display !== 'none';
-    menu.style.display = isVisible ? 'none' : 'block';
-    
-    // Close menu when clicking outside
-    if (!isVisible) {
-        setTimeout(() => {
-            document.addEventListener('click', function closeMenuOnClick(e) {
-                if (!menu.contains(e.target) && e.target.id !== 'previewSettingsBtn') {
-                    menu.style.display = 'none';
-                    document.removeEventListener('click', closeMenuOnClick);
-                }
-            });
-        }, 0);
-    }
-}
+// togglePreviewSettings removed - settings are now always visible in the 3rd column
 
 /**
  * Show draft preview modal
@@ -1661,6 +2250,9 @@ function showDraftPreview() {
         // Make content editable
         contentDiv.contentEditable = 'true';
         contentDiv.setAttribute('contenteditable', 'true');
+        
+        // Apply initial display settings (header hidden by default)
+        updatePreviewDisplay();
         
         // Build section navigation
         buildPreviewSectionNavigation();
@@ -1773,12 +2365,33 @@ function updatePreviewDisplay() {
     const hideImageSuggestion = document.getElementById('hideImageSuggestion')?.checked || false;
     const hideParagraphNumbers = document.getElementById('hideParagraphNumbers')?.checked || false;
     const hideEmptyMediaFields = document.getElementById('hideEmptyMediaFields')?.checked || false;
+    const trimEmptyParagraphs = document.getElementById('trimEmptyParagraphs')?.checked || false;
+    const showHeader = document.getElementById('showHeader')?.checked || false;
+    const showAssessorFeedback = document.getElementById('showAssessorFeedback')?.checked || false;
     const fontSize = document.getElementById('previewFontSize')?.value || '16pt';
     const fontType = document.getElementById('previewFontType')?.value || "'Times New Roman', serif";
     
     // Apply font settings
     contentDiv.style.fontSize = fontSize;
     contentDiv.style.fontFamily = fontType;
+    
+    // Show/hide header table
+    const headerTable = contentDiv.querySelector('#previewHeaderTable');
+    if (headerTable) {
+        headerTable.style.display = showHeader ? 'block' : 'none';
+    }
+    
+    // Show/hide assessor feedback table
+    const assessorFeedbackTable = contentDiv.querySelector('#previewAssessorFeedback');
+    if (assessorFeedbackTable) {
+        assessorFeedbackTable.style.display = showAssessorFeedback ? 'block' : 'none';
+        // Update feedback content from textarea
+        const feedbackContent = document.getElementById('previewAssessorFeedbackContent');
+        if (feedbackContent) {
+            const feedback = document.getElementById('assessorFeedback')?.value || '';
+            feedbackContent.textContent = feedback;
+        }
+    }
     
     // Show/hide section titles
     const sectionTitles = contentDiv.querySelectorAll('.preview-section-title');
@@ -1824,6 +2437,146 @@ function updatePreviewDisplay() {
     emptyTables.forEach(table => {
         table.style.display = hideEmptyMediaFields ? 'none' : 'table';
     });
+    
+    // Trim empty paragraphs: if there are 2+ consecutive empty paragraphs, reduce to 1
+    // This must run AFTER all hide operations to catch paragraphs that become empty
+    // Use setTimeout to ensure DOM has updated after all hide operations
+    if (trimEmptyParagraphs) {
+        // Force a reflow to ensure all style changes are applied
+        void contentDiv.offsetHeight;
+        
+        // Helper function to check if an element is visible
+        const isElementVisible = (el) => {
+            if (!el) return false;
+            // Check computed style (most reliable)
+            const style = window.getComputedStyle(el);
+            if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) === 0) {
+                return false;
+            }
+            // Check inline style as fallback
+            if (el.style.display === 'none' || el.style.visibility === 'hidden') {
+                return false;
+            }
+            return true;
+        };
+        
+        // Helper function to check if a paragraph is empty (considering hidden elements)
+        const isParagraphEmpty = (p) => {
+            // First, check if paragraph itself is hidden - if so, don't process it
+            if (!isElementVisible(p)) {
+                return false; // Don't consider hidden paragraphs for trimming
+            }
+            
+            // Use innerText which automatically excludes hidden elements
+            // This is the most reliable way to check visible content
+            const visibleText = (p.innerText || '').trim();
+            const visibleTextClean = visibleText.replace(/[\u00A0\u2000-\u200B\u2028\u2029\s]/g, '');
+            
+            // If there's any visible text, paragraph is not empty
+            if (visibleTextClean.length > 0) {
+                return false;
+            }
+            
+            // Check for visible images
+            const visibleImages = Array.from(p.querySelectorAll('img')).filter(img => isElementVisible(img));
+            if (visibleImages.length > 0) {
+                return false;
+            }
+            
+            // Check for visible tables
+            const visibleTables = Array.from(p.querySelectorAll('table')).filter(table => isElementVisible(table));
+            if (visibleTables.length > 0) {
+                return false;
+            }
+            
+            // Check for any other visible block elements with content
+            const allElements = p.querySelectorAll('*');
+            for (const el of allElements) {
+                if (!isElementVisible(el)) continue;
+                
+                // Skip paragraph numbers (they're inline markers)
+                if (el.classList.contains('preview-paragraph-number')) continue;
+                
+                // Check if element has any visible content
+                const elText = (el.innerText || el.textContent || '').trim();
+                const elTextClean = elText.replace(/[\u00A0\u2000-\u200B\u2028\u2029\s]/g, '');
+                if (elTextClean.length > 0) {
+                    return false; // Has visible content
+                }
+            }
+            
+            // Paragraph is empty (no visible content)
+            return true;
+        };
+        
+        // Function to perform trimming (iterative until no more changes)
+        const performTrimming = () => {
+            let iterations = 0;
+            const maxIterations = 10; // Prevent infinite loops
+            
+            const trimOnce = () => {
+                iterations++;
+                if (iterations > maxIterations) {
+                    console.warn('Trim empty paragraphs: max iterations reached');
+                    return;
+                }
+                
+                // Get all paragraphs in document order (fresh query each time)
+                const allParagraphs = Array.from(contentDiv.querySelectorAll('p'));
+                
+                if (allParagraphs.length === 0) return;
+                
+                // Collect paragraphs to remove
+                const paragraphsToRemove = [];
+                
+                // Find consecutive empty paragraphs
+                for (let i = 0; i < allParagraphs.length; i++) {
+                    if (isParagraphEmpty(allParagraphs[i])) {
+                        // Found an empty paragraph, check how many consecutive empty ones follow
+                        let emptyCount = 1;
+                        let j = i + 1;
+                        while (j < allParagraphs.length && isParagraphEmpty(allParagraphs[j])) {
+                            emptyCount++;
+                            j++;
+                        }
+                        
+                        // If we have 2 or more consecutive empty paragraphs, mark all but the first for removal
+                        if (emptyCount >= 2) {
+                            // Mark all but the first empty paragraph for removal
+                            for (let k = i + 1; k < j; k++) {
+                                paragraphsToRemove.push(allParagraphs[k]);
+                            }
+                            // Skip the remaining empty paragraphs we've already processed
+                            i = j - 1; // -1 because the loop will increment
+                        }
+                    }
+                }
+                
+                // Remove the marked paragraphs (in reverse order to maintain DOM stability)
+                if (paragraphsToRemove.length > 0) {
+                    paragraphsToRemove.reverse().forEach(p => {
+                        if (p.parentNode) {
+                            p.remove();
+                        }
+                    });
+                    
+                    // Force a reflow
+                    void contentDiv.offsetHeight;
+                    
+                    // Run trimming again to catch any new sequences
+                    setTimeout(trimOnce, 0);
+                }
+            };
+            
+            // Start trimming
+            trimOnce();
+        };
+        
+        // Run trimming with a small delay to ensure all hide operations have taken effect
+        setTimeout(() => {
+            performTrimming();
+        }, 50);
+    }
 }
 
 /**
@@ -1945,6 +2698,10 @@ let isResizingPreview = false;
 let resizeStartX = 0;
 let resizeStartWidth = 0;
 
+let isResizingPreview2 = false;
+let resizeStartX2 = 0;
+let resizeStartWidth2 = 0;
+
 function startResizePreview(e) {
     e.preventDefault();
     isResizingPreview = true;
@@ -1981,6 +2738,42 @@ function stopResizePreview() {
     document.body.style.userSelect = '';
 }
 
+function startResizePreview2(e) {
+    e.preventDefault();
+    isResizingPreview2 = true;
+    resizeStartX2 = e.clientX;
+    const settingsColumn = document.getElementById('previewSettingsColumn');
+    resizeStartWidth2 = settingsColumn.offsetWidth;
+    
+    document.addEventListener('mousemove', handleResizePreview2);
+    document.addEventListener('mouseup', stopResizePreview2);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+}
+
+function handleResizePreview2(e) {
+    if (!isResizingPreview2) return;
+    
+    const settingsColumn = document.getElementById('previewSettingsColumn');
+    const diff = resizeStartX2 - e.clientX; // Reverse direction (dragging left increases width)
+    const newWidth = resizeStartWidth2 + diff;
+    
+    // Constrain width between min and max
+    const minWidth = 250;
+    const maxWidth = 400;
+    const constrainedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+    
+    settingsColumn.style.width = constrainedWidth + 'px';
+}
+
+function stopResizePreview2() {
+    isResizingPreview2 = false;
+    document.removeEventListener('mousemove', handleResizePreview2);
+    document.removeEventListener('mouseup', stopResizePreview2);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+}
+
 /**
  * Export DOCX from preview (uses preview content with hidden elements excluded)
  */
@@ -2001,6 +2794,18 @@ function exportObservationDocxFromPreview() {
     }
     
     const assignments = getCurrentAssignments();
+    
+    // Get header fields
+    const headerData = {
+        learner: document.getElementById('headerLearner')?.value || '',
+        assessor: document.getElementById('headerAssessor')?.value || '',
+        visit_date: document.getElementById('headerVisitDate')?.value || '',
+        location: document.getElementById('headerLocation')?.value || '',
+        address: document.getElementById('headerAddress')?.value || ''
+    };
+    
+    // Get assessor feedback
+    const assessorFeedback = document.getElementById('assessorFeedback')?.value || '';
     
     // Get font settings from preview controls
     const fontSize = document.getElementById('previewFontSize')?.value || '16pt';
@@ -2063,7 +2868,9 @@ function exportObservationDocxFromPreview() {
             assignments: assignments,
             filename: filename,
             font_size: fontSizeNum,
-            font_name: fontName
+            font_name: fontName,
+            header_data: headerData,
+            assessor_feedback: assessorFeedback
         })
     })
         .then(response => response.json())
@@ -2095,15 +2902,97 @@ function exportObservationDocxFromPreview() {
 }
 
 /**
+ * Format date from YYYY-MM-DD to readable format (DD Month YYYY)
+ */
+function formatDateForDisplay(dateString) {
+    if (!dateString) return '';
+    
+    try {
+        const date = new Date(dateString + 'T00:00:00'); // Add time to avoid timezone issues
+        const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                       'July', 'August', 'September', 'October', 'November', 'December'];
+        const day = date.getDate();
+        const month = months[date.getMonth()];
+        const year = date.getFullYear();
+        return `${day} ${month} ${year}`;
+    } catch (e) {
+        return dateString; // Return original if parsing fails
+    }
+}
+
+/**
+ * Generate header table HTML
+ */
+function generateHeaderTableHTML() {
+    const learner = document.getElementById('headerLearner')?.value || '';
+    const assessor = document.getElementById('headerAssessor')?.value || '';
+    const visitDate = document.getElementById('headerVisitDate')?.value || '';
+    const location = document.getElementById('headerLocation')?.value || '';
+    const address = document.getElementById('headerAddress')?.value || '';
+    
+    const formattedDate = formatDateForDisplay(visitDate);
+    
+    return `
+        <div id="previewHeaderTable" class="preview-header-container" style="margin-bottom: 20px;">
+            <table class="preview-header-table">
+                <tr>
+                    <td>Learner</td>
+                    <td>${escapeHtml(learner)}</td>
+                </tr>
+                <tr>
+                    <td>Assessor</td>
+                    <td>${escapeHtml(assessor)}</td>
+                </tr>
+                <tr>
+                    <td>Visit Date</td>
+                    <td>${escapeHtml(formattedDate)}</td>
+                </tr>
+                <tr>
+                    <td>Location</td>
+                    <td>${escapeHtml(location)}</td>
+                </tr>
+                <tr>
+                    <td>Address</td>
+                    <td>${escapeHtml(address)}</td>
+                </tr>
+            </table>
+        </div>
+    `;
+}
+
+/**
+ * Generate assessor feedback table HTML
+ */
+function generateAssessorFeedbackHTML() {
+    const feedback = document.getElementById('assessorFeedback')?.value || '';
+    
+    return `
+        <div id="previewAssessorFeedback" class="preview-assessor-feedback-container" style="display: none; margin-top: 20px;">
+            <table class="preview-assessor-feedback-table">
+                <tr>
+                    <td>Assessor Feedback</td>
+                </tr>
+                <tr>
+                    <td id="previewAssessorFeedbackContent">${escapeHtml(feedback)}</td>
+                </tr>
+            </table>
+        </div>
+    `;
+}
+
+/**
  * Generate DOCX-style preview HTML
  */
 function generateDocxPreview(text, assignments) {
-    if (!text) {
-        return '<p style="color: #999; font-style: italic;">No content to preview</p>';
-    }
-
     let html = '';
-    const lines = text.split('\n');
+    
+    // Add header table at the beginning (will be shown/hidden based on checkbox)
+    html += generateHeaderTableHTML();
+    
+    if (!text) {
+        html += '<p style="color: #999; font-style: italic;">No content to preview</p>';
+    } else {
+        const lines = text.split('\n');
     
     // Parse placeholders
     const placeholderPattern = /\{\{([A-Za-z0-9_]+)\}\}/g;
@@ -2235,6 +3124,9 @@ function generateDocxPreview(text, assignments) {
         }
     }
     
+    // Add assessor feedback table at the end (will be shown/hidden based on checkbox)
+    html += generateAssessorFeedbackHTML();
+    
     return html;
 }
 
@@ -2310,9 +3202,10 @@ function generateDocxTablePreview(mediaList, placeholderKey) {
                             </div>
                         </div>
                     `;
-                } else {
-                    // Video - show filename
-                    tableHtml += `<div style="color: #999; font-size: 11px;">${escapeHtml(media.name || 'Video')}</div>`;
+                } else if (media.type === 'video' || media.type === 'audio' || media.type === 'document') {
+                    // Video, Audio, or PDF - show filename
+                    const mediaLabel = media.type === 'audio' ? 'Audio' : media.type === 'document' ? 'PDF' : 'Video';
+                    tableHtml += `<div style="color: #999; font-size: 11px;">${escapeHtml(media.name || mediaLabel)}</div>`;
                 }
             } else {
                 // Empty cell
@@ -2575,6 +3468,11 @@ function renderSectionsForDialog(sectionData, placeholders, colorMap, assignment
     return html;
 }
 
+// Export to window immediately so it's available for showPlaceholderSelectionDialog
+if (typeof window !== 'undefined') {
+    window.renderSectionsForDialog = renderSectionsForDialog;
+}
+
 /**
  * Render section content with placeholders for dialog
  */
@@ -2654,6 +3552,11 @@ function renderSectionContentForDialog(content, placeholders, colorMap, assignme
     }
 
     return html;
+}
+
+// Export to window immediately
+if (typeof window !== 'undefined') {
+    window.renderSectionContentForDialog = renderSectionContentForDialog;
 }
 
 /**
@@ -3000,22 +3903,19 @@ function updatePreview() {
         sectionControls.style.display = sectionData.hasSections ? 'flex' : 'none';
     }
 
-    // Show/hide reshuffle button (only when there are assigned media)
-    const reshuffleBtn = document.getElementById('reshuffleBtn');
-    if (reshuffleBtn) {
-        const hasAssignedMedia = Object.keys(assignments).some(key => assignments[key] && assignments[key].length > 0);
-        reshuffleBtn.style.display = hasAssignedMedia ? 'inline-block' : 'none';
-    }
+    // Reshuffle is now always enabled by default - no button needed
 }
 
 /**
  * Toggle reshuffle mode (enable/disable drag-and-drop reordering)
  */
-let reshuffleMode = false;
+let reshuffleMode = true; // Always enabled by default
+window.reshuffleMode = true; // Make it accessible globally
 function toggleReshuffleMode() {
     console.log('[RESHUFFLE] ========== toggleReshuffleMode CALLED ==========');
     console.log('[RESHUFFLE] Current reshuffleMode:', reshuffleMode);
     reshuffleMode = !reshuffleMode;
+    window.reshuffleMode = reshuffleMode; // Update global reference
     console.log('[RESHUFFLE] New reshuffleMode:', reshuffleMode);
     const reshuffleBtn = document.getElementById('reshuffleBtn');
     console.log('[RESHUFFLE] reshuffleBtn element:', reshuffleBtn ? 'FOUND' : 'NOT FOUND');
@@ -3091,6 +3991,13 @@ function toggleReshuffleMode() {
             }
         });
         console.log('[RESHUFFLE] Updated', draggableCount, 'draggable cells');
+        
+        // Refresh preview to ensure all cells have proper drag handlers
+        if (typeof window !== 'undefined' && typeof window.updatePreview === 'function') {
+            window.updatePreview();
+        } else if (typeof updatePreview === 'function') {
+            updatePreview();
+        }
     } else {
         console.log('[RESHUFFLE] DISABLING reshuffle mode');
         // Disable reshuffle mode
@@ -3138,12 +4045,16 @@ function generateMediaTable(mediaList, placeholder, thumbnailSize = null) {
                        style="border: 1px solid #000; border-collapse: collapse; width: 100%; margin: 10px 0;"
                        data-placeholder="${placeholder}">
             <tr>
-                <td style="border: 1px solid #000; padding: 10px; min-height: 50px;"
-                    ondrop="handleTableDrop(event, '${placeholder}')" 
-                    ondragover="handleTableDragOver(event)"></td>
-                <td style="border: 1px solid #000; padding: 10px; min-height: 50px;"
-                    ondrop="handleTableDrop(event, '${placeholder}')" 
-                    ondragover="handleTableDragOver(event)"></td>
+                <td class="media-cell" style="border: 1px solid #000; padding: 10px; min-height: 50px;"
+                          data-media-index="0"
+                          data-placeholder="${placeholder}"
+                          ondrop="if(typeof window.handleTableDrop === 'function') { window.handleTableDrop(event, '${placeholder}'); }" 
+                          ondragover="if(typeof window.handleTableDragOver === 'function') { window.handleTableDragOver(event); }"></td>
+                <td class="media-cell" style="border: 1px solid #000; padding: 10px; min-height: 50px;"
+                          data-media-index="1"
+                          data-placeholder="${placeholder}"
+                          ondrop="if(typeof window.handleTableDrop === 'function') { window.handleTableDrop(event, '${placeholder}'); }" 
+                          ondragover="if(typeof window.handleTableDragOver === 'function') { window.handleTableDragOver(event); }"></td>
             </tr>
         </table>`;
     }
@@ -3167,14 +4078,15 @@ function generateMediaTable(mediaList, placeholder, thumbnailSize = null) {
         // Column 1
         const hasMedia1 = mediaList[i] !== undefined && mediaList[i] !== null;
         tableHtml += `<td class="media-cell" 
-                          style="border: 1px solid #000; padding: 10px; width: 50%; position: relative;"
+                          style="border: 1px solid #000; padding: 10px; width: 50%; position: relative;${hasMedia1 ? ' cursor: grab;' : ''}"
                           data-media-index="${i}"
                           data-placeholder="${placeholder}"
-                          ondrop="handleTableDrop(event, '${placeholder}')" 
-                          ondragover="handleTableDragOver(event)"
+                          ondrop="if(typeof window.handleTableDrop === 'function') { window.handleTableDrop(event, '${placeholder}'); }" 
+                          ondragover="if(typeof window.handleTableDragOver === 'function') { window.handleTableDragOver(event); }"
                           draggable="${hasMedia1 ? 'true' : 'false'}"
-                          ondragstart="${hasMedia1 ? `handleTableCellDragStart(event, ${i}, '${placeholder}')` : ''}"
-                          onclick="handleTableCellClick(event, ${i}, '${placeholder}')">`;
+                          ondragstart="${hasMedia1 ? `if(typeof window.handleTableCellDragStart === 'function') { window.handleTableCellDragStart(event, ${i}, '${placeholder}'); }` : ''}"
+                          onclick="handleTableCellClick(event, ${i}, '${placeholder}')"
+                          ${hasMedia1 ? `title="Drag to reorder media"` : ''}>`;
         if (mediaList[i]) {
             if (mediaList[i].type === 'image') {
                 tableHtml += `<img src="/v2p-formatter/media-converter/thumbnail?path=${encodeURIComponent(mediaList[i].path)}&size=${thumbSize}" 
@@ -3192,14 +4104,15 @@ function generateMediaTable(mediaList, placeholder, thumbnailSize = null) {
 
         // Column 2
         tableHtml += `<td class="media-cell" 
-                          style="border: 1px solid #000; padding: 10px; width: 50%; position: relative;"
+                          style="border: 1px solid #000; padding: 10px; width: 50%; position: relative;${mediaList[i + 1] ? ' cursor: grab;' : ''}"
                           data-media-index="${i + 1}"
                           data-placeholder="${placeholder}"
-                          ondrop="handleTableDrop(event, '${placeholder}')" 
-                          ondragover="handleTableDragOver(event)"
+                          ondrop="if(typeof window.handleTableDrop === 'function') { window.handleTableDrop(event, '${placeholder}'); }" 
+                          ondragover="if(typeof window.handleTableDragOver === 'function') { window.handleTableDragOver(event); }"
                           draggable="${mediaList[i + 1] ? 'true' : 'false'}"
-                          ondragstart="${mediaList[i + 1] ? `handleTableCellDragStart(event, ${i + 1}, '${placeholder}')` : ''}"
-                          onclick="handleTableCellClick(event, ${i + 1}, '${placeholder}')">`;
+                          ondragstart="${mediaList[i + 1] ? `if(typeof window.handleTableCellDragStart === 'function') { window.handleTableCellDragStart(event, ${i + 1}, '${placeholder}'); }` : ''}"
+                          onclick="handleTableCellClick(event, ${i + 1}, '${placeholder}')"
+                          ${mediaList[i + 1] ? `title="Drag to reorder media"` : ''}>`;
         if (mediaList[i + 1]) {
             if (mediaList[i + 1].type === 'image') {
                 tableHtml += `<img src="/v2p-formatter/media-converter/thumbnail?path=${encodeURIComponent(mediaList[i + 1].path)}&size=${thumbSize}" 
@@ -3225,16 +4138,16 @@ function generateMediaTable(mediaList, placeholder, thumbnailSize = null) {
                           style="border: 1px solid #000; padding: 10px; min-height: 50px; width: 50%; position: relative;"
                           data-media-index="${mediaList.length}"
                           data-placeholder="${placeholder}"
-                          ondrop="handleTableDrop(event, '${placeholder}')" 
-                          ondragover="handleTableDragOver(event)">
+                          ondrop="if(typeof window.handleTableDrop === 'function') { window.handleTableDrop(event, '${placeholder}'); }" 
+                          ondragover="if(typeof window.handleTableDragOver === 'function') { window.handleTableDragOver(event); }">
                           <div style="text-align: center; color: #999; font-size: 12px; padding: 20px;">Drop media here</div>
                       </td>`;
         tableHtml += `<td class="media-cell" 
                           style="border: 1px solid #000; padding: 10px; min-height: 50px; width: 50%; position: relative;"
                           data-media-index="${mediaList.length + 1}"
                           data-placeholder="${placeholder}"
-                          ondrop="handleTableDrop(event, '${placeholder}')" 
-                          ondragover="handleTableDragOver(event)">
+                          ondrop="if(typeof window.handleTableDrop === 'function') { window.handleTableDrop(event, '${placeholder}'); }" 
+                          ondragover="if(typeof window.handleTableDragOver === 'function') { window.handleTableDragOver(event); }">
                           <div style="text-align: center; color: #999; font-size: 12px; padding: 20px;">Drop media here</div>
                       </td>`;
         tableHtml += '</tr>';
@@ -3321,8 +4234,55 @@ function handleTableCellClick(e, mediaIndex, placeholder) {
  */
 function handleTableDrop(e, placeholder) {
     console.log('[DROP] handleTableDrop ENTRY', { placeholder, hasEvent: !!e, hasDataTransfer: !!e?.dataTransfer });
+    
     e.preventDefault();
     e.stopPropagation();
+    
+    // Get data to check if this is a reshuffle
+    let dataStr = '';
+    try {
+        dataStr = e.dataTransfer ? e.dataTransfer.getData('application/json') : '';
+    } catch (err) {
+        console.warn('[DROP] Error getting dataTransfer data:', err);
+    }
+    
+    // Check if this is a reshuffle operation
+    if (dataStr) {
+        try {
+            const data = JSON.parse(dataStr);
+            // If it's a reshuffle (source === 'table'), let reshuffle.js handle it
+            if (data.source === 'table' && data.placeholder && data.index !== undefined) {
+                console.log('[DROP] Detected reshuffle operation, delegating to reshuffle.js');
+                // Call reshuffle function directly if available
+                if (typeof window._reshuffleHandleTableDrop === 'function') {
+                    const result = window._reshuffleHandleTableDrop(e, placeholder);
+                    if (result === true) {
+                        console.log('[DROP] Reshuffle handled successfully');
+                        return; // Reshuffle handled
+                    }
+                } else if (typeof window.reorderMedia === 'function') {
+                    // Fallback: use reorderMedia directly
+                    const targetCell = (e.target && e.target.closest) ? e.target.closest('.media-cell') || e.target.closest('td') : null;
+                    if (targetCell) {
+                        const targetIndex = parseInt(targetCell.dataset?.mediaIndex);
+                        if (!isNaN(targetIndex)) {
+                            console.log('[DROP] Calling reshuffle reorderMedia directly');
+                            const success = window.reorderMedia(placeholder, data.index, targetIndex);
+                            if (success) {
+                                return; // Reshuffle handled
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('[DROP] Error parsing drop data:', err);
+            // Continue with normal handling
+        }
+    }
+    
+    // Not a reshuffle - handle as normal drop (media browser drop, etc.)
+    console.log('[DROP] Handling as normal drop (not reshuffle)');
     
     const targetInfo = e.target ? { tagName: e.target.tagName, className: e.target.className } : { tagName: 'null', className: 'null' };
     console.log('[DROP] handleTableDrop called', { placeholder, target: targetInfo });
@@ -3338,9 +4298,29 @@ function handleTableDrop(e, placeholder) {
         
         console.log('[DROP] DataTransfer data:', dataStr ? 'found' : 'empty', dataStr ? dataStr.substring(0, 100) : '');
         
+        // If no data in dataTransfer, try fallback methods
         if (!dataStr || dataStr === '') {
-            console.warn('[DROP] No dataTransfer data - cannot process drop');
-            return;
+            // Try text/plain as fallback
+            try {
+                dataStr = e.dataTransfer ? e.dataTransfer.getData('text/plain') : '';
+                if (dataStr) {
+                    console.log('[DROP] Got data from text/plain fallback');
+                }
+            } catch (err) {
+                console.warn('[DROP] Error getting text/plain:', err);
+            }
+            
+            // Try to get from window.lastDragData (set by media browser)
+            if ((!dataStr || dataStr === '') && window.lastDragData) {
+                console.log('[DROP] Using window.lastDragData fallback');
+                dataStr = JSON.stringify(window.lastDragData);
+                window.lastDragData = null; // Clear after use
+            }
+            
+            if (!dataStr || dataStr === '') {
+                console.warn('[DROP] No dataTransfer data - cannot process drop');
+                return;
+            }
         }
         
         let data;
@@ -3430,7 +4410,13 @@ function handleTableDrop(e, placeholder) {
             }
 
             // Update preview
-            updatePreview();
+            if (typeof window !== 'undefined' && typeof window.updatePreview === 'function') {
+                try {
+                    window.updatePreview();
+                } catch (e) {
+                    console.error('Error calling updatePreview:', e);
+                }
+            }
 
             if (skippedCount > 0 && assignedCount > 0) {
                 alert(`${assignedCount} media item(s) assigned. ${skippedCount} item(s) were already assigned.`);
@@ -3465,7 +4451,23 @@ function handleTableDrop(e, placeholder) {
                     targetIndex: targetCell.dataset.mediaIndex,
                     placeholder: targetCell.dataset.placeholder 
                 });
-                reorderMediaInPlaceholder(placeholder, data.index, targetCell);
+                
+                // Use standalone reshuffle function if available
+                const targetIndex = parseInt(targetCell.dataset.mediaIndex);
+                if (!isNaN(targetIndex) && typeof window.reorderMedia === 'function') {
+                    console.log('[DROP] Using standalone reorderMedia function');
+                    const success = window.reorderMedia(placeholder, data.index, targetIndex);
+                    if (success) {
+                        console.log('[DROP] Reshuffle successful');
+                    } else {
+                        console.warn('[DROP] Reshuffle failed');
+                    }
+                } else if (typeof reorderMediaInPlaceholder === 'function') {
+                    // Fallback to old function
+                    reorderMediaInPlaceholder(placeholder, data.index, targetCell);
+                } else {
+                    console.error('[DROP] No reshuffle function available');
+                }
             } else {
                 console.error('[DROP] Target cell not found for drop', { 
                     target: e.target.tagName, 
@@ -3491,8 +4493,16 @@ function handleTableDrop(e, placeholder) {
             console.log('[DROP] Assignment result:', result);
             
             // Update preview to show the new assignment
-            updatePreview();
-            updatePlaceholderStats();
+            if (typeof window !== 'undefined' && typeof window.updatePreview === 'function') {
+                window.updatePreview();
+            } else if (typeof updatePreview === 'function') {
+                updatePreview();
+            }
+            if (typeof window !== 'undefined' && typeof window.updatePlaceholderStats === 'function') {
+                window.updatePlaceholderStats();
+            } else if (typeof updatePlaceholderStats === 'function') {
+                updatePlaceholderStats();
+            }
         } else {
             // Fallback: If dataTransfer doesn't have proper data structure
             console.log('[DROP] Fallback: Invalid data structure, trying to infer from elements');
@@ -3561,11 +4571,22 @@ function handleTableDragOver(e) {
 function reorderMediaInPlaceholder(placeholder, fromIndex, targetCell) {
     console.log('[RESHUFFLE] reorderMediaInPlaceholder called', { placeholder, fromIndex, targetCell });
     
-    const assignments = getCurrentAssignments();
+    // Ensure assignments object exists
+    if (!window.observationMediaAssignments) {
+        window.observationMediaAssignments = {};
+    }
+    
+    const assignments = window.observationMediaAssignments; // Use directly to ensure we're modifying the actual object
     const placeholderKey = placeholder.toLowerCase();
     
     if (!assignments[placeholderKey] || !assignments[placeholderKey][fromIndex]) {
-        console.error('[RESHUFFLE] Invalid source index or no assignments', { placeholderKey, fromIndex, assignments: assignments[placeholderKey] });
+        console.error('[RESHUFFLE] Invalid source index or no assignments', { 
+            placeholderKey, 
+            fromIndex, 
+            assignmentsExists: !!assignments[placeholderKey],
+            assignmentsLength: assignments[placeholderKey] ? assignments[placeholderKey].length : 0,
+            assignments: assignments[placeholderKey] 
+        });
         return;
     }
 
@@ -3644,7 +4665,8 @@ function reorderMediaInPlaceholder(placeholder, fromIndex, targetCell) {
     console.log('[RESHUFFLE] Reorder complete. Final order:', assignments[placeholderKey].map(m => m.name || m.path));
 
     // Before updating preview, ensure sections with assigned media are expanded
-    if (reshuffleMode) {
+    const currentReshuffleMode = (typeof window !== 'undefined' && window.reshuffleMode !== undefined) ? window.reshuffleMode : reshuffleMode;
+    if (currentReshuffleMode) {
         const textEditor = document.getElementById('observationTextEditor');
         const text = textEditor ? textEditor.value : '';
         const sectionData = parseSections(text);
@@ -3666,8 +4688,16 @@ function reorderMediaInPlaceholder(placeholder, fromIndex, targetCell) {
     }
 
     // Update UI
-    updatePreview();
-    updatePlaceholderStats();
+    if (typeof window !== 'undefined' && typeof window.updatePreview === 'function') {
+        window.updatePreview();
+    } else if (typeof updatePreview === 'function') {
+        updatePreview();
+    }
+    if (typeof window !== 'undefined' && typeof window.updatePlaceholderStats === 'function') {
+        window.updatePlaceholderStats();
+    } else if (typeof updatePlaceholderStats === 'function') {
+        updatePlaceholderStats();
+    }
     
     // Also update dialog preview if dialog is open
     if (window.currentPlaceholderDialog) {
@@ -3809,20 +4839,163 @@ function loadObservationSubfolders() {
 
 /**
  * Load observation media for selected subfolder
+ * Updated to support new two-level dropdown system
  */
 function loadObservationMedia() {
-    // API-free: Use data already embedded in the page
-    const subfolder = document.getElementById('observationSubfolderSelect').value;
+    // Check if new two-level system is being used
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    
+    if (qualificationSelect && learnerSelect) {
+        // New two-level system - check if template's version exists and call it
+        // The template's version should be defined in the HTML and override this
+        // But if it hasn't loaded yet, we'll handle it here as fallback
+        const qualification = qualificationSelect.value;
+        const learner = learnerSelect.value;
+        
+        if (!qualification || !learner) {
+            const grid = document.getElementById('observationMediaGrid');
+            if (grid) {
+                grid.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;" id="mediaBrowserMessage">Please select both qualification and learner</p>';
+            }
+            const countEl = document.getElementById('observationMediaCount');
+            if (countEl) {
+                countEl.textContent = '0 files';
+            }
+            return;
+        }
+        
+        // Try to call the template's version if it exists (it should override this)
+        // If we're here, it means the template version hasn't loaded yet or was overridden
+        // So we need to implement the fetch here as fallback
+        const grid = document.getElementById('observationMediaGrid');
+        if (grid) {
+            grid.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;" id="mediaBrowserMessage">Loading media files...</p>';
+        }
+        
+        const fetchUrl = `/v2p-formatter/media-converter/observation-media/media?qualification=${encodeURIComponent(qualification)}&learner=${encodeURIComponent(learner)}`;
+        console.log('Fetching media from:', fetchUrl);
+        fetch(fetchUrl)
+            .then(response => {
+                console.log('Fetch response received, status:', response.status, response.statusText);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Media data received:', data);
+                console.log('Success:', data.success, 'Media count:', data.media ? data.media.length : 0);
+                
+                if (data.success) {
+                    const mediaFiles = data.media || [];
+                    console.log('Media files count:', mediaFiles.length);
+                    
+                    if (mediaFiles.length === 0) {
+                        console.warn('No media files returned');
+                        const grid = document.getElementById('observationMediaGrid');
+                        if (grid) {
+                            grid.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;" id="mediaBrowserMessage">No media files found</p>';
+                        }
+                        const countEl = document.getElementById('observationMediaCount');
+                        if (countEl) {
+                            countEl.textContent = '0 files';
+                        }
+                        return;
+                    }
+                    
+                    // Display media
+                    console.log('Calling displayObservationMedia with', mediaFiles.length, 'files');
+                    if (typeof displayObservationMedia === 'function') {
+                        displayObservationMedia(mediaFiles);
+                        console.log('displayObservationMedia called successfully');
+                    } else if (typeof window.displayObservationMedia === 'function') {
+                        window.displayObservationMedia(mediaFiles);
+                        console.log('window.displayObservationMedia called successfully');
+                    } else {
+                        console.warn('displayObservationMedia function not found - will retry');
+                        const grid = document.getElementById('observationMediaGrid');
+                        if (grid) {
+                            grid.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Display function not available</p>';
+                        }
+                        return;
+                    }
+                    
+                    const countEl = document.getElementById('observationMediaCount');
+                    if (countEl) {
+                        countEl.textContent = `${mediaFiles.length} files`;
+                        console.log('File count updated to:', countEl.textContent);
+                    }
+                } else {
+                    console.error('Media load failed:', data.error);
+                    const grid = document.getElementById('observationMediaGrid');
+                    if (grid) {
+                        grid.innerHTML = `<p style="color: #999; text-align: center; padding: 20px;" id="mediaBrowserMessage">Error: ${data.error || 'Failed to load media'}</p>`;
+                    }
+                    const countEl = document.getElementById('observationMediaCount');
+                    if (countEl) {
+                        countEl.textContent = '0 files';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error loading media:', error);
+                console.error('Error stack:', error.stack);
+                const grid = document.getElementById('observationMediaGrid');
+                if (grid) {
+                    grid.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;" id="mediaBrowserMessage">Error loading media files: ' + error.message + '</p>';
+                }
+                const countEl = document.getElementById('observationMediaCount');
+                if (countEl) {
+                    countEl.textContent = '0 files';
+                }
+            });
+        return;
+    }
+    
+    // Fallback to old single-level system for backward compatibility
+    const subfolderSelect = document.getElementById('observationSubfolderSelect');
+    if (!subfolderSelect) {
+        // Neither system available
+        const grid = document.getElementById('observationMediaGrid');
+        if (grid) {
+            grid.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Media browser not initialized</p>';
+        }
+        return;
+    }
+    
+    const subfolder = subfolderSelect.value;
     if (!subfolder) {
-        document.getElementById('observationMediaGrid').innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Please select a subfolder</p>';
-        document.getElementById('observationMediaCount').textContent = '0 files';
+        const grid = document.getElementById('observationMediaGrid');
+        if (grid) {
+            grid.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Please select a subfolder</p>';
+        }
+        const countEl = document.getElementById('observationMediaCount');
+        if (countEl) {
+            countEl.textContent = '0 files';
+        }
         return;
     }
 
     // Get media from embedded data (API-free)
-    const mediaFiles = window.observationMediaData[subfolder] || [];
-    displayObservationMedia(mediaFiles);
-    document.getElementById('observationMediaCount').textContent = `${mediaFiles.length} files`;
+    const mediaFiles = window.observationMediaData && window.observationMediaData[subfolder] ? window.observationMediaData[subfolder] : [];
+    
+    if (typeof displayObservationMedia === 'function') {
+        displayObservationMedia(mediaFiles);
+    } else if (typeof window.displayObservationMedia === 'function') {
+        window.displayObservationMedia(mediaFiles);
+    } else {
+        const grid = document.getElementById('observationMediaGrid');
+        if (grid) {
+            grid.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Display function not available</p>';
+        }
+        return;
+    }
+    
+    const countEl = document.getElementById('observationMediaCount');
+    if (countEl) {
+        countEl.textContent = `${mediaFiles.length} files`;
+    }
 }
 
 /**
@@ -3880,7 +5053,112 @@ function displayObservationMedia(mediaFiles) {
     
     // Check if we have subfolders (non-empty subfolder names)
     const hasSubfolders = subfolderKeys.some(key => key && key.trim() !== '');
+    
+    // Check if we have files directly in the folder (empty subfolder)
+    const hasRootFiles = groupedMedia[''] && groupedMedia[''].length > 0;
 
+    // First, display files directly in the folder if they exist (main category files first)
+    if (hasRootFiles) {
+        const assignments = getCurrentAssignments();
+        const textEditor = document.getElementById('observationTextEditor');
+        const text = textEditor ? textEditor.value : '';
+        
+        // Create container for root files with grid layout
+        const rootContainer = document.createElement('div');
+        rootContainer.className = 'media-root-files-container';
+        rootContainer.style.display = 'grid';
+        rootContainer.style.gap = '15px';
+        rootContainer.style.padding = '10px 0';
+        
+        // Apply grid layout settings to root files container
+        updateSubfolderContentGrid(rootContainer);
+        
+        const rootMedia = groupedMedia[''];
+        rootMedia.forEach((media, index) => {
+            const card = document.createElement('div');
+            card.className = 'observation-media-card';
+            card.dataset.mediaIndex = index;
+            card.dataset.mediaPath = media.path;
+            card.dataset.mediaName = media.name;
+            card.dataset.mediaType = media.type;
+
+            // Check if media is already assigned (disabled state)
+            const isAssigned = isMediaAssigned(media.path);
+            
+            // Get section color for assigned media
+            let sectionColor = null;
+            let badgeStyle = '';
+            if (isAssigned) {
+                sectionColor = getSectionColorForMedia(media.path, assignments, text);
+                if (sectionColor) {
+                    badgeStyle = `style="background: ${sectionColor}E6; border-color: ${sectionColor}; color: white;"`;
+                } else {
+                    badgeStyle = 'style="background: rgba(78, 205, 196, 0.9); border-color: #4ecdc4; color: white;"';
+                }
+            }
+            
+            if (isAssigned) {
+                card.classList.add('media-assigned');
+                card.style.opacity = '0.5';
+                card.style.cursor = 'not-allowed';
+            } else {
+                card.draggable = true;
+                card.style.cursor = 'grab';
+            }
+
+            // Get thumbnail size from settings - increased for crystal clear quality
+            let thumbSize = '640x480'; // Default - increased from 240x180 for better quality
+            let thumbWidth = 640;
+            let thumbHeight = 480;
+            
+            if (typeof getThumbnailSizeString === 'function') {
+                thumbSize = getThumbnailSizeString();
+                // Parse size string to get width and height for fallback SVG
+                const sizeMatch = thumbSize.match(/(\d+)x(\d+)/);
+                if (sizeMatch) {
+                    thumbWidth = parseInt(sizeMatch[1]);
+                    thumbHeight = parseInt(sizeMatch[2]);
+                }
+            }
+            
+            card.innerHTML = `
+                <div class="observation-media-thumbnail">
+                    <img src="/v2p-formatter/media-converter/thumbnail?path=${encodeURIComponent(media.path)}&size=${thumbSize}" 
+                         alt="${media.name}" 
+                         onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'${thumbWidth}\' height=\'${thumbHeight}\'%3E%3Crect fill=\'%23333\' width=\'${thumbWidth}\' height=\'${thumbHeight}\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%23999\' font-size=\'12\'%3E${media.type === 'video' ? 'VIDEO' : media.type === 'audio' ? 'AUDIO' : media.type === 'document' ? 'PDF' : 'IMAGE'}%3C/text%3E%3C/svg%3E'">
+                    ${media.type === 'video' ? '<span class="video-badge">⏯</span>' : ''}
+                    ${media.type === 'audio' ? '<span class="audio-badge">🎵</span>' : ''}
+                    ${media.type === 'document' ? '<span class="pdf-badge">📄</span>' : ''}
+                    ${media.type === 'audio' ? `<div class="audio-player-overlay" onclick="event.stopPropagation(); playAudioFile('${encodeURIComponent(media.path)}', '${escapeHtml(media.name)}');"><span class="audio-play-button">▶</span></div>` : ''}
+                    ${isAssigned ? `<span class="assigned-badge" ${badgeStyle}>✓ Assigned</span>` : ''}
+                </div>
+                <div class="observation-media-info">
+                    <div class="observation-media-name" 
+                         title="${media.name}"
+                         data-media-path="${media.path}"
+                         data-media-name="${media.name}"
+                         onclick="handleMediaNameClick(event, this)"
+                         style="cursor: pointer; user-select: none;">
+                        ${media.name}
+                    </div>
+                    <div class="observation-media-size">${formatFileSize(media.size)}</div>
+                </div>
+            `;
+
+            // Add drag and click handlers for unassigned media
+            if (!isAssigned) {
+                card.addEventListener('dragstart', handleMediaDragStart);
+                card.addEventListener('click', () => handleMediaClick(media));
+            }
+
+            rootContainer.appendChild(card);
+        });
+        
+        // Append root files container to grid FIRST
+        grid.appendChild(rootContainer);
+    }
+
+    // Then, display files in subfolders if they exist (subfolders after main category files)
     if (hasSubfolders) {
         // Create collapsible sections for each subfolder
         subfolderKeys.forEach(subfolder => {
@@ -3954,10 +5232,10 @@ function displayObservationMedia(mediaFiles) {
                 card.style.cursor = 'grab';
             }
 
-            // Get thumbnail size from settings
-            let thumbSize = '240x180'; // Default
-            let thumbWidth = 240;
-            let thumbHeight = 180;
+            // Get thumbnail size from settings - increased for crystal clear quality
+            let thumbSize = '640x480'; // Default - increased from 240x180 for better quality
+            let thumbWidth = 640;
+            let thumbHeight = 480;
             
             if (typeof getThumbnailSizeString === 'function') {
                 thumbSize = getThumbnailSizeString();
@@ -3973,8 +5251,11 @@ function displayObservationMedia(mediaFiles) {
                 <div class="observation-media-thumbnail">
                     <img src="/v2p-formatter/media-converter/thumbnail?path=${encodeURIComponent(media.path)}&size=${thumbSize}" 
                          alt="${media.name}" 
-                         onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'${thumbWidth}\' height=\'${thumbHeight}\'%3E%3Crect fill=\'%23333\' width=\'${thumbWidth}\' height=\'${thumbHeight}\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%23999\' font-size=\'12\'%3E${media.type === 'video' ? 'VIDEO' : 'IMAGE'}%3C/text%3E%3C/svg%3E'">
+                         onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'${thumbWidth}\' height=\'${thumbHeight}\'%3E%3Crect fill=\'%23333\' width=\'${thumbWidth}\' height=\'${thumbHeight}\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%23999\' font-size=\'12\'%3E${media.type === 'video' ? 'VIDEO' : media.type === 'audio' ? 'AUDIO' : media.type === 'document' ? 'PDF' : 'IMAGE'}%3C/text%3E%3C/svg%3E'">
                     ${media.type === 'video' ? '<span class="video-badge">⏯</span>' : ''}
+                    ${media.type === 'audio' ? '<span class="audio-badge">🎵</span>' : ''}
+                    ${media.type === 'document' ? '<span class="pdf-badge">📄</span>' : ''}
+                    ${media.type === 'audio' ? `<div class="audio-player-overlay" onclick="event.stopPropagation(); playAudioFile('${encodeURIComponent(media.path)}', '${escapeHtml(media.name)}');"><span class="audio-play-button">▶</span></div>` : ''}
                     ${isAssigned ? `<span class="assigned-badge" ${badgeStyle}>✓ Assigned</span>` : ''}
                 </div>
                 <div class="observation-media-info">
@@ -4003,11 +5284,24 @@ function displayObservationMedia(mediaFiles) {
             section.appendChild(content);
             grid.appendChild(section);
         });
-    } else {
-        // No subfolders - display media files directly (flat display)
+    }
+    
+    // Fallback: if no subfolders and no root files were displayed, show all files (shouldn't happen normally)
+    if (!hasRootFiles && !hasSubfolders) {
+        // No subfolders - display media files directly (flat display with grid layout)
         const assignments = getCurrentAssignments();
         const textEditor = document.getElementById('observationTextEditor');
         const text = textEditor ? textEditor.value : '';
+        
+        // Create container for root files with grid layout
+        const rootContainer = document.createElement('div');
+        rootContainer.className = 'media-root-files-container';
+        rootContainer.style.display = 'grid';
+        rootContainer.style.gap = '15px';
+        rootContainer.style.padding = '10px 0';
+        
+        // Apply grid layout settings to root files container
+        updateSubfolderContentGrid(rootContainer);
         
         const flatMedia = groupedMedia[''] || mediaFiles;
         flatMedia.forEach((media, index) => {
@@ -4042,10 +5336,10 @@ function displayObservationMedia(mediaFiles) {
                 card.style.cursor = 'grab';
             }
 
-            // Get thumbnail size from settings
-            let thumbSize = '240x180'; // Default
-            let thumbWidth = 240;
-            let thumbHeight = 180;
+            // Get thumbnail size from settings - increased for crystal clear quality
+            let thumbSize = '640x480'; // Default - increased from 240x180 for better quality
+            let thumbWidth = 640;
+            let thumbHeight = 480;
             
             if (typeof getThumbnailSizeString === 'function') {
                 thumbSize = getThumbnailSizeString();
@@ -4061,8 +5355,11 @@ function displayObservationMedia(mediaFiles) {
                 <div class="observation-media-thumbnail">
                     <img src="/v2p-formatter/media-converter/thumbnail?path=${encodeURIComponent(media.path)}&size=${thumbSize}" 
                          alt="${media.name}" 
-                         onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'${thumbWidth}\' height=\'${thumbHeight}\'%3E%3Crect fill=\'%23333\' width=\'${thumbWidth}\' height=\'${thumbHeight}\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%23999\' font-size=\'12\'%3E${media.type === 'video' ? 'VIDEO' : 'IMAGE'}%3C/text%3E%3C/svg%3E'">
+                         onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'${thumbWidth}\' height=\'${thumbHeight}\'%3E%3Crect fill=\'%23333\' width=\'${thumbWidth}\' height=\'${thumbHeight}\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%23999\' font-size=\'12\'%3E${media.type === 'video' ? 'VIDEO' : media.type === 'audio' ? 'AUDIO' : media.type === 'document' ? 'PDF' : 'IMAGE'}%3C/text%3E%3C/svg%3E'">
                     ${media.type === 'video' ? '<span class="video-badge">⏯</span>' : ''}
+                    ${media.type === 'audio' ? '<span class="audio-badge">🎵</span>' : ''}
+                    ${media.type === 'document' ? '<span class="pdf-badge">📄</span>' : ''}
+                    ${media.type === 'audio' ? `<div class="audio-player-overlay" onclick="event.stopPropagation(); playAudioFile('${encodeURIComponent(media.path)}', '${escapeHtml(media.name)}');"><span class="audio-play-button">▶</span></div>` : ''}
                     ${isAssigned ? `<span class="assigned-badge" ${badgeStyle}>✓ Assigned</span>` : ''}
                 </div>
                 <div class="observation-media-info">
@@ -4084,8 +5381,11 @@ function displayObservationMedia(mediaFiles) {
                 card.addEventListener('click', () => handleMediaClick(media));
             }
 
-            grid.appendChild(card);
+            rootContainer.appendChild(card);
         });
+        
+        // Append root files container to grid
+        grid.appendChild(rootContainer);
     }
 }
 
@@ -4098,10 +5398,16 @@ function handleMediaDragStart(e) {
     // Check if this card is part of bulk selection
     if (card.classList.contains('media-selected') && window.bulkSelectedMedia) {
         // Drag all selected media
-        e.dataTransfer.setData('application/json', JSON.stringify({
+        const bulkData = {
             bulk: true,
             media: window.bulkSelectedMedia
-        }));
+        };
+        const bulkDataStr = JSON.stringify(bulkData);
+        e.dataTransfer.setData('application/json', bulkDataStr);
+        e.dataTransfer.setData('text/plain', bulkDataStr); // Fallback
+        // Store in window for fallback
+        window.lastDragData = bulkData;
+        console.log('[DRAG] Started drag with bulk data:', bulkData);
     } else {
         // Drag single media
         const mediaData = {
@@ -4109,11 +5415,18 @@ function handleMediaDragStart(e) {
             name: card.dataset.mediaName,
             type: card.dataset.mediaType
         };
-        e.dataTransfer.setData('application/json', JSON.stringify(mediaData));
+        const mediaDataStr = JSON.stringify(mediaData);
+        e.dataTransfer.setData('application/json', mediaDataStr);
+        e.dataTransfer.setData('text/plain', mediaDataStr); // Fallback
+        e.dataTransfer.setData('text/html', mediaData.path); // Another fallback
+        // Store in window for fallback
+        window.lastDragData = mediaData;
+        console.log('[DRAG] Started drag with media data:', mediaData);
     }
 
     e.dataTransfer.effectAllowed = 'copy';
     card.style.opacity = '0.5';
+    card.classList.add('dragging'); // Mark as dragging for fallback detection
 }
 
 /**
@@ -4241,6 +5554,12 @@ function updateAllSubfolderGrids() {
             updateSubfolderContentGrid(content);
         }
     });
+    
+    // Also update root files container
+    const rootContainers = document.querySelectorAll('.media-root-files-container');
+    rootContainers.forEach(container => {
+        updateSubfolderContentGrid(container);
+    });
 }
 
 /**
@@ -4366,7 +5685,14 @@ window.handleMediaClick = handleMediaClick;
 window.formatFileSize = formatFileSize;
 window.toggleBulkSelectMode = toggleBulkSelectMode;
 window.toggleSubfolderSection = toggleSubfolderSection;
+window.getSectionColorForMedia = getSectionColorForMedia;
+window.findPlaceholderForMedia = findPlaceholderForMedia;
+window.getSectionColorForPlaceholder = getSectionColorForPlaceholder;
 window.updateAllSubfolderGrids = updateAllSubfolderGrids;
+window.handleTableDrop = handleTableDrop;
+window.handleTableDragOver = handleTableDragOver;
+window.handleTableCellDragStart = handleTableCellDragStart;
+window.removeMediaFromPlaceholder = removeMediaFromPlaceholder;
 window.assignSelectedMedia = assignSelectedMedia;
 window.updateSelectedCount = updateSelectedCount;
 window.handleBulkMediaDragStart = handleBulkMediaDragStart;
@@ -5428,13 +6754,784 @@ window.deleteEmptyTable = deleteEmptyTable;
 window.exportObservationDocxFromPreview = exportObservationDocxFromPreview;
 window.previewUndo = previewUndo;
 window.previewRedo = previewRedo;
-window.togglePreviewSettings = togglePreviewSettings;
+// togglePreviewSettings removed - settings are now always visible in the 3rd column
+window.startResizePreview = startResizePreview;
+window.startResizePreview2 = startResizePreview2;
 window.updateDraftFromPreview = updateDraftFromPreview;
+// ============================================
+// Column Resizing Functions
+// ============================================
+
+let isResizing = false;
+let currentResizer = null;
+let startX = 0;
+let startLeftWidth = 0;
+let startMiddleWidth = 0;
+let startRightWidth = 0;
+
+function startColumnResize(e, resizerNum) {
+    e.preventDefault();
+    isResizing = true;
+    currentResizer = resizerNum;
+    
+    const container = document.querySelector('.observation-media-container');
+    const leftPanel = document.querySelector('.observation-media-left-panel');
+    const middlePanel = document.querySelector('.observation-media-middle-panel');
+    const rightPanel = document.querySelector('.observation-media-right-panel');
+    
+    startX = e.clientX;
+    startLeftWidth = leftPanel.offsetWidth;
+    startMiddleWidth = middlePanel.offsetWidth;
+    startRightWidth = rightPanel.offsetWidth;
+    
+    document.addEventListener('mousemove', handleColumnResize);
+    document.addEventListener('mouseup', stopColumnResize);
+    
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+}
+
+function handleColumnResize(e) {
+    if (!isResizing) return;
+    
+    const container = document.querySelector('.observation-media-container');
+    const leftPanel = document.querySelector('.observation-media-left-panel');
+    const middlePanel = document.querySelector('.observation-media-middle-panel');
+    const rightPanel = document.querySelector('.observation-media-right-panel');
+    const containerWidth = container.offsetWidth;
+    
+    const diff = e.clientX - startX;
+    
+    if (currentResizer === 1) {
+        // Resizing between left and middle
+        const newLeftWidth = startLeftWidth + diff;
+        const newMiddleWidth = startMiddleWidth - diff;
+        
+        const minWidth = 200;
+        if (newLeftWidth >= minWidth && newMiddleWidth >= minWidth && 
+            newLeftWidth <= containerWidth * 0.6 && newMiddleWidth <= containerWidth * 0.6) {
+            leftPanel.style.width = newLeftWidth + 'px';
+            leftPanel.style.flex = '0 0 ' + newLeftWidth + 'px';
+            middlePanel.style.flex = '1';
+        }
+    } else if (currentResizer === 2) {
+        // Resizing between middle and right
+        const newMiddleWidth = startMiddleWidth + diff;
+        const newRightWidth = startRightWidth - diff;
+        
+        const minWidth = 250;
+        if (newMiddleWidth >= minWidth && newRightWidth >= minWidth &&
+            newMiddleWidth <= containerWidth * 0.6 && newRightWidth <= containerWidth * 0.6) {
+            middlePanel.style.width = newMiddleWidth + 'px';
+            middlePanel.style.flex = '0 0 ' + newMiddleWidth + 'px';
+            rightPanel.style.flex = '1';
+        }
+    }
+}
+
+function stopColumnResize() {
+    if (!isResizing) return;
+    
+    isResizing = false;
+    currentResizer = null;
+    
+    document.removeEventListener('mousemove', handleColumnResize);
+    document.removeEventListener('mouseup', stopColumnResize);
+    
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    
+    // Save column widths to localStorage
+    saveColumnWidths();
+}
+
+function saveColumnWidths() {
+    const leftPanel = document.querySelector('.observation-media-left-panel');
+    const middlePanel = document.querySelector('.observation-media-middle-panel');
+    const rightPanel = document.querySelector('.observation-media-right-panel');
+    
+    if (leftPanel && middlePanel && rightPanel) {
+        const widths = {
+            left: leftPanel.offsetWidth,
+            middle: middlePanel.offsetWidth,
+            right: rightPanel.offsetWidth
+        };
+        localStorage.setItem('observationMediaColumnWidths', JSON.stringify(widths));
+    }
+}
+
+function loadColumnWidths() {
+    const saved = localStorage.getItem('observationMediaColumnWidths');
+    if (saved) {
+        try {
+            const widths = JSON.parse(saved);
+            const leftPanel = document.querySelector('.observation-media-left-panel');
+            const middlePanel = document.querySelector('.observation-media-middle-panel');
+            const rightPanel = document.querySelector('.observation-media-right-panel');
+            
+            if (leftPanel && middlePanel && rightPanel && widths.left && widths.middle && widths.right) {
+                leftPanel.style.flex = '0 0 ' + widths.left + 'px';
+                middlePanel.style.flex = '0 0 ' + widths.middle + 'px';
+                rightPanel.style.flex = '0 0 ' + widths.right + 'px';
+            }
+        } catch (e) {
+            console.error('Error loading column widths:', e);
+        }
+    }
+}
+
+// ============================================
+// Standards Loading and Display Functions
+// ============================================
+
+let currentStandardsData = null;
+
+async function loadStandardsFromDraft(draft) {
+    const standardsContent = document.getElementById('standardsContent');
+    
+    console.log('Loading standards from draft:', draft);
+    
+    if (!draft || !draft.json_file_id) {
+        console.log('No json_file_id in draft:', draft);
+        standardsContent.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No JSON Standards File assigned to this draft.</p>';
+        currentStandardsData = null;
+        return;
+    }
+    
+    standardsContent.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Loading standards...</p>';
+    
+    try {
+        const url = `/v2p-formatter/ac-matrix/json-files/${draft.json_file_id}`;
+        console.log('Fetching JSON file from:', url);
+        
+        const response = await fetch(url);
+        console.log('Response status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Response error:', errorText);
+            throw new Error(`Failed to load JSON file: ${response.status} ${response.statusText}`);
+        }
+        
+        const jsonData = await response.json();
+        console.log('JSON data received:', jsonData);
+        currentStandardsData = jsonData;
+        renderStandards(jsonData);
+    } catch (error) {
+        console.error('Error loading standards:', error);
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            draft: draft
+        });
+        standardsContent.innerHTML = `<p style="color: #ff6b6b; text-align: center; padding: 20px;">Error loading standards: ${error.message || 'Unknown error'}. Check console for details.</p>`;
+        currentStandardsData = null;
+    }
+}
+
+function renderStandards(jsonData) {
+    const standardsContent = document.getElementById('standardsContent');
+    
+    // Clear any active search when rendering new standards
+    clearStandardsSearch();
+    
+    if (!jsonData || !jsonData.qualifications || jsonData.qualifications.length === 0) {
+        standardsContent.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No standards data available.</p>';
+        return;
+    }
+    
+    let html = '';
+    let unitIndex = 0;
+    
+    // Extract all units from all qualifications
+    jsonData.qualifications.forEach(qualification => {
+        if (qualification.units && qualification.units.length > 0) {
+            qualification.units.forEach(unit => {
+                html += renderUnit(unit, unitIndex);
+                unitIndex++;
+            });
+        }
+    });
+    
+    if (html === '') {
+        standardsContent.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No units found in standards file.</p>';
+        return;
+    }
+    
+    standardsContent.innerHTML = html;
+}
+
+function renderUnit(unit, unitIndex) {
+    const unitId = unit.unit_id || unit.unit_internal_id || 'Unknown';
+    const unitName = unit.unit_name || 'Unnamed Unit';
+    
+    // Get draft text to check for AC coverage
+    const textEditor = document.getElementById('observationTextEditor');
+    const draftText = textEditor ? textEditor.value : '';
+    const sectionData = parseSections(draftText);
+    
+    let html = `<div class="standards-unit" data-unit-index="${unitIndex % 8}" data-unit-id="${unitId}">`;
+    html += `<div class="standards-unit-header" onclick="toggleStandardsUnit(this)">`;
+    html += `<span class="standards-unit-icon">▶</span>`;
+    html += `<span class="standards-unit-title">${unitId}: ${escapeHtml(unitName)}</span>`;
+    html += `</div>`;
+    html += `<div class="standards-unit-content">`;
+    
+    // Extract all ACs directly from all learning outcomes (no LO display)
+    if (unit.learning_outcomes && unit.learning_outcomes.length > 0) {
+        unit.learning_outcomes.forEach(lo => {
+            if (lo.questions && lo.questions.length > 0) {
+                lo.questions.forEach(question => {
+                    const acId = question.question_id || '';
+                    const acText = question.question_name || '';
+                    const acType = question.question_type || 'Other';
+                    
+                    // Check if AC is covered in any section (unit-specific matching)
+                    const coveredSections = [];
+                    if (sectionData.hasSections && acId && unitId) {
+                        // Escape unit ID and AC ID for regex
+                        const escapedUnitId = unitId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const escapedAcId = acId.replace(/\./g, '\\.');
+                        
+                        for (const section of sectionData.sections) {
+                            const sectionContent = section.content;
+                            let matches = false;
+                            
+                            // Pattern 1: Explicit unit:AC format (641:1.1, 641:1.2, etc.)
+                            const explicitPattern = new RegExp(`${escapedUnitId}\\s*[:.]\\s*${escapedAcId}\\b`, 'i');
+                            if (explicitPattern.test(sectionContent)) {
+                                matches = true;
+                            }
+                            
+                            // Pattern 2: Unit mentioned, then ACs listed (641:1.1, 1.2, 1.3 where 1.2 and 1.3 are from 641)
+                            // Look for pattern like "641:1.1" or "Unit 641" followed by AC list containing our AC
+                            if (!matches) {
+                                // Find where unit 641 is mentioned, then check if AC appears nearby
+                                const unitMentionPattern = new RegExp(`${escapedUnitId}\\s*[:.]\\s*[\\d.]+(?:\\s*,\\s*[\\d.]+)*`, 'i');
+                                const unitMentionMatch = sectionContent.match(unitMentionPattern);
+                                if (unitMentionMatch) {
+                                    // Check if our AC ID appears in the same context (within the same AC list)
+                                    const acListPattern = new RegExp(`${escapedUnitId}\\s*[:.]\\s*[\\d.]+(?:\\s*,\\s*[\\d.]+)*`, 'gi');
+                                    const acLists = sectionContent.matchAll(acListPattern);
+                                    for (const acList of acLists) {
+                                        // Check if our AC ID is in this list (could be explicit like 641:1.2 or shorthand like 1.2)
+                                        const listContent = acList[0];
+                                        // Check for explicit match first
+                                        if (new RegExp(`${escapedUnitId}\\s*[:.]\\s*${escapedAcId}\\b`, 'i').test(listContent)) {
+                                            matches = true;
+                                            break;
+                                        }
+                                        // Check for shorthand match (1.2 after 641:1.1)
+                                        if (new RegExp(`(?:^|,)\\s*${escapedAcId}\\b`, 'i').test(listContent)) {
+                                            matches = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Pattern 3: "Unit 641 AC 1.1" or "641 AC 1.1" format
+                            if (!matches) {
+                                const unitAcPattern = new RegExp(`(?:Unit\\s+)?${escapedUnitId}\\s+(?:AC\\s+)?${escapedAcId}\\b`, 'i');
+                                if (unitAcPattern.test(sectionContent)) {
+                                    matches = true;
+                                }
+                            }
+                            
+                            // Pattern 4: "AC 641:1.1" format
+                            if (!matches) {
+                                const acUnitPattern = new RegExp(`AC\\s+${escapedUnitId}\\s*[:.]\\s*${escapedAcId}\\b`, 'i');
+                                if (acUnitPattern.test(sectionContent)) {
+                                    matches = true;
+                                }
+                            }
+                            
+                            // Pattern 5: "AC covered: 641:1.1, 1.2, 1.3" format - check if AC is in the list
+                            // FIXED: Properly parse each "AC covered:" line separately to avoid false positives
+                            if (!matches) {
+                                // Find all "AC covered:" lines in the section
+                                // Pattern matches from "AC covered:" to the next "AC covered:" or end of section
+                                // Uses multiline mode to handle cases where AC covered spans multiple lines
+                                const acCoveredLinePattern = /AC\s+covered\s*[:.]?\s*([\s\S]*?)(?=\n\s*AC\s+covered\s*[:.]?\s*|$)/gi;
+                                const acCoveredLines = [];
+                                let match;
+                                
+                                // Reset regex lastIndex to ensure we start from the beginning
+                                acCoveredLinePattern.lastIndex = 0;
+                                
+                                while ((match = acCoveredLinePattern.exec(sectionContent)) !== null) {
+                                    // Include the "AC covered:" prefix in the matched line
+                                    const fullLine = match[0].trim();
+                                    if (fullLine) {
+                                        acCoveredLines.push(fullLine);
+                                    }
+                                }
+                                
+                                // Check each "AC covered:" line separately
+                                for (const acCoveredLine of acCoveredLines) {
+                                    if (parseAcCoveredLine(acCoveredLine, unitId, acId)) {
+                                        matches = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            if (matches) {
+                                coveredSections.push(section);
+                            }
+                        }
+                    }
+                    
+                    html += `<div class="standards-ac" data-ac-type="${escapeHtml(acType)}">`;
+                    html += `<div class="standards-ac-id">${escapeHtml(acId)}</div>`;
+                    html += `<div class="standards-ac-text">${escapeHtml(acText)}</div>`;
+                    
+                    // Always show "Covered:..." line for every AC
+                    if (coveredSections.length > 0) {
+                        // Show all sections that contain this AC as bullet points
+                        const sectionBullets = coveredSections.map(section => {
+                            const sectionColor = section.color || SECTION_COLORS[section.index % SECTION_COLORS.length];
+                            // Use section title if available, otherwise use section ID
+                            const sectionLabel = section.title || section.id || `section-${section.index}`;
+                            const sectionId = section.id || `section-${section.index}`;
+                            // Make section name clickable to expand section in Live Preview (dotted underline)
+                            return `<div style="margin-left: 12px; margin-top: 2px;"><span style="color: ${sectionColor}; cursor: pointer; text-decoration: underline; text-decoration-style: dotted;" onclick="expandSectionInPreview('${sectionId}'); event.stopPropagation();">${escapeHtml(sectionLabel)}</span></div>`;
+                        }).join('');
+                        
+                        html += `<div class="standards-ac-covered" style="margin-top: 6px; font-size: 12px; color: #999;">Covered:${sectionBullets}</div>`;
+                    } else {
+                        // Show "Covered:" with no sections if not covered
+                        html += `<div class="standards-ac-covered" style="margin-top: 6px; font-size: 12px; color: #999;">Covered:</div>`;
+                    }
+                    
+                    html += `</div>`;
+                });
+            }
+        });
+    }
+    
+    html += `</div>`;
+    html += `</div>`;
+    
+    return html;
+}
+
+function toggleStandardsUnit(header) {
+    const unit = header.closest('.standards-unit');
+    if (unit) {
+        unit.classList.toggle('expanded');
+        const icon = header.querySelector('.standards-unit-icon');
+        if (icon) {
+            icon.textContent = unit.classList.contains('expanded') ? '▼' : '▶';
+        }
+    }
+}
+
+function expandAllStandardsUnits() {
+    const units = document.querySelectorAll('.standards-unit');
+    units.forEach(unit => {
+        unit.classList.add('expanded');
+        const icon = unit.querySelector('.standards-unit-icon');
+        if (icon) {
+            icon.textContent = '▼';
+        }
+    });
+}
+
+function collapseAllStandardsUnits() {
+    const units = document.querySelectorAll('.standards-unit');
+    units.forEach(unit => {
+        unit.classList.remove('expanded');
+        const icon = unit.querySelector('.standards-unit-icon');
+        if (icon) {
+            icon.textContent = '▶';
+        }
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+/**
+ * Escape special regex characters
+ */
+function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Parse an "AC covered:" line to check if a specific AC is listed
+ * @param {string} line - The "AC covered:" line (including the "AC covered:" prefix)
+ * @param {string} targetUnitId - The unit ID to check (e.g., "129v4")
+ * @param {string} targetAcId - The AC ID to check (e.g., "5.1")
+ * @returns {boolean} - True if the AC is found in this line
+ */
+function parseAcCoveredLine(line, targetUnitId, targetAcId) {
+    // Remove "AC covered:" prefix
+    const acList = line.replace(/^AC\s+covered\s*[:.]?\s*/i, '').trim();
+    
+    if (!acList) {
+        return false;
+    }
+    
+    // Escape for regex
+    const escapedUnitId = escapeRegex(targetUnitId);
+    const escapedAcId = escapeRegex(targetAcId);
+    
+    // Split by semicolons to get unit blocks
+    const blocks = acList.split(';').map(b => b.trim()).filter(b => b.length > 0);
+    
+    for (const block of blocks) {
+        // Check if this block contains our unit
+        const unitMatch = block.match(new RegExp(`(${escapedUnitId})\\s*[:.]\\s*`, 'i'));
+        
+        if (unitMatch) {
+            // This block is for our unit
+            const acsInBlock = block.substring(unitMatch.index + unitMatch[0].length);
+            
+            // Check for explicit match: unitId:acId
+            const explicitPattern = new RegExp(`${escapedUnitId}\\s*[:.]\\s*${escapedAcId}\\b`, 'i');
+            if (explicitPattern.test(block)) {
+                return true;
+            }
+            
+            // Check for shorthand match: acId after unitId: (must be in the AC list part)
+            // Look for the AC ID as a standalone value (not part of another AC like 5.10)
+            // Pattern: start of string, comma, semicolon, or space, followed by our AC ID, followed by word boundary
+            const shorthandPattern = new RegExp(`(?:^|[,;]|\\s)${escapedAcId}\\b`, 'i');
+            if (shorthandPattern.test(acsInBlock)) {
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * Expand a section in Live Preview when clicked from Standards column
+ */
+function expandSectionInPreview(sectionId) {
+    // Toggle the section to expand it (if collapsed) or ensure it's expanded
+    if (typeof toggleSection === 'function') {
+        // Get current section states
+        const states = getSectionStates();
+        const currentState = states[sectionId] || false;
+        
+        // If section is collapsed, expand it
+        if (!currentState) {
+            toggleSection(sectionId);
+        } else {
+            // If already expanded, scroll to it
+            const sectionElement = document.querySelector(`[data-section-id="${sectionId}"]`);
+            if (sectionElement) {
+                sectionElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+        
+        // Scroll Live Preview into view if needed
+        const previewElement = document.getElementById('observationPreview');
+        if (previewElement) {
+            previewElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+}
+
+// Clear standards when draft is cleared
+function clearStandards() {
+    const standardsContent = document.getElementById('standardsContent');
+    if (standardsContent) {
+        standardsContent.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No draft loaded. Load a draft to view standards.</p>';
+    }
+    currentStandardsData = null;
+    // Clear search when standards are cleared
+    clearStandardsSearch();
+}
+
+// ============================================
+// Standards Search Functions
+// ============================================
+
+let standardsSearchDebounceTimer = null;
+let previousUnitStates = {}; // Store unit states before search
+
+function handleStandardsSearch(searchTerm) {
+    const clearBtn = document.getElementById('standardsSearchClear');
+    if (clearBtn) {
+        clearBtn.style.display = searchTerm.trim() ? 'block' : 'none';
+    }
+    
+    // Debounce search (300ms)
+    clearTimeout(standardsSearchDebounceTimer);
+    standardsSearchDebounceTimer = setTimeout(() => {
+        performStandardsSearch(searchTerm);
+    }, 300);
+}
+
+function performStandardsSearch(searchTerm) {
+    if (!searchTerm || searchTerm.trim() === '') {
+        clearStandardsSearch();
+        return;
+    }
+    
+    const trimmedTerm = searchTerm.trim();
+    const isExactPhrase = trimmedTerm.startsWith('"') && trimmedTerm.endsWith('"') && trimmedTerm.length > 2;
+    const searchTermLower = isExactPhrase 
+        ? trimmedTerm.slice(1, -1).toLowerCase() 
+        : trimmedTerm.toLowerCase();
+    
+    const units = document.querySelectorAll('.standards-unit');
+    let hasMatches = false;
+    let firstMatchElement = null;
+    
+    // Store unit states if first search
+    if (Object.keys(previousUnitStates).length === 0) {
+        units.forEach(unit => {
+            const unitId = unit.getAttribute('data-unit-id');
+            previousUnitStates[unitId] = unit.classList.contains('expanded');
+        });
+    }
+    
+    units.forEach(unit => {
+        const acs = unit.querySelectorAll('.standards-ac');
+        let unitHasMatch = false;
+        
+        acs.forEach(acElement => {
+            const acTextElement = acElement.querySelector('.standards-ac-text');
+            if (!acTextElement) return;
+            
+            // Get original text before removing highlights (in case it's already highlighted)
+            const acText = acTextElement.textContent || acTextElement.innerText || '';
+            
+            // Remove previous highlights
+            removeHighlights(acTextElement);
+            
+            // Get clean text after removing highlights
+            const cleanText = acTextElement.textContent || acTextElement.innerText || acText;
+            const acTextLower = cleanText.toLowerCase();
+            let matches = false;
+            
+            if (isExactPhrase) {
+                // Exact phrase match (case-insensitive)
+                matches = acTextLower.includes(searchTermLower);
+            } else {
+                // Multiple words: all must be present (AND logic, case-insensitive)
+                const words = searchTermLower.split(/\s+/).filter(w => w.length > 0);
+                matches = words.every(word => acTextLower.includes(word));
+            }
+            
+            if (matches) {
+                unitHasMatch = true;
+                // Show this AC
+                acElement.style.display = 'block';
+                if (!firstMatchElement) {
+                    firstMatchElement = acElement.closest('.standards-unit');
+                }
+                // Use original text for highlighting to preserve formatting
+                highlightText(acTextElement, cleanText, searchTermLower, isExactPhrase);
+            } else {
+                // Hide ACs that don't match
+                acElement.style.display = 'none';
+            }
+        });
+        
+        // Expand/collapse unit based on matches
+        if (unitHasMatch) {
+            expandStandardsUnit(unit);
+            hasMatches = true;
+        } else {
+            collapseStandardsUnit(unit);
+        }
+    });
+    
+    // Show no results message if no matches
+    const standardsContent = document.getElementById('standardsContent');
+    const noResultsMsg = standardsContent.querySelector('.standards-no-results');
+    if (!hasMatches) {
+        if (!noResultsMsg) {
+            const msg = document.createElement('div');
+            msg.className = 'standards-no-results';
+            msg.textContent = `No results found for "${trimmedTerm}"`;
+            standardsContent.insertBefore(msg, standardsContent.firstChild);
+        } else {
+            noResultsMsg.textContent = `No results found for "${trimmedTerm}"`;
+        }
+    } else {
+        if (noResultsMsg) {
+            noResultsMsg.remove();
+        }
+        // Scroll to first match
+        if (firstMatchElement) {
+            setTimeout(() => {
+                firstMatchElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+        }
+    }
+}
+
+function highlightText(element, originalText, searchTerm, isExactPhrase) {
+    if (!originalText || !searchTerm) {
+        return;
+    }
+    
+    const textLower = originalText.toLowerCase();
+    
+    if (isExactPhrase) {
+        // Highlight exact phrase (case-insensitive match, but preserve original case)
+        const index = textLower.indexOf(searchTerm);
+        if (index !== -1) {
+            const before = escapeHtml(originalText.substring(0, index));
+            const match = escapeHtml(originalText.substring(index, index + searchTerm.length));
+            const after = escapeHtml(originalText.substring(index + searchTerm.length));
+            element.innerHTML = before + 
+                '<span class="standards-search-highlight">' + match + '</span>' + 
+                after;
+        } else {
+            element.innerHTML = escapeHtml(originalText);
+        }
+    } else {
+        // Highlight all words (case-insensitive, preserve original case)
+        const words = searchTerm.split(/\s+/).filter(w => w.length > 0);
+        let highlightedText = escapeHtml(originalText);
+        
+        // Find and highlight each word (case-insensitive)
+        // Process words to avoid highlighting within HTML tags
+        words.forEach(word => {
+            // Escape special regex characters
+            const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // Match word boundaries, but avoid matching inside HTML tags
+            // Simple approach: match word boundaries
+            const regex = new RegExp(`\\b(${escapedWord})\\b`, 'gi');
+            // Replace only if not inside an HTML tag
+            highlightedText = highlightedText.replace(regex, (match, p1, offset) => {
+                // Check if we're inside an HTML tag by looking backwards
+                const beforeMatch = highlightedText.substring(0, offset);
+                const lastTagStart = beforeMatch.lastIndexOf('<');
+                const lastTagEnd = beforeMatch.lastIndexOf('>');
+                // If last < is after last >, we're inside a tag
+                if (lastTagStart > lastTagEnd) {
+                    return match; // Don't highlight inside tags
+                }
+                return '<span class="standards-search-highlight">' + p1 + '</span>';
+            });
+        });
+        
+        element.innerHTML = highlightedText;
+    }
+}
+
+function removeHighlights(element) {
+    // Remove highlight spans and restore plain text
+    const highlights = element.querySelectorAll('.standards-search-highlight');
+    highlights.forEach(highlight => {
+        const parent = highlight.parentNode;
+        if (parent) {
+            parent.replaceChild(document.createTextNode(highlight.textContent), highlight);
+            parent.normalize();
+        }
+    });
+    // Also handle nested highlights
+    if (element.innerHTML) {
+        element.innerHTML = element.textContent;
+    }
+}
+
+function expandStandardsUnit(unit) {
+    if (unit && !unit.classList.contains('expanded')) {
+        unit.classList.add('expanded');
+        const icon = unit.querySelector('.standards-unit-icon');
+        if (icon) {
+            icon.textContent = '▼';
+        }
+    }
+}
+
+function collapseStandardsUnit(unit) {
+    if (unit && unit.classList.contains('expanded')) {
+        unit.classList.remove('expanded');
+        const icon = unit.querySelector('.standards-unit-icon');
+        if (icon) {
+            icon.textContent = '▶';
+        }
+    }
+}
+
+function clearStandardsSearch() {
+    const searchInput = document.getElementById('standardsSearchInput');
+    const clearBtn = document.getElementById('standardsSearchClear');
+    
+    if (searchInput) {
+        searchInput.value = '';
+    }
+    if (clearBtn) {
+        clearBtn.style.display = 'none';
+    }
+    
+    // Show all ACs (remove display:none)
+    const allAcs = document.querySelectorAll('.standards-ac');
+    allAcs.forEach(ac => {
+        ac.style.display = '';
+    });
+    
+    // Remove all highlights
+    const highlightedElements = document.querySelectorAll('.standards-search-highlight');
+    highlightedElements.forEach(highlight => {
+        const parent = highlight.parentNode;
+        if (parent) {
+            parent.replaceChild(document.createTextNode(highlight.textContent), highlight);
+            parent.normalize();
+        }
+    });
+    
+    // Remove no results message
+    const noResultsMsg = document.querySelector('.standards-no-results');
+    if (noResultsMsg) {
+        noResultsMsg.remove();
+    }
+    
+    // Restore unit states
+    const units = document.querySelectorAll('.standards-unit');
+    units.forEach(unit => {
+        const unitId = unit.getAttribute('data-unit-id');
+        const wasExpanded = previousUnitStates[unitId] || false;
+        if (wasExpanded) {
+            expandStandardsUnit(unit);
+        } else {
+            collapseStandardsUnit(unit);
+        }
+    });
+    
+    // Clear stored states
+    previousUnitStates = {};
+}
+
+window.handleStandardsSearch = handleStandardsSearch;
+window.loadStandardsFromDraft = loadStandardsFromDraft;
+window.clearStandardsSearch = clearStandardsSearch;
+
+window.showSaveDraftDialog = showSaveDraftDialog;
+window.showEnhancedDraftDialog = showEnhancedDraftDialog;
+window.closeEnhancedDraftDialog = closeEnhancedDraftDialog;
+window.saveDraftFromDialog = saveDraftFromDialog;
+window.selectAllDraftDialogUnits = selectAllDraftDialogUnits;
+window.deselectAllDraftDialogUnits = deselectAllDraftDialogUnits;
 window.showSaveDraftDialog = showSaveDraftDialog;
 window.showLoadDraftDialog = showLoadDraftDialog;
+window.showDraftSelectionDialog = showDraftSelectionDialog;
+window.saveDraft = saveDraft;
+window.loadDraft = loadDraft;
+window.deleteDraft = deleteDraft;
 window.closeDraftDialog = closeDraftDialog;
 window.toggleSection = toggleSection;
 window.expandAllSections = expandAllSections;
+window.startColumnResize = startColumnResize;
+window.expandAllStandardsUnits = expandAllStandardsUnits;
+window.collapseAllStandardsUnits = collapseAllStandardsUnits;
+window.toggleStandardsUnit = toggleStandardsUnit;
+window.expandSectionInPreview = expandSectionInPreview;
 window.collapseAllSections = collapseAllSections;
 window.toggleReshuffleMode = toggleReshuffleMode;
 window.toggleDialogSection = toggleDialogSection;
@@ -5753,4 +7850,92 @@ function handleMediaNameClick(event, element) {
 
 // Make function globally available
 window.handleMediaNameClick = handleMediaNameClick;
+
+
+/**
+ * Play audio file in a modal dialog
+ */
+function playAudioFile(audioPath, audioName) {
+    // Create modal overlay
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        animation: fadeIn 0.2s ease-in;
+    `;
+    
+    // Create modal content
+    const content = document.createElement('div');
+    content.style.cssText = `
+        background: #1e1e1e;
+        border: 2px solid #667eea;
+        border-radius: 8px;
+        padding: 30px;
+        max-width: 500px;
+        width: 90%;
+        text-align: center;
+    `;
+    
+    // Audio player
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.style.cssText = 'width: 100%; margin: 20px 0;';
+    audio.src = `/v2p-formatter/media-converter/audio-file?path=${audioPath}`;
+    
+    // Title
+    const title = document.createElement('div');
+    title.style.cssText = 'color: #e0e0e0; font-size: 18px; font-weight: bold; margin-bottom: 10px;';
+    title.textContent = audioName;
+    
+    // Close button
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Close';
+    closeBtn.style.cssText = `
+        margin-top: 20px;
+        padding: 10px 20px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    `;
+    closeBtn.onclick = () => {
+        audio.pause();
+        document.body.removeChild(modal);
+    };
+    
+    // Close on overlay click
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            audio.pause();
+            document.body.removeChild(modal);
+        }
+    };
+    
+    content.appendChild(title);
+    content.appendChild(audio);
+    content.appendChild(closeBtn);
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+    
+    // Auto-play
+    audio.play().catch(e => {
+        console.log('Auto-play prevented:', e);
+    });
+}
+
+// Make function globally available
+window.playAudioFile = playAudioFile;
+
+} // Close if (typeof window !== 'undefined') block
+
 

@@ -11,19 +11,65 @@
             <a href="/v2p-formatter/media-converter" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
                 Media Converter
             </a>
-            <a href="/v2p-formatter/observation-media" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
-                Observation Media
+            <a href="/v2p-formatter/image-to-pdf" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Image to PDF
             </a>
         </div>
     </div>
 
+    <!-- Qualification/Learner Selection Section -->
+    <section class="upload-section" style="margin-bottom: 20px;">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+            <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Select Qualification:</label>
+            <select id="qualificationSelect" style="flex: 1; min-width: 200px; padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
+                <option value="">Select Qualification...</option>
+                {% for qualification in qualifications %}
+                <option value="{{ qualification }}" {% if qualification == selected_qualification %}selected{% endif %}>{{ qualification }}</option>
+                {% endfor %}
+            </select>
+            <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Select Learner:</label>
+            <select id="learnerSelect" style="flex: 1; min-width: 200px; padding: 8px 12px; background: #1e1e1e; color: #999; border: 1px solid #555; border-radius: 4px; font-size: 14px;" {% if not selected_qualification %}disabled{% endif %}>
+                <option value="">Select Learner...</option>
+                {% for learner in learners %}
+                <option value="{{ learner }}" {% if learner == selected_learner %}selected{% endif %}>{{ learner }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-secondary" onclick="loadFiles()" style="padding: 8px 16px;">🔄 Refresh</button>
+        </div>
+    </section>
+    
     <!-- Video Selection Section -->
     <section class="upload-section">
         <h2>1. Select Video</h2>
-        <div class="file-selector-container">
-            <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
-                <button class="btn btn-secondary" onclick="loadFiles()" style="padding: 8px 16px;">🔄 Refresh</button>
+        
+        <!-- Bulk Selection Controls -->
+        <div id="bulkSelectionControls" style="margin-bottom: 15px; padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+            <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                <!-- Mode Toggle -->
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Mode:</label>
+                    <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="bulkModeToggle" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                        <span style="color: #e0e0e0; font-weight: 500;">Bulk Selection Mode</span>
+                    </label>
+                </div>
+                
+                <!-- Select All (visible only in bulk mode) -->
+                <div id="selectAllContainer" style="display: none; display: flex; align-items: center; gap: 10px;">
+                    <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="selectAllCheckbox" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                        <span style="color: #e0e0e0; font-weight: 500;">Select All</span>
+                    </label>
+                </div>
+                
+                <!-- Selection Count Badge (visible only in bulk mode) -->
+                <div id="selectionCountBadge" style="display: none; padding: 6px 12px; background: #667eea; color: white; border-radius: 20px; font-weight: bold; font-size: 14px;">
+                    <span id="selectionCount">0</span> video(s) selected
+                </div>
             </div>
+        </div>
+        
+        <div class="file-selector-container">
             <div id="fileTree" class="file-tree" style="margin-top: 20px; max-height: 600px; overflow-y: auto; border: 1px solid #555; border-radius: 6px; padding: 15px; background: #1e1e1e;">
                 <div id="fileTreeContent">
                     <p style="text-align: center; color: #999; padding: 20px;">Loading MP4 files...</p>
@@ -43,7 +89,11 @@
 
     <!-- Time Selection Section -->
     <section class="time-section" id="timeSection" style="display: none;">
-        <h2>2. Select Time Points from Video</h2>
+        <h2 id="timeSectionTitle">2. Select Time Points from Video</h2>
+        <div id="batchModeIndicator" style="display: none; margin-bottom: 15px; padding: 12px; background: #2a3a4a; border-left: 4px solid #667eea; border-radius: 4px;">
+            <strong style="color: #667eea;">📦 Batch Mode:</strong>
+            <span id="batchModeInfo" style="color: #e0e0e0; margin-left: 8px;">Time points will be applied to all selected videos.</span>
+        </div>
         <div class="video-container">
             <video id="videoPlayer" controls style="width: 100%; max-width: 800px; background: #000;"></video>
         </div>
@@ -80,7 +130,11 @@
 
     <!-- Output Settings Section -->
     <section class="output-settings-section" id="outputSettingsSection" style="display: none;">
-        <h2>3. Output Settings</h2>
+        <h2 id="outputSettingsTitle">3. Output Settings</h2>
+        <div id="batchSettingsIndicator" style="display: none; margin-bottom: 15px; padding: 12px; background: #2a3a4a; border-left: 4px solid #667eea; border-radius: 4px;">
+            <strong style="color: #667eea;">📦 Batch Mode:</strong>
+            <span id="batchSettingsInfo" style="color: #e0e0e0; margin-left: 8px;">These settings will apply to all selected videos.</span>
+        </div>
         <div class="settings-container">
             <div class="settings-group">
                 <h3>Image Settings</h3>
@@ -106,8 +160,9 @@
                     <div class="config-item">
                         <label for="outputFormat">Format:</label>
                         <select id="outputFormat">
-                            <option value="pdf">PDF</option>
-                            <option value="docx">DOCX (Word)</option>
+                            <option value="both">Both (PDF + DOCX)</option>
+                            <option value="pdf">PDF Only</option>
+                            <option value="docx">DOCX Only</option>
                         </select>
                     </div>
                     <div class="config-item" id="pdfSettingsContainer">
@@ -130,7 +185,7 @@
             </div>
         </div>
         <p class="output-info" style="margin-top: 20px; padding: 15px; background-color: #2a2a2a; border: 1px solid #555; border-radius: 8px; color: #e0e0e0;">
-            All generated files (images and PDFs) will be saved in: <code style="background: #1e1e1e; color: #667eea; padding: 2px 6px; border-radius: 4px; border: 1px solid #555;">/Users/rom/Documents/nvq/v2p-formatter-output</code>
+            All generated files (images and PDFs) will be saved in the same directory as the selected video file.
         </p>
     </section>
 
@@ -141,6 +196,21 @@
             <button class="btn btn-primary" id="extractFramesBtn" type="button">Extract Frames</button>
             <button class="btn btn-primary" id="generateOutputBtn" type="button" style="display: none;">Generate PDF & DOCX</button>
         </div>
+        
+        <!-- Batch Progress Section -->
+        <div id="batchProgressContainer" style="display: none; margin-top: 20px; padding: 20px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+            <h3 style="margin-top: 0; color: #e0e0e0;">Batch Processing Progress</h3>
+            <div id="batchProgressBar" style="width: 100%; height: 30px; background: #1e1e1e; border-radius: 4px; overflow: hidden; margin-bottom: 15px; border: 1px solid #555;">
+                <div id="batchProgressFill" style="height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); width: 0%; transition: width 0.3s ease;"></div>
+            </div>
+            <div id="batchProgressText" style="color: #e0e0e0; margin-bottom: 15px; font-weight: 500;">Preparing...</div>
+            
+            <!-- Per-Video Status List -->
+            <div id="batchVideoStatusList" style="max-height: 300px; overflow-y: auto; border: 1px solid #555; border-radius: 4px; padding: 10px; background: #1e1e1e;">
+                <!-- Status items will be dynamically added here -->
+            </div>
+        </div>
+        
         <div id="progressContainer" class="progress-container" style="display: none;">
             <div class="progress-bar">
                 <div class="progress-fill" id="progressFill"></div>
@@ -157,7 +227,14 @@ window.appData = {
     videoPath: null,
     videoInfo: null,
     selectedTimes: [],
-    extractedImages: []
+    extractedImages: [],
+    
+    // Bulk selection mode (initialized to prevent undefined errors)
+    bulkMode: false,
+    selectedVideos: [],           // Array of {path, name, info} for bulk mode
+    currentBatchIndex: 0,
+    batchResults: [],             // Results for each video in batch
+    availableFiles: []            // Available files list (for re-rendering)
 };
 
 // Debug function
@@ -173,52 +250,123 @@ function debug(msg, type = 'info') {
     console.log(`[${type.toUpperCase()}]`, msg);
 }
 
+/**
+ * Handle qualification dropdown change
+ */
+function handleQualificationChange() {
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    
+    if (!qualificationSelect || !learnerSelect) {
+        return;
+    }
+    
+    const qualification = qualificationSelect.value;
+    
+    // Clear learner selection
+    learnerSelect.value = '';
+    learnerSelect.disabled = true;
+    learnerSelect.style.color = '#999';
+    
+    // Clear file tree
+    document.getElementById('fileTreeContent').innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Please select a learner to view files</p>';
+    
+    if (qualification) {
+        // Fetch learners for this qualification
+        fetch(`/v2p-formatter/learners?qualification=${encodeURIComponent(qualification)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    populateLearnerDropdown(data.learners);
+                } else {
+                    debug('Error loading learners: ' + (data.error || 'Unknown'), 'error');
+                }
+            })
+            .catch(err => {
+                debug('Error: ' + err.message, 'error');
+            });
+    }
+}
+
+/**
+ * Populate learner dropdown
+ */
+function populateLearnerDropdown(learners) {
+    const learnerSelect = document.getElementById('learnerSelect');
+    if (!learnerSelect) {
+        return;
+    }
+    
+    learnerSelect.innerHTML = '<option value="">Select Learner...</option>';
+    
+    learners.forEach(learner => {
+        const option = document.createElement('option');
+        option.value = learner;
+        option.textContent = learner;
+        learnerSelect.appendChild(option);
+    });
+    
+    learnerSelect.disabled = false;
+    learnerSelect.style.color = '#e0e0e0';
+}
+
+/**
+ * Handle learner dropdown change
+ */
+function handleLearnerChange() {
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    
+    if (!qualificationSelect || !learnerSelect) {
+        return;
+    }
+    
+    const qualification = qualificationSelect.value;
+    const learner = learnerSelect.value;
+    
+    // Auto-load files when both qualification and learner are selected
+    if (qualification && learner) {
+        // Update URL without reload
+        const url = new URL(window.location);
+        url.searchParams.set('qualification', qualification);
+        url.searchParams.set('learner', learner);
+        window.history.pushState({}, '', url);
+        
+        loadFiles();
+    } else {
+        // Clear file tree
+        document.getElementById('fileTreeContent').innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Please select both qualification and learner to view files</p>';
+    }
+}
+
 // Load files on page load
 window.loadFiles = function() {
     debug('Loading files...', 'info');
     document.getElementById('fileTreeLoading').style.display = 'block';
     document.getElementById('fileTreeContent').innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Loading MP4 files...</p>';
     
-    fetch('/v2p-formatter/list_files')
+    // Get qualification and learner from dropdowns or URL parameters
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    const urlParams = new URLSearchParams(window.location.search);
+    const qualification = (qualificationSelect && qualificationSelect.value) || urlParams.get('qualification') || '';
+    const learner = (learnerSelect && learnerSelect.value) || urlParams.get('learner') || '';
+    
+    // Build URL with parameters
+    let url = '/v2p-formatter/list_files';
+    if (qualification && learner) {
+        url += `?qualification=${encodeURIComponent(qualification)}&learner=${encodeURIComponent(learner)}`;
+    }
+    
+    fetch(url)
         .then(r => r.json())
         .then(data => {
             document.getElementById('fileTreeLoading').style.display = 'none';
             
             if (data.success && data.files && data.files.length > 0) {
-                let html = '';
-                data.files.forEach(file => {
-                    const path = file.path.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
-                    const cacheBuster = new Date().getTime();
-                    const thumbnailUrl = `/v2p-formatter/thumbnail?path=${encodeURIComponent(file.path)}&size=120x90&t=${cacheBuster}`;
-                    
-                    html += `
-                        <div onclick="selectFile('${path}', '${file.name}')" 
-                             style="cursor: pointer; padding: 12px; margin: 8px 0; background: #2a2a2a; border-radius: 6px; border: 1px solid #555; transition: all 0.2s; color: #e0e0e0; display: flex; gap: 12px; align-items: flex-start;"
-                             onmouseover="this.style.background='#333'; this.style.borderColor='#667eea'"
-                             onmouseout="this.style.background='#2a2a2a'; this.style.borderColor='#555'">
-                            <div style="flex-shrink: 0; width: 120px; height: 90px; background: #1a1a1a; border: 1px solid #444; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
-                                <img src="${thumbnailUrl}" 
-                                     alt="${file.name}" 
-                                     style="max-width: 100%; max-height: 100%; object-fit: contain;"
-                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-                                     onload="this.nextElementSibling.style.display='none';">
-                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; position: absolute; width: 100%; height: 100%; background: #1a1a1a;">
-                                    <span style="font-size: 1.5em;">⏳</span>
-                                    <span>Loading...</span>
-                                </div>
-                                <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.7); color: #fff; padding: 2px 6px; border-radius: 3px; font-size: 10px;">▶️</div>
-                            </div>
-                            <div style="flex: 1; min-width: 0;">
-                                <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                                    <span style="font-size: 1.3em;">🎬</span>
-                                    <strong style="margin-left: 10px; word-break: break-word;">${file.name}</strong>
-                                    <span style="color: #999; margin-left: 10px; white-space: nowrap;">(${file.size_mb} MB)</span>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-                document.getElementById('fileTreeContent').innerHTML = html;
+                // Store files for bulk selection
+                window.appData.availableFiles = data.files;
+                renderVideoList(data.files);
                 debug(`Loaded ${data.files.length} file(s)`, 'success');
             } else {
                 document.getElementById('fileTreeContent').innerHTML = '<p style="color: #999; padding: 20px; text-align: center;">No MP4 files found in input folder.</p>';
@@ -231,17 +379,146 @@ window.loadFiles = function() {
         });
 };
 
-// Auto-load on page load
+// Auto-load on page load only if URL parameters are present
 (function() {
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', window.loadFiles);
-    } else {
-        window.loadFiles();
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasQualification = urlParams.get('qualification');
+    const hasLearner = urlParams.get('learner');
+    
+    // Only auto-load if both URL parameters are present (otherwise wait for DOMContentLoaded to set dropdowns)
+    if (hasQualification && hasLearner) {
+        if (document.readyState === 'loading') {
+            // Wait for DOMContentLoaded to set dropdowns first
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(() => {
+                    if (typeof window.loadFiles === 'function') {
+                        window.loadFiles();
+                    }
+                }, 600);
+            });
+        } else {
+            // DOM already loaded, but wait a bit for dropdowns to be set
+            setTimeout(() => {
+                if (typeof window.loadFiles === 'function') {
+                    window.loadFiles();
+                }
+            }, 600);
+        }
     }
 })();
 
-// Select file
-window.selectFile = function(filePath, fileName) {
+// Render video list with bulk selection support
+function renderVideoList(files) {
+    const bulkMode = window.appData.bulkMode || false;
+    const selectedVideos = window.appData.selectedVideos || [];
+    const selectedPaths = selectedVideos.map(v => v.path);
+    
+    let html = '';
+    files.forEach(file => {
+        const path = file.path.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+        const name = file.name.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+        const cacheBuster = new Date().getTime();
+        const thumbnailUrl = `/v2p-formatter/thumbnail?path=${encodeURIComponent(file.path)}&size=120x90&t=${cacheBuster}`;
+        const isSelected = selectedPaths.includes(file.path);
+        
+        // Style based on selection state
+        const bgColor = isSelected ? '#2a3a4a' : '#2a2a2a';
+        const borderColor = isSelected ? '#667eea' : '#555';
+        const borderWidth = isSelected ? '2px' : '1px';
+        
+        html += `
+            <div data-video-path="${path}" 
+                 data-video-name="${name}"
+                 onclick="handleVideoClick('${path}', '${name}')" 
+                 style="cursor: pointer; padding: 12px; margin: 8px 0; background: ${bgColor}; border-radius: 6px; border: ${borderWidth} solid ${borderColor}; transition: all 0.2s; color: #e0e0e0; display: flex; gap: 12px; align-items: flex-start; position: relative;"
+                 onmouseover="if (!window.appData.bulkMode) { this.style.background='#333'; this.style.borderColor='#667eea'; }"
+                 onmouseout="if (!window.appData.bulkMode) { const selected = (window.appData.selectedVideos || []).some(v => v.path === '${path}'); this.style.background=selected ? '#2a3a4a' : '#2a2a2a'; this.style.borderColor=selected ? '#667eea' : '#555'; }">
+                ${bulkMode ? `
+                    <div style="position: absolute; top: 8px; left: 8px; z-index: 10;">
+                        <input type="checkbox" 
+                               ${isSelected ? 'checked' : ''}
+                               onclick="event.stopPropagation(); toggleVideoSelection('${path}', '${name}');"
+                               style="width: 20px; height: 20px; cursor: pointer; accent-color: #667eea;">
+                    </div>
+                ` : ''}
+                ${isSelected ? `
+                    <div style="position: absolute; top: 8px; right: 8px; z-index: 10; background: #4ade80; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">✓</div>
+                ` : ''}
+                <div style="flex-shrink: 0; width: 120px; height: 90px; background: #1a1a1a; border: 1px solid #444; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
+                    <img src="${thumbnailUrl}" 
+                         alt="${file.name}" 
+                         style="max-width: 100%; max-height: 100%; object-fit: contain;"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                         onload="this.nextElementSibling.style.display='none';">
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; position: absolute; width: 100%; height: 100%; background: #1a1a1a;">
+                        <span style="font-size: 1.5em;">⏳</span>
+                        <span>Loading...</span>
+                    </div>
+                    <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.7); color: #fff; padding: 2px 6px; border-radius: 3px; font-size: 10px;">▶️</div>
+                </div>
+                <div style="flex: 1; min-width: 0; ${bulkMode ? 'padding-left: 30px;' : ''}">
+                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 1.3em;">🎬</span>
+                        <strong style="margin-left: 10px; word-break: break-word;">${file.name}</strong>
+                        <span style="color: #999; margin-left: 10px; white-space: nowrap;">(${file.size_mb} MB)</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    document.getElementById('fileTreeContent').innerHTML = html;
+    updateSelectionUI();
+}
+
+// Handle video click (single or bulk mode)
+window.handleVideoClick = function(filePath, fileName) {
+    if (window.appData.bulkMode) {
+        // Bulk mode: toggle selection
+        toggleVideoSelection(filePath, fileName);
+    } else {
+        // Single mode: immediate selection (existing behavior)
+        selectSingleVideo(filePath, fileName);
+    }
+};
+
+// Toggle video selection in bulk mode
+window.toggleVideoSelection = function(filePath, fileName) {
+    // Ensure selectedVideos is initialized
+    if (!window.appData.selectedVideos) {
+        window.appData.selectedVideos = [];
+    }
+    
+    const index = window.appData.selectedVideos.findIndex(v => v.path === filePath);
+    
+    if (index >= 0) {
+        // Deselect
+        window.appData.selectedVideos.splice(index, 1);
+        debug(`Deselected: ${fileName}`, 'info');
+    } else {
+        // Select (limit to 20 videos)
+        if (window.appData.selectedVideos.length >= 20) {
+            alert('Maximum 20 videos can be selected at once.');
+            return;
+        }
+        
+        window.appData.selectedVideos.push({
+            path: filePath,
+            name: fileName,
+            info: null // Will be loaded later
+        });
+        debug(`Selected: ${fileName} (${window.appData.selectedVideos.length} selected)`, 'info');
+    }
+    
+    // Re-render to update UI
+    if (window.appData.availableFiles) {
+        renderVideoList(window.appData.availableFiles);
+    }
+    
+    updateSelectionUI();
+};
+
+// Select single video (existing behavior)
+window.selectSingleVideo = function(filePath, fileName) {
     debug(`Selecting file: ${fileName}`, 'info');
     
     fetch('/v2p-formatter/select_file', {
@@ -252,6 +529,10 @@ window.selectFile = function(filePath, fileName) {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
+            // PRESERVE existing time points before doing anything else
+            const existingTimes = window.appData.selectedTimes || [];
+            console.log('📹 DEBUG selectSingleVideo: Preserving time points:', existingTimes);
+            
             window.appData.videoPath = data.filepath;
             window.appData.videoInfo = data;
             
@@ -276,10 +557,18 @@ window.selectFile = function(filePath, fileName) {
             document.getElementById('outputSettingsSection').style.display = 'block';
             document.getElementById('processingSection').style.display = 'block';
             
-            // Initialize time selector
-            setTimeout(initTimeSelector, 500);
+            // RESTORE time points (don't let initTimeSelector or anything else clear them)
+            window.appData.selectedTimes = existingTimes;
+            console.log('📹 DEBUG: Restored time points:', window.appData.selectedTimes);
             
-            debug('File loaded successfully', 'success');
+            // Initialize time selector (will preserve existing times)
+            setTimeout(() => {
+                initTimeSelector();
+                updateTimeDisplay(); // Ensure UI shows preserved times
+                console.log('📹 DEBUG: After initTimeSelector, selectedTimes =', window.appData.selectedTimes);
+            }, 500);
+            
+            debug(`File loaded successfully. Time points preserved: ${existingTimes.length}`, 'success');
         } else {
             alert('Error: ' + (data.error || 'Failed to load file'));
             debug('Error loading file: ' + (data.error || 'Unknown'), 'error');
@@ -290,6 +579,552 @@ window.selectFile = function(filePath, fileName) {
         debug('Error: ' + err.message, 'error');
     });
 };
+
+// Update selection UI (count badge, select all checkbox, batch indicators)
+function updateSelectionUI() {
+    if (!window.appData.selectedVideos) {
+        window.appData.selectedVideos = [];
+    }
+    const count = window.appData.selectedVideos.length;
+    const countBadge = document.getElementById('selectionCountBadge');
+    const countText = document.getElementById('selectionCount');
+    const selectAllContainer = document.getElementById('selectAllContainer');
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    
+    if (window.appData.bulkMode) {
+        // Show selection count
+        if (countBadge) {
+            countBadge.style.display = 'block';
+            if (countText) countText.textContent = count;
+        }
+        
+        // Show select all container
+        if (selectAllContainer) {
+            selectAllContainer.style.display = 'flex';
+        }
+        
+        // Update select all checkbox
+        if (selectAllCheckbox && window.appData.availableFiles) {
+            const allSelected = window.appData.availableFiles.length > 0 && 
+                               window.appData.selectedVideos.length === window.appData.availableFiles.length &&
+                               window.appData.selectedVideos.length <= 20;
+            selectAllCheckbox.checked = allSelected;
+            selectAllCheckbox.indeterminate = count > 0 && count < Math.min(window.appData.availableFiles.length, 20);
+        }
+        
+        // Update batch mode indicators
+        const batchIndicator = document.getElementById('batchModeIndicator');
+        const batchSettingsIndicator = document.getElementById('batchSettingsIndicator');
+        if (batchIndicator && count > 0) {
+            batchIndicator.style.display = 'block';
+            document.getElementById('batchModeInfo').textContent = `Time points will be applied to all ${count} selected video(s).`;
+        }
+        if (batchSettingsIndicator && count > 0) {
+            batchSettingsIndicator.style.display = 'block';
+            document.getElementById('batchSettingsInfo').textContent = `These settings will apply to all ${count} selected video(s).`;
+        }
+        
+        // Show sections if videos are selected
+        if (count > 0) {
+            // PRESERVE existing time points BEFORE showing sections
+            const existingTimes = window.appData.selectedTimes || [];
+            
+            document.getElementById('timeSection').style.display = 'block';
+            document.getElementById('outputSettingsSection').style.display = 'block';
+            document.getElementById('processingSection').style.display = 'block';
+            
+            // In bulk mode: Load video info IMMEDIATELY if not already loaded
+            if (window.appData.bulkMode && window.appData.selectedVideos.length > 0) {
+                const firstVideo = window.appData.selectedVideos[0];
+                
+                // Check if we already have video info
+                if (firstVideo.info && firstVideo.info.duration) {
+                    // Info already loaded - use it
+                    window.appData.videoInfo = firstVideo.info;
+                    window.appData.videoPath = firstVideo.path;
+                    setupVideoPlayer(firstVideo);
+                    window.appData.selectedTimes = existingTimes; // Preserve times
+                    setTimeout(() => {
+                        initTimeSelector();
+                        updateTimeDisplay();
+                    }, 100);
+                } else if (window.appData.videoInfo && window.appData.videoInfo.duration) {
+                    // Use existing videoInfo (might be from previous selection)
+                    firstVideo.info = window.appData.videoInfo;
+                    setupVideoPlayer(firstVideo);
+                    window.appData.selectedTimes = existingTimes;
+                    setTimeout(() => {
+                        initTimeSelector();
+                        updateTimeDisplay();
+                    }, 100);
+                } else {
+                    // Need to load video info - show loading indicator
+                    showVideoInfoLoading(true);
+                    
+                    fetch('/v2p-formatter/select_file', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ file_path: firstVideo.path })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        showVideoInfoLoading(false);
+                        if (data.success) {
+                            // Store video info in BOTH places (single source of truth + backup)
+                            firstVideo.info = data;
+                            window.appData.videoInfo = data;  // PRIMARY SOURCE
+                            window.appData.videoPath = data.filepath;
+                            
+                            // Setup video player
+                            setupVideoPlayer(firstVideo);
+                            
+                            // Preserve existing time points
+                            window.appData.selectedTimes = existingTimes;
+                            
+                            // Initialize time selector
+                            setTimeout(() => {
+                                initTimeSelector();
+                                updateTimeDisplay();
+                                debug('Video info loaded. Ready for time point generation.', 'success');
+                            }, 100);
+                        } else {
+                            showVideoInfoError('Failed to load video info: ' + (data.error || 'Unknown error'));
+                        }
+                    })
+                    .catch(err => {
+                        showVideoInfoLoading(false);
+                        showVideoInfoError('Error loading video info: ' + err.message);
+                    });
+                }
+            } else {
+                // Not bulk mode - just preserve times
+                window.appData.selectedTimes = existingTimes;
+            }
+        }
+        
+        // Update button labels
+        updateExtractButtonLabel();
+    } else {
+        // Hide selection UI
+        const batchIndicator = document.getElementById('batchModeIndicator');
+        const batchSettingsIndicator = document.getElementById('batchSettingsIndicator');
+        if (countBadge) countBadge.style.display = 'none';
+        if (selectAllContainer) selectAllContainer.style.display = 'none';
+        if (batchIndicator) batchIndicator.style.display = 'none';
+        if (batchSettingsIndicator) batchSettingsIndicator.style.display = 'none';
+        
+        // Reset button labels
+        updateExtractButtonLabel();
+    }
+}
+
+// Helper function to setup video player
+function setupVideoPlayer(video) {
+    const videoElement = document.getElementById('videoPlayer');
+    if (videoElement && video.path) {
+        videoElement.src = `/v2p-formatter/video_file?path=${encodeURIComponent(video.path)}`;
+    }
+}
+
+// Show/hide loading indicator for video info
+function showVideoInfoLoading(show) {
+    const timeSection = document.getElementById('timeSection');
+    if (!timeSection) return;
+    
+    let loader = document.getElementById('videoInfoLoader');
+    if (show) {
+        if (!loader) {
+            loader = document.createElement('div');
+            loader.id = 'videoInfoLoader';
+            loader.style.cssText = 'padding: 15px; margin: 15px 0; background: #2a3a4a; border-left: 4px solid #667eea; border-radius: 4px; color: #e0e0e0;';
+            loader.innerHTML = '<strong>⏳ Loading video information...</strong><br><span style="color: #999; font-size: 14px;">Please wait while we prepare time point generation.</span>';
+            const videoContainer = timeSection.querySelector('.video-container');
+            if (videoContainer) {
+                timeSection.insertBefore(loader, videoContainer);
+            } else {
+                timeSection.appendChild(loader);
+            }
+        }
+        loader.style.display = 'block';
+        // Disable auto-generate dropdown while loading
+        const autoShotsSelect = document.getElementById('autoShotsSelect');
+        if (autoShotsSelect) autoShotsSelect.disabled = true;
+    } else {
+        if (loader) loader.style.display = 'none';
+        const autoShotsSelect = document.getElementById('autoShotsSelect');
+        if (autoShotsSelect) autoShotsSelect.disabled = false;
+    }
+}
+
+// Show error message for video info loading
+function showVideoInfoError(message) {
+    const timeSection = document.getElementById('timeSection');
+    if (!timeSection) return;
+    
+    let errorDiv = document.getElementById('videoInfoError');
+    if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.id = 'videoInfoError';
+        errorDiv.style.cssText = 'padding: 15px; margin: 15px 0; background: #3a2a2a; border-left: 4px solid #ff6b6b; border-radius: 4px; color: #e0e0e0;';
+        const videoContainer = timeSection.querySelector('.video-container');
+        if (videoContainer) {
+            timeSection.insertBefore(errorDiv, videoContainer);
+        } else {
+            timeSection.appendChild(errorDiv);
+        }
+    }
+    errorDiv.innerHTML = `<strong>❌ Error:</strong> ${message}<br><span style="color: #999; font-size: 14px;">You can still add time points manually.</span>`;
+    errorDiv.style.display = 'block';
+    
+    // Hide after 5 seconds
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 5000);
+}
+
+// Select/Deselect all videos
+window.toggleSelectAll = function() {
+    const checkbox = document.getElementById('selectAllCheckbox');
+    if (!checkbox || !window.appData.availableFiles) return;
+    
+    const selectAll = checkbox.checked;
+    
+    if (selectAll) {
+        // Select all (up to limit)
+        window.appData.selectedVideos = [];
+        const maxVideos = Math.min(20, window.appData.availableFiles.length);
+        
+        for (let i = 0; i < maxVideos; i++) {
+            const file = window.appData.availableFiles[i];
+            window.appData.selectedVideos.push({
+                path: file.path,
+                name: file.name,
+                info: null
+            });
+        }
+        
+        if (window.appData.availableFiles.length > 20) {
+            alert('Only first 20 videos selected (maximum batch size).');
+        }
+        
+        debug(`Selected all ${window.appData.selectedVideos.length} videos`, 'info');
+    } else {
+        // Deselect all
+        window.appData.selectedVideos = [];
+        debug('Deselected all videos', 'info');
+    }
+    
+    // Re-render
+    renderVideoList(window.appData.availableFiles);
+    updateSelectionUI();
+};
+
+// Toggle bulk mode
+window.toggleBulkMode = function() {
+    const checkbox = document.getElementById('bulkModeToggle');
+    if (!checkbox) return;
+    
+    window.appData.bulkMode = checkbox.checked;
+    
+    if (window.appData.bulkMode) {
+        // Entering bulk mode - clear single video selection (but keep time points and videoInfo if available)
+        window.appData.videoPath = null;
+        // DON'T clear videoInfo - might be needed for auto-generate time points
+        // window.appData.videoInfo = null;
+        // DON'T clear selectedTimes - user might have already set them up
+        // window.appData.selectedTimes = [];
+        window.appData.extractedImages = [];
+        
+        // Hide single video sections
+        document.getElementById('timeSection').style.display = 'none';
+        document.getElementById('outputSettingsSection').style.display = 'none';
+        document.getElementById('processingSection').style.display = 'none';
+        
+        // Show batch mode indicators when sections are shown later
+        const batchIndicator = document.getElementById('batchModeIndicator');
+        const batchSettingsIndicator = document.getElementById('batchSettingsIndicator');
+        if (batchIndicator) {
+            const count = window.appData.selectedVideos.length;
+            if (count > 0) {
+                document.getElementById('batchModeInfo').textContent = `Time points will be applied to all ${count} selected video(s).`;
+            } else {
+                document.getElementById('batchModeInfo').textContent = 'Time points will be applied to all selected videos.';
+            }
+        }
+        if (batchSettingsIndicator) {
+            const count = window.appData.selectedVideos.length;
+            if (count > 0) {
+                document.getElementById('batchSettingsInfo').textContent = `These settings will apply to all ${count} selected video(s).`;
+            } else {
+                document.getElementById('batchSettingsInfo').textContent = 'These settings will apply to all selected videos.';
+            }
+        }
+        
+        debug('Entered bulk selection mode', 'info');
+    } else {
+        // Exiting bulk mode - clear bulk selections
+        window.appData.selectedVideos = [];
+        
+        // Hide batch mode indicators
+        const batchIndicator = document.getElementById('batchModeIndicator');
+        const batchSettingsIndicator = document.getElementById('batchSettingsIndicator');
+        if (batchIndicator) batchIndicator.style.display = 'none';
+        if (batchSettingsIndicator) batchSettingsIndicator.style.display = 'none';
+        
+        debug('Exited bulk selection mode', 'info');
+    }
+    
+    // Re-render video list
+    if (window.appData.availableFiles) {
+        renderVideoList(window.appData.availableFiles);
+    }
+    
+    updateSelectionUI();
+};
+
+// Validate bulk time points before processing
+async function validateBulkTimePoints(videoPaths, timePoints) {
+    try {
+        const response = await fetch('/v2p-formatter/validate_batch_time_points', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                video_paths: videoPaths,
+                time_points: timePoints
+            })
+        });
+        
+        const data = await response.json();
+        if (!data.success) {
+            throw new Error(data.error || 'Validation failed');
+        }
+        
+        // Check for warnings
+        if (data.has_warnings) {
+            let warningMessage = 'Some videos have time points that exceed their duration:\n\n';
+            data.results.forEach(result => {
+                if (result.warnings && result.warnings.length > 0) {
+                    warningMessage += `• ${result.filename}: ${result.warnings[0].message}\n`;
+                }
+            });
+            warningMessage += '\nInvalid time points will be clamped to video duration. Continue?';
+            
+            if (!confirm(warningMessage)) {
+                throw new Error('User cancelled due to warnings');
+            }
+        }
+        
+        return data;
+    } catch (err) {
+        throw err;
+    }
+}
+
+// Start bulk extraction process
+async function startBulkExtraction(selectedVideos, timePoints) {
+    const quality = parseInt(document.getElementById('qualitySlider').value) || 95;
+    const resolution = document.getElementById('resolutionSelect').value || 'original';
+    
+    // Initialize batch results
+    window.appData.batchResults = selectedVideos.map((video, index) => ({
+        index: index,
+        video: video,
+        status: 'pending',
+        extractedImages: [],
+        error: null
+    }));
+    
+    // Show batch progress container
+    const batchContainer = document.getElementById('batchProgressContainer');
+    const batchFill = document.getElementById('batchProgressFill');
+    const batchText = document.getElementById('batchProgressText');
+    const batchStatusList = document.getElementById('batchVideoStatusList');
+    
+    batchContainer.style.display = 'block';
+    document.getElementById('progressContainer').style.display = 'none';
+    batchFill.style.width = '0%';
+    batchText.textContent = `Processing video 1 of ${selectedVideos.length}...`;
+    
+    // Clear status list
+    batchStatusList.innerHTML = '';
+    selectedVideos.forEach((video, index) => {
+        const statusItem = document.createElement('div');
+        statusItem.id = `batch-status-${index}`;
+        statusItem.style.cssText = 'padding: 10px; margin: 5px 0; background: #2a2a2a; border-radius: 4px; border-left: 4px solid #666; display: flex; align-items: center; justify-content: space-between;';
+        statusItem.innerHTML = `
+            <div>
+                <strong style="color: #e0e0e0;">${video.name}</strong>
+                <div style="color: #999; font-size: 12px; margin-top: 2px;">⏸️ Pending</div>
+            </div>
+        `;
+        batchStatusList.appendChild(statusItem);
+    });
+    
+    // Process videos sequentially
+    let completed = 0;
+    
+    for (let i = 0; i < selectedVideos.length; i++) {
+        const video = selectedVideos[i];
+        const statusItem = document.getElementById(`batch-status-${i}`);
+        
+        // Update current video status
+        batchText.textContent = `Processing video ${i + 1} of ${selectedVideos.length}: ${video.name}`;
+        window.appData.currentBatchIndex = i;
+        
+        // Update status item to processing
+        statusItem.style.borderLeftColor = '#667eea';
+        statusItem.innerHTML = `
+            <div>
+                <strong style="color: #e0e0e0;">${video.name}</strong>
+                <div style="color: #667eea; font-size: 12px; margin-top: 2px;">⏳ Processing...</div>
+            </div>
+        `;
+        
+        try {
+            // Extract frames
+            const response = await fetch('/v2p-formatter/extract_frames', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    video_path: video.path,
+                    time_points: timePoints.map(t => parseFloat(t)),
+                    quality: quality,
+                    resolution: resolution
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Success
+                window.appData.batchResults[i].status = 'completed';
+                window.appData.batchResults[i].extractedImages = data.images || [];
+                
+                statusItem.style.borderLeftColor = '#4ade80';
+                statusItem.innerHTML = `
+                    <div>
+                        <strong style="color: #e0e0e0;">${video.name}</strong>
+                        <div style="color: #4ade80; font-size: 12px; margin-top: 2px;">✅ Completed - ${data.count} frames</div>
+                    </div>
+                `;
+                
+                debug(`Extracted frames for ${video.name}: ${data.count} frames`, 'success');
+            } else {
+                // Error
+                window.appData.batchResults[i].status = 'error';
+                window.appData.batchResults[i].error = data.error || 'Unknown error';
+                
+                statusItem.style.borderLeftColor = '#ff6b6b';
+                statusItem.innerHTML = `
+                    <div>
+                        <strong style="color: #e0e0e0;">${video.name}</strong>
+                        <div style="color: #ff6b6b; font-size: 12px; margin-top: 2px;">❌ Error: ${data.error || 'Unknown'}</div>
+                    </div>
+                `;
+                
+                debug(`Error extracting frames for ${video.name}: ${data.error}`, 'error');
+            }
+        } catch (err) {
+            // Network or other error
+            window.appData.batchResults[i].status = 'error';
+            window.appData.batchResults[i].error = err.message;
+            
+            statusItem.style.borderLeftColor = '#ff6b6b';
+            statusItem.innerHTML = `
+                <div>
+                    <strong style="color: #e0e0e0;">${video.name}</strong>
+                    <div style="color: #ff6b6b; font-size: 12px; margin-top: 2px;">❌ Error: ${err.message}</div>
+                </div>
+            `;
+            
+            debug(`Error extracting frames for ${video.name}: ${err.message}`, 'error');
+        }
+        
+        // Update progress
+        completed++;
+        const progressPercent = Math.round((completed / selectedVideos.length) * 100);
+        batchFill.style.width = progressPercent + '%';
+    }
+    
+    // All done
+    batchText.textContent = `Batch extraction complete! ${completed} of ${selectedVideos.length} videos processed.`;
+    
+    // Show generate button if any videos succeeded
+    const successfulVideos = window.appData.batchResults.filter(r => r.status === 'completed');
+    if (successfulVideos.length > 0) {
+        document.getElementById('generateOutputBtn').style.display = 'inline-block';
+        updateGenerateButtonLabel();
+    }
+    
+    // Show summary
+    showBulkExtractionResults();
+}
+
+// Show bulk extraction results summary
+function showBulkExtractionResults() {
+    if (!window.appData.batchResults) {
+        window.appData.batchResults = [];
+    }
+    const results = window.appData.batchResults;
+    const successful = results.filter(r => r.status === 'completed').length;
+    const failed = results.filter(r => r.status === 'error').length;
+    
+    let html = '<div style="padding: 15px; background: #1e3a1e; border: 1px solid #2d5a2d; border-radius: 6px; margin-top: 15px; color: #e0e0e0;">';
+    html += `<strong>✅ Batch Extraction Complete!</strong><br><br>`;
+    html += `Successfully processed: ${successful} of ${results.length} videos<br>`;
+    
+    if (failed > 0) {
+        html += `<span style="color: #ff6b6b;">Failed: ${failed} videos</span><br>`;
+    }
+    
+    html += '</div>';
+    
+    document.getElementById('results').innerHTML = html;
+}
+
+// Update button labels based on mode
+function updateExtractButtonLabel() {
+    const btn = document.getElementById('extractFramesBtn');
+    if (!btn) return;
+    
+    if (window.appData.bulkMode && window.appData.selectedVideos.length > 0) {
+        btn.textContent = `Extract Frames for All ${window.appData.selectedVideos.length} Videos`;
+    } else {
+        btn.textContent = 'Extract Frames';
+    }
+}
+
+function updateGenerateButtonLabel() {
+    const btn = document.getElementById('generateOutputBtn');
+    if (!btn) return;
+    
+    if (window.appData.bulkMode) {
+        const successful = window.appData.batchResults ? 
+            window.appData.batchResults.filter(r => r.status === 'completed').length : 0;
+        if (successful > 0) {
+            btn.textContent = `Generate Documents for All ${successful} Videos`;
+        }
+    } else {
+        btn.textContent = 'Generate PDF & DOCX';
+    }
+}
+
+// Initialize bulk mode controls
+document.addEventListener('DOMContentLoaded', function() {
+    const bulkModeToggle = document.getElementById('bulkModeToggle');
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    
+    if (bulkModeToggle) {
+        bulkModeToggle.addEventListener('change', toggleBulkMode);
+    }
+    
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', toggleSelectAll);
+    }
+    
+    // Initialize UI state
+    updateSelectionUI();
+});
 
 // Time selector - WITH PREVIEW THUMBNAILS AND AUTO-GENERATION
 function initTimeSelector() {
@@ -317,6 +1152,34 @@ function initTimeSelector() {
     const freshClear = document.getElementById('clearAllTimesBtn');
     
     freshAdd.onclick = function() {
+        // Check if in bulk mode
+        if (window.appData.bulkMode) {
+            // In bulk mode, show input dialog for manual time entry
+            const timeInput = prompt('Enter time point in seconds (e.g., 10.5):');
+            if (timeInput === null) return; // User cancelled
+            
+            const time = parseFloat(timeInput);
+            if (isNaN(time) || time < 0) {
+                alert('Invalid time. Please enter a number >= 0.');
+                return;
+            }
+            
+            if (!window.appData.selectedTimes) {
+                window.appData.selectedTimes = [];
+            }
+            
+            if (window.appData.selectedTimes.includes(time)) {
+                debug(`Time ${time.toFixed(2)}s already added`, 'info');
+                return;
+            }
+            
+            window.appData.selectedTimes.push(time);
+            window.appData.selectedTimes.sort((a, b) => a - b);
+            console.log('DEBUG: After adding time, selectedTimes =', window.appData.selectedTimes);
+            updateTimeDisplay();
+            debug(`Added time: ${time.toFixed(2)}s. Total: ${window.appData.selectedTimes.length} time points`, 'success');
+        } else {
+            // Single mode: use video player
         const video = document.getElementById('videoPlayer');
         if (!video) {
             alert('Video not found');
@@ -328,6 +1191,10 @@ function initTimeSelector() {
             alert('Video not ready');
             return;
         }
+            
+            if (!window.appData.selectedTimes) {
+                window.appData.selectedTimes = [];
+        }
         
         if (window.appData.selectedTimes.includes(time)) {
             debug(`Time ${time.toFixed(2)}s already added`, 'info');
@@ -336,15 +1203,24 @@ function initTimeSelector() {
         
         window.appData.selectedTimes.push(time);
         window.appData.selectedTimes.sort((a, b) => a - b);
+            console.log('✅ DEBUG: Added time point (single mode). selectedTimes now =', window.appData.selectedTimes, 'length =', window.appData.selectedTimes.length);
         
         // Add thumbnail preview
         addTimePointWithThumbnail(time);
-        debug(`Added time: ${time.toFixed(2)}s`, 'success');
+            debug(`Added time: ${time.toFixed(2)}s. Total: ${window.appData.selectedTimes.length} time points`, 'success');
+        }
     };
     
     freshClear.onclick = function() {
+        if (!window.appData.selectedTimes) {
         window.appData.selectedTimes = [];
+        }
+        window.appData.selectedTimes = [];
+        if (!window.appData.timeThumbnails) {
         window.appData.timeThumbnails = {};
+        } else {
+            window.appData.timeThumbnails = {};
+        }
         updateTimeDisplay();
         debug('Cleared all times', 'info');
     };
@@ -362,8 +1238,9 @@ function initTimeSelector() {
             } else {
                 customShotsInput.style.display = 'none';
                 applyAutoShotsBtn.style.display = 'none';
-                // Auto-apply
-                generateAutoTimePoints(parseInt(value));
+                // Auto-apply: generateAutoTimePoints will handle video info loading if needed
+                const numShots = parseInt(value);
+                generateAutoTimePoints(numShots);
             }
         };
     }
@@ -391,15 +1268,92 @@ function initTimeSelector() {
 
 // Generate evenly spaced time points
 function generateAutoTimePoints(numShots) {
-    if (!window.appData.videoInfo || !window.appData.videoInfo.duration) {
+    // STATE CHECK: Ensure we have video info
+    let duration = null;
+    
+    if (window.appData.bulkMode) {
+        // BULK MODE: Use window.appData.videoInfo as primary source
+        if (window.appData.videoInfo && window.appData.videoInfo.duration) {
+            duration = window.appData.videoInfo.duration;
+            debug(`Generating ${numShots} time points (video duration: ${duration.toFixed(2)}s)`, 'info');
+            generateAutoTimePointsWithDuration(numShots, duration);
+        } else {
+            // Video info not loaded yet - check if it's being loaded
+            const selectedVideos = window.appData.selectedVideos || [];
+            if (selectedVideos.length === 0) {
+                alert('Please select at least one video first!');
+                return;
+            }
+            
+            // Try to load video info now
+            const firstVideo = selectedVideos[0];
+            showVideoInfoLoading(true);
+            
+            fetch('/v2p-formatter/select_file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_path: firstVideo.path })
+            })
+            .then(r => r.json())
+            .then(data => {
+                showVideoInfoLoading(false);
+                if (data.success) {
+                    firstVideo.info = data;
+                    window.appData.videoInfo = data;
+                    window.appData.videoPath = data.filepath;
+                    debug(`Generating ${numShots} time points (video duration: ${data.duration.toFixed(2)}s)`, 'info');
+                    generateAutoTimePointsWithDuration(numShots, data.duration);
+                } else {
+                    showVideoInfoError('Failed to load video info. Please try again.');
+                    promptForDurationAndGenerate(numShots);
+                }
+            })
+            .catch(err => {
+                showVideoInfoLoading(false);
+                showVideoInfoError('Error loading video info: ' + err.message);
+                promptForDurationAndGenerate(numShots);
+            });
+            return; // Will continue after async fetch
+        }
+    } else {
+        // SINGLE MODE: Use existing video info
+        const videoInfo = window.appData.videoInfo || (typeof appState !== 'undefined' ? appState.videoInfo : null);
+    
+    if (!videoInfo || !videoInfo.duration) {
         alert('Video info not available. Please wait for video to load.');
         return;
     }
     
-    const duration = window.appData.videoInfo.duration;
-    const maxTime = duration - 0.01; // Ensure we're always slightly before the end
+        duration = videoInfo.duration;
+        debug(`Generating ${numShots} time points (video duration: ${duration.toFixed(2)}s)`, 'info');
+        generateAutoTimePointsWithDuration(numShots, duration);
+    }
+}
+
+// Helper function to generate time points with a known duration
+function generateAutoTimePointsWithDuration(numShots, duration) {
+    // Validate input
+    if (!duration || duration <= 0 || isNaN(duration)) {
+        alert('Invalid video duration. Cannot generate time points.');
+        return;
+    }
     
-    // Clear existing times
+    if (!numShots || numShots < 1 || isNaN(numShots)) {
+        alert('Invalid number of shots. Please select a valid number.');
+        return;
+    }
+    
+    const maxTime = Math.max(0, duration - 0.01); // Ensure we're always slightly before the end
+    
+    // Initialize arrays if needed
+    if (!window.appData.selectedTimes) {
+    window.appData.selectedTimes = [];
+    }
+    if (!window.appData.timeThumbnails) {
+        window.appData.timeThumbnails = {};
+    }
+    
+    // Clear existing times (user explicitly requested new generation)
     window.appData.selectedTimes = [];
     window.appData.timeThumbnails = {};
     
@@ -411,14 +1365,12 @@ function generateAutoTimePoints(numShots) {
         times.push(Math.round(time * 100) / 100);
     } else {
         // Evenly spaced from start to (duration - small buffer)
-        // This ensures all points are safely within the video duration
         const startTime = 0;
-        const endTime = maxTime; // Slightly before the end
+        const endTime = maxTime;
         const interval = (endTime - startTime) / (numShots - 1);
         
         for (let i = 0; i < numShots; i++) {
             let time = startTime + (i * interval);
-            // Ensure time is within bounds
             time = Math.max(0, Math.min(time, maxTime));
             times.push(Math.round(time * 100) / 100);
         }
@@ -427,20 +1379,37 @@ function generateAutoTimePoints(numShots) {
     // Remove duplicates and sort
     const uniqueTimes = [...new Set(times)].sort((a, b) => a - b);
     
-    debug(`Generating ${numShots} evenly spaced time points (video duration: ${duration.toFixed(2)}s)...`, 'info');
+    // Validate generation result
+    if (uniqueTimes.length === 0) {
+        alert('Failed to generate time points. Please try again.');
+        return;
+    }
     
-    // Add all time points
+    // Store time points
     window.appData.selectedTimes = uniqueTimes;
+    
+    // Update UI
     updateTimeDisplay();
     
-    // Load thumbnails for all time points
+    // Load thumbnails for all time points (if we have a video path)
+    const videoPath = window.appData.videoPath || 
+                     (window.appData.selectedVideos && window.appData.selectedVideos.length > 0 ? 
+                      window.appData.selectedVideos[0].path : null);
+    
+    if (videoPath) {
+        // Temporarily set videoPath for thumbnail loading if needed
+        if (!window.appData.videoPath) {
+            window.appData.videoPath = videoPath;
+        }
+        
     uniqueTimes.forEach((time, index) => {
         setTimeout(() => {
             addTimePointWithThumbnail(time);
         }, index * 200); // Stagger thumbnail loading
     });
+    }
     
-    debug(`✅ Generated ${uniqueTimes.length} time points (${uniqueTimes[0].toFixed(2)}s to ${uniqueTimes[uniqueTimes.length-1].toFixed(2)}s)`, 'success');
+    debug(`✅ Generated ${uniqueTimes.length} time point(s) (${uniqueTimes[0].toFixed(2)}s${uniqueTimes.length > 1 ? ' to ' + uniqueTimes[uniqueTimes.length-1].toFixed(2) + 's' : ''})`, 'success');
 }
 
 function addTimePointWithThumbnail(time) {
@@ -481,10 +1450,16 @@ function updateTimeDisplay() {
     const container = document.getElementById('timePointsList');
     if (!container) return;
     
+    if (!window.appData.selectedTimes) {
+        window.appData.selectedTimes = [];
+    }
     const times = window.appData.selectedTimes;
     
     if (times.length === 0) {
-        container.innerHTML = '<p style="color: #999; font-style: italic; padding: 10px;">No time points. Click "+ Add Current Time" to add.</p>';
+        const helpText = window.appData.bulkMode ? 
+            'No time points. Click "+ Add Current Time" to add manually, or use auto-generate.' :
+            'No time points. Click "+ Add Current Time" to add.';
+        container.innerHTML = `<p style="color: #999; font-style: italic; padding: 10px;">${helpText}</p>`;
         return;
     }
     
@@ -523,6 +1498,9 @@ function updateTimeDisplay() {
 }
 
 window.removeTime = function(time) {
+    if (!window.appData.selectedTimes) {
+        window.appData.selectedTimes = [];
+    }
     window.appData.selectedTimes = window.appData.selectedTimes.filter(t => t !== time);
     // Clean up thumbnail URL
     if (window.appData.timeThumbnails && window.appData.timeThumbnails[time]) {
@@ -555,6 +1533,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const freshBtn = document.getElementById('extractFramesBtn');
         
         freshBtn.onclick = function() {
+            // Check if bulk mode
+            if (window.appData.bulkMode) {
+                processBulkExtraction();
+            } else {
+                processSingleExtraction();
+            }
+        };
+        
+        function processSingleExtraction() {
             const times = window.appData.selectedTimes;
             if (!times || times.length === 0) {
                 alert('Please add at least one time point first!');
@@ -615,7 +1602,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Error: ' + err.message);
                 debug('Extract error: ' + err.message, 'error');
             });
-        };
+        }
+        
+        function processBulkExtraction() {
+            // Ensure selectedVideos is initialized
+            if (!window.appData.selectedVideos) {
+                window.appData.selectedVideos = [];
+            }
+            
+            const selectedVideos = window.appData.selectedVideos;
+            if (!selectedVideos || selectedVideos.length === 0) {
+                alert('Please select at least one video in bulk mode!');
+                return;
+            }
+            
+            // Ensure selectedTimes is initialized
+            if (!window.appData.selectedTimes) {
+                window.appData.selectedTimes = [];
+            }
+            
+            const times = window.appData.selectedTimes;
+            console.log('🔍 DEBUG processBulkExtraction: selectedTimes =', times, 'length =', times ? times.length : 0);
+            console.log('🔍 DEBUG processBulkExtraction: window.appData =', window.appData);
+            
+            if (!times || times.length === 0) {
+                alert('Please add at least one time point first! Use "+ Add Current Time" or auto-generate time points.\n\nDebug: selectedTimes.length = ' + (times ? times.length : 'null'));
+                debug('ERROR: No time points found. selectedTimes = ' + JSON.stringify(window.appData.selectedTimes), 'error');
+                return;
+            }
+            
+            // Validate time points before processing
+            const videoPaths = selectedVideos.map(v => v.path);
+            validateBulkTimePoints(videoPaths, times).then(() => {
+                startBulkExtraction(selectedVideos, times);
+            }).catch(err => {
+                alert('Validation failed: ' + err.message);
+            });
+        }
     }
     
     if (document.readyState === 'loading') {
@@ -666,7 +1689,27 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.parentNode.replaceChild(newBtn, btn);
         const freshBtn = document.getElementById('generateOutputBtn');
         
-        freshBtn.onclick = function() {
+        // Define functions before using them
+        function processBulkDocumentGeneration() {
+            if (!window.appData.batchResults) {
+                window.appData.batchResults = [];
+            }
+            const batchResults = window.appData.batchResults;
+            if (!batchResults || batchResults.length === 0) {
+                alert('No batch extraction results found. Please extract frames first!');
+                return;
+            }
+            
+            const successfulResults = batchResults.filter(r => r.status === 'completed' && r.extractedImages && r.extractedImages.length > 0);
+            if (successfulResults.length === 0) {
+                alert('No videos have extracted frames. Please extract frames first!');
+                return;
+            }
+            
+            startBulkDocumentGeneration(successfulResults);
+        }
+        
+        function processSingleDocumentGeneration() {
             const images = window.appData.extractedImages;
             if (!images || images.length === 0) {
                 alert('Please extract frames first!');
@@ -732,65 +1775,320 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('results').innerHTML = html;
                 document.getElementById('results').style.display = 'block';
             }
-            
-            // Generate PDF
-            fetch('/v2p-formatter/generate_pdf', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    video_path: window.appData.videoPath,
-                    image_paths: images,
-                    layout: layout,
-                    images_per_page: imagesPerPage
-                })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    results.pdf = data;
-                    debug(`PDF generated: ${data.filename}`, 'success');
-                } else {
-                    debug(`Error generating PDF: ${data.error}`, 'error');
-                }
-                updateProgress();
-            })
-            .catch(err => {
-                debug(`Network error during PDF generation: ${err.message}`, 'error');
-                updateProgress();
-            });
-            
-            // Generate DOCX
-            fetch('/v2p-formatter/generate_docx', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    video_path: window.appData.videoPath,
-                    image_paths: images,
-                    images_per_page: imagesPerPage
-                })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    results.docx = data;
-                    debug(`DOCX generated: ${data.filename}`, 'success');
-                } else {
-                    debug(`Error generating DOCX: ${data.error}`, 'error');
-                }
-                updateProgress();
-            })
-            .catch(err => {
-                debug(`Network error during DOCX generation: ${err.message}`, 'error');
-                updateProgress();
-            });
+        }
+        
+        // Set onclick handler AFTER functions are defined
+        freshBtn.onclick = function() {
+            // Check if bulk mode
+            if (window.appData.bulkMode) {
+                processBulkDocumentGeneration();
+            } else {
+                processSingleDocumentGeneration();
+            }
         };
     }
     
+    // Initialize on page load
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initGenerateBtn);
     } else {
         setTimeout(initGenerateBtn, 1000);
     }
 })();
+
+// Start bulk document generation
+async function startBulkDocumentGeneration(successfulResults) {
+    const layout = document.getElementById('layoutSelect').value || 'grid';
+    const imagesPerPage = parseInt(document.getElementById('imagesPerPage').value) || 4;
+    const outputFormat = document.getElementById('outputFormat').value || 'both';
+    
+    // Determine which formats to generate
+    const generatePDF = outputFormat === 'pdf' || outputFormat === 'both';
+    const generateDOCX = outputFormat === 'docx' || outputFormat === 'both';
+    
+    // Show batch progress container
+    const batchContainer = document.getElementById('batchProgressContainer');
+    const batchFill = document.getElementById('batchProgressFill');
+    const batchText = document.getElementById('batchProgressText');
+    const batchStatusList = document.getElementById('batchVideoStatusList');
+    
+    if (!batchContainer || !batchFill || !batchText || !batchStatusList) {
+        alert('Batch progress UI elements not found. Please refresh the page.');
+        return;
+    }
+    
+    batchContainer.style.display = 'block';
+    const progressContainer = document.getElementById('progressContainer');
+    if (progressContainer) progressContainer.style.display = 'none';
+    batchFill.style.width = '0%';
+    batchText.textContent = `Generating documents for video 1 of ${successfulResults.length}...`;
+    
+    // Clear and populate status list
+    batchStatusList.innerHTML = '';
+    successfulResults.forEach((result) => {
+        const statusItem = document.createElement('div');
+        statusItem.id = `batch-doc-status-${result.index}`;
+        statusItem.style.cssText = 'padding: 10px; margin: 5px 0; background: #2a2a2a; border-radius: 4px; border-left: 4px solid #666; display: flex; align-items: center; justify-content: space-between;';
+        const videoName = result.video ? result.video.name : result.filename || 'Unknown';
+        statusItem.innerHTML = `
+            <div>
+                <strong style="color: #e0e0e0;">${videoName}</strong>
+                <div style="color: #999; font-size: 12px; margin-top: 2px;">⏸️ Pending</div>
+            </div>
+        `;
+        batchStatusList.appendChild(statusItem);
+    });
+    
+    // Process videos sequentially
+    let completed = 0;
+    const totalVideos = successfulResults.length;
+    // Calculate total operations based on selected format
+    const operationsPerVideo = (generatePDF ? 1 : 0) + (generateDOCX ? 1 : 0);
+    const totalOperations = totalVideos * operationsPerVideo;
+    
+    if (totalOperations === 0) {
+        alert('Please select at least one output format (PDF or DOCX)');
+        batchContainer.style.display = 'none';
+        return;
+    }
+    
+    for (let i = 0; i < successfulResults.length; i++) {
+        const result = successfulResults[i];
+        const videoName = result.video ? result.video.name : result.filename || 'Unknown';
+        const videoPath = result.video ? result.video.path : result.videoPath;
+        const statusItem = document.getElementById(`batch-doc-status-${result.index}`);
+        
+        if (!statusItem) continue;
+        
+        batchText.textContent = `Generating documents for video ${i + 1} of ${totalVideos}: ${videoName}`;
+        
+        // Update status to processing
+        statusItem.style.borderLeftColor = '#667eea';
+        statusItem.innerHTML = `
+            <div>
+                <strong style="color: #e0e0e0;">${videoName}</strong>
+                <div style="color: #667eea; font-size: 12px; margin-top: 2px;">⏳ Generating...</div>
+            </div>
+        `;
+        
+        const videoResults = { pdf: null, docx: null };
+        let pdfError = null;
+        let docxError = null;
+        
+        try {
+            // Generate PDF if requested
+            if (generatePDF) {
+                try {
+                    const pdfResponse = await fetch('/v2p-formatter/generate_pdf', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            video_path: videoPath,
+                            image_paths: result.extractedImages,
+                            layout: layout,
+                            images_per_page: imagesPerPage
+                        })
+                    });
+                    
+                    const pdfData = await pdfResponse.json();
+                    if (pdfData.success) {
+                        videoResults.pdf = { file_path: pdfData.pdf_path || pdfData.file_path, filename: pdfData.filename };
+                        debug(`PDF generated for ${videoName}: ${pdfData.filename}`, 'success');
+                    } else {
+                        pdfError = pdfData.error || 'Unknown error';
+                        debug(`Error generating PDF for ${videoName}: ${pdfError}`, 'error');
+                    }
+                } catch (err) {
+                    pdfError = err.message;
+                    debug(`Network error generating PDF for ${videoName}: ${err.message}`, 'error');
+                }
+                completed++;
+                const progressPercent = Math.round((completed / totalOperations) * 100);
+                batchFill.style.width = progressPercent + '%';
+            }
+            
+            // Generate DOCX if requested
+            if (generateDOCX) {
+                try {
+                    const docxResponse = await fetch('/v2p-formatter/generate_docx', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            video_path: videoPath,
+                            image_paths: result.extractedImages,
+                            images_per_page: imagesPerPage
+                        })
+                    });
+                    
+                    const docxData = await docxResponse.json();
+                    if (docxData.success) {
+                        videoResults.docx = { file_path: docxData.docx_path || docxData.file_path, filename: docxData.filename };
+                        debug(`DOCX generated for ${videoName}: ${docxData.filename}`, 'success');
+                    } else {
+                        docxError = docxData.error || 'Unknown error';
+                        debug(`Error generating DOCX for ${videoName}: ${docxError}`, 'error');
+                    }
+                } catch (err) {
+                    docxError = err.message;
+                    debug(`Network error generating DOCX for ${videoName}: ${err.message}`, 'error');
+                }
+                completed++;
+                const progressPercent = Math.round((completed / totalOperations) * 100);
+                batchFill.style.width = progressPercent + '%';
+            }
+            
+            // Update result in batchResults
+            if (!window.appData.batchResults) {
+                window.appData.batchResults = [];
+            }
+            const batchIndex = window.appData.batchResults.findIndex(r => r.index === result.index);
+            if (batchIndex >= 0) {
+                window.appData.batchResults[batchIndex].generatedDocuments = videoResults;
+            }
+            
+            // Update status based on results
+            const hasPDF = videoResults.pdf !== null;
+            const hasDOCX = videoResults.docx !== null;
+            const hasAnySuccess = hasPDF || hasDOCX;
+            const hasAllRequested = (generatePDF ? hasPDF : true) && (generateDOCX ? hasDOCX : true);
+            
+            let statusColor, statusText, statusIcon;
+            if (!hasAnySuccess) {
+                statusColor = '#ff6b6b';
+                statusIcon = '❌';
+                statusText = 'Failed';
+            } else if (!hasAllRequested) {
+                statusColor = '#ffa500';
+                statusIcon = '⚠️';
+                const parts = [];
+                if (hasPDF) parts.push('PDF');
+                if (hasDOCX) parts.push('DOCX');
+                statusText = `Partial: ${parts.join(', ')}`;
+            } else {
+                statusColor = '#4ade80';
+                statusIcon = '✅';
+                const parts = [];
+                if (hasPDF) parts.push('PDF');
+                if (hasDOCX) parts.push('DOCX');
+                statusText = `Complete: ${parts.join(', ')}`;
+            }
+            
+            statusItem.style.borderLeftColor = statusColor;
+            statusItem.innerHTML = `
+                <div>
+                    <strong style="color: #e0e0e0;">${videoName}</strong>
+                    <div style="color: ${statusColor}; font-size: 12px; margin-top: 2px;">${statusIcon} ${statusText}</div>
+                    ${pdfError ? `<div style="color: #ff6b6b; font-size: 11px; margin-top: 2px;">PDF: ${pdfError}</div>` : ''}
+                    ${docxError ? `<div style="color: #ff6b6b; font-size: 11px; margin-top: 2px;">DOCX: ${docxError}</div>` : ''}
+                </div>
+            `;
+            
+        } catch (err) {
+            debug(`Unexpected error generating documents for ${videoName}: ${err.message}`, 'error');
+            statusItem.style.borderLeftColor = '#ff6b6b';
+            statusItem.innerHTML = `
+                <div>
+                    <strong style="color: #e0e0e0;">${videoName}</strong>
+                    <div style="color: #ff6b6b; font-size: 12px; margin-top: 2px;">❌ Error: ${err.message}</div>
+                </div>
+            `;
+            // Mark operations as completed to maintain progress
+            completed += operationsPerVideo;
+            const progressPercent = Math.round((completed / totalOperations) * 100);
+            batchFill.style.width = progressPercent + '%';
+        }
+    }
+    
+    // All done
+    batchText.textContent = `Batch document generation complete! ${totalVideos} video(s) processed.`;
+    
+    // Show results
+    showBulkDocumentGenerationResults(successfulResults);
+}
+
+function showBulkDocumentGenerationResults(successfulResults) {
+    let html = '<div style="padding: 15px; background: #1e3a1e; border: 1px solid #2d5a2d; border-radius: 6px; margin-top: 15px; color: #e0e0e0;">';
+    html += '<strong>✅ Batch Document Generation Complete!</strong><br><br>';
+    html += `<strong>Generated documents for ${successfulResults.length} video(s):</strong><br><br>`;
+    
+    successfulResults.forEach(result => {
+        const batchResult = window.appData.batchResults.find(r => r.index === result.index);
+        if (batchResult && batchResult.generatedDocuments) {
+            const videoName = result.video ? result.video.name : result.filename || 'Unknown';
+            html += `<div style="margin-bottom: 15px; padding: 10px; background: #2a3a4a; border-radius: 4px;">`;
+            html += `<strong>${videoName}:</strong><br>`;
+            
+            if (batchResult.generatedDocuments.pdf) {
+                const pdfUrl = `/v2p-formatter/download?path=${encodeURIComponent(batchResult.generatedDocuments.pdf.file_path)}`;
+                html += `<a href="${pdfUrl}" download style="display: inline-block; padding: 8px 16px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; margin-right: 8px; margin-top: 8px;">
+                    📄 ${batchResult.generatedDocuments.pdf.filename}
+                </a>`;
+            }
+            
+            if (batchResult.generatedDocuments.docx) {
+                const docxUrl = `/v2p-formatter/download?path=${encodeURIComponent(batchResult.generatedDocuments.docx.file_path)}`;
+                html += `<a href="${docxUrl}" download style="display: inline-block; padding: 8px 16px; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; margin-right: 8px; margin-top: 8px;">
+                    📝 ${batchResult.generatedDocuments.docx.filename}
+                </a>`;
+            }
+            
+            html += `</div>`;
+        }
+    });
+    
+    html += '</div>';
+    
+    const resultsDiv = document.getElementById('results');
+    if (resultsDiv) {
+        resultsDiv.innerHTML = html;
+        resultsDiv.style.display = 'block';
+        // Scroll to results
+        resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+// Initialize dropdown handlers on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up dropdown event listeners
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    
+    if (qualificationSelect) {
+        qualificationSelect.addEventListener('change', handleQualificationChange);
+    }
+    
+    if (learnerSelect) {
+        learnerSelect.addEventListener('change', handleLearnerChange);
+    }
+    
+    // Auto-load if both are selected (from URL parameters)
+    const urlParams = new URLSearchParams(window.location.search);
+    const selectedQualification = urlParams.get('qualification');
+    const selectedLearner = urlParams.get('learner');
+    
+    if (selectedQualification && qualificationSelect) {
+        qualificationSelect.value = selectedQualification;
+        handleQualificationChange();
+        
+        // Wait a bit for learner dropdown to populate, then set learner and load files
+        setTimeout(() => {
+            if (selectedLearner && learnerSelect) {
+                learnerSelect.value = selectedLearner;
+                // Load files after both dropdowns are set
+                if (typeof window.loadFiles === 'function') {
+                    window.loadFiles();
+                } else if (typeof loadFileTree === 'function') {
+                    loadFileTree();
+                }
+            }
+        }, 500); // Increased timeout to ensure dropdown is populated
+    } else {
+        // No selection - show empty message
+        const fileTreeContent = document.getElementById('fileTreeContent');
+        if (fileTreeContent) {
+            fileTreeContent.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Please select both qualification and learner to view files</p>';
+        }
+    }
+});
 </script>
 {% endblock %}

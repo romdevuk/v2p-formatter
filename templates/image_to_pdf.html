@@ -1,0 +1,850 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="app-container">
+    <!-- Navigation Tabs -->
+    <div style="margin-bottom: 30px; border-bottom: 2px solid #555;">
+        <div style="display: flex; gap: 10px;">
+            <a href="/v2p-formatter/" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Video to Image
+            </a>
+            <a href="/v2p-formatter/media-converter" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Media Converter
+            </a>
+            <a href="/v2p-formatter/image-to-pdf" style="padding: 12px 24px; background: #1e1e1e; color: #667eea; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #667eea; border-bottom: none; font-weight: bold;">
+                Image to PDF
+            </a>
+        </div>
+    </div>
+
+    <!-- Qualification/Learner Selection Section -->
+    <section class="upload-section" style="margin-bottom: 20px;">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+            <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Select Qualification:</label>
+            <select id="qualificationSelect" style="flex: 1; min-width: 200px; padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
+                <option value="">Select Qualification...</option>
+                {% for qualification in qualifications %}
+                <option value="{{ qualification }}" {% if qualification == selected_qualification %}selected{% endif %}>{{ qualification }}</option>
+                {% endfor %}
+            </select>
+            <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Select Learner:</label>
+            <select id="learnerSelect" style="flex: 1; min-width: 200px; padding: 8px 12px; background: #1e1e1e; color: #999; border: 1px solid #555; border-radius: 4px; font-size: 14px;" {% if not selected_qualification %}disabled{% endif %}>
+                <option value="">Select Learner...</option>
+                {% for learner in learners %}
+                <option value="{{ learner }}" {% if learner == selected_learner %}selected{% endif %}>{{ learner }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-secondary" onclick="loadImages()" style="padding: 8px 16px;">🔄 Refresh</button>
+        </div>
+    </section>
+    
+    <!-- Image Selection Section -->
+    <section class="upload-section">
+        <h2>1. Select Images</h2>
+        
+        <!-- Bulk Selection Controls -->
+        <div id="bulkSelectionControls" style="margin-bottom: 15px; padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+            <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                <!-- Select All -->
+                <div id="selectAllContainer" style="display: flex; align-items: center; gap: 10px;">
+                    <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="selectAllCheckbox" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                        <span style="color: #e0e0e0; font-weight: 500;">Select All</span>
+                    </label>
+                </div>
+                
+                <!-- Selection Count Badge -->
+                <div id="selectionCountBadge" style="display: none; padding: 6px 12px; background: #667eea; color: white; border-radius: 20px; font-weight: bold; font-size: 14px;">
+                    <span id="selectionCount">0</span> image(s) selected
+                </div>
+
+                <!-- Layout Options -->
+                <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
+                    <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Sort by:</label>
+                    <select id="sortBy" style="padding: 6px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px; cursor: pointer;">
+                        <option value="name" selected>Name</option>
+                        <option value="date">Date/Time</option>
+                    </select>
+                    <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Thumbnails per row:</label>
+                    <select id="thumbnailsPerRow" style="padding: 6px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px; cursor: pointer;">
+                        <option value="3" selected>3</option>
+                        <option value="4">4</option>
+                    </select>
+                    <button id="openFullScreenSelectorBtn" class="btn btn-primary" style="padding: 8px 10px; font-size: 20px; margin-left: 10px; min-width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 6px;" title="Open Full Screen Selector">
+                        ⛶
+                    </button>
+                </div>
+
+                <!-- Order Controls (visible only in bulk mode with selections) -->
+                <div id="orderControls" style="display: none; display: flex; align-items: center; gap: 10px;">
+                    <button id="resetOrderBtn" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;">Reset to Default Order</button>
+                    <span style="color: #999; font-size: 13px;">Sequences are assigned by selection order (1, 2, 3...)</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="file-selector-container">
+            <div id="fileTree" class="file-tree" style="margin-top: 20px; max-height: 600px; overflow-y: auto; border: 1px solid #555; border-radius: 6px; padding: 15px; background: #1e1e1e;">
+                <div id="fileTreeContent">
+                    <p style="text-align: center; color: #999; padding: 20px;">Please select both qualification and learner to view images</p>
+                </div>
+            </div>
+            <div id="fileTreeLoading" style="display: none; margin-top: 20px; text-align: center; color: #999;">
+                <p>Scanning directory for images...</p>
+            </div>
+        </div>
+        <div id="uploadStatus" class="status-message"></div>
+    </section>
+
+    <!-- Output Settings Section -->
+    <section class="output-settings-section" id="outputSettingsSection">
+        <h2 id="outputSettingsTitle">2. Output Settings</h2>
+        <div id="batchSettingsIndicator" style="display: none; margin-bottom: 15px; padding: 12px; background: #2a3a4a; border-left: 4px solid #667eea; border-radius: 4px;">
+            <strong style="color: #667eea;">📦 Batch Mode:</strong>
+            <span id="batchSettingsInfo" style="color: #e0e0e0; margin-left: 8px;">These settings will apply to all selected images.</span>
+        </div>
+        <div class="settings-container">
+            <div class="settings-group">
+                <h3>Image Settings</h3>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="qualitySlider">Quality: <span id="qualityValue">95</span></label>
+                        <input type="range" id="qualitySlider" min="1" max="100" value="95">
+                    </div>
+                    <div class="config-item">
+                        <label for="resolutionSelect">Max Size:</label>
+                        <select id="resolutionSelect">
+                            <option value="original">Original</option>
+                            <option value="1920x1080">1920x1080</option>
+                            <option value="1280x720">1280x720</option>
+                            <option value="640x480" selected>640x480</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-group">
+                <h3>Output Format</h3>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="outputFormat">Format:</label>
+                        <select id="outputFormat">
+                            <option value="pdf" selected>PDF Only</option>
+                            <option value="both">Both (PDF + DOCX)</option>
+                            <option value="docx">DOCX Only</option>
+                        </select>
+                    </div>
+                    <div class="config-item" id="pdfSettingsContainer">
+                        <label for="layoutSelect">Layout:</label>
+                        <select id="layoutSelect">
+                            <option value="grid" selected>Grid</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div class="config-item" id="imagesPerPageContainer">
+                        <label for="imagesPerPage">Images per Page:</label>
+                        <select id="imagesPerPage">
+                            <option value="1">1</option>
+                            <option value="2" selected>2</option>
+                            <option value="4">4</option>
+                            <option value="6">6</option>
+                            <option value="9">9</option>
+                            <option value="12">12</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <p class="output-info" style="margin-top: 20px; padding: 15px; background-color: #2a2a2a; border: 1px solid #555; border-radius: 8px; color: #e0e0e0;">
+            Generated PDF and DOCX files will include images with filenames displayed below each image.
+        </p>
+    </section>
+
+    <!-- Processing Section -->
+    <section class="processing-section" id="processingSection" style="display: none;">
+        <h2>3. Generate Documents</h2>
+        <div class="action-buttons">
+            <button class="btn btn-primary" id="generateDocumentsBtn" type="button">Generate Documents</button>
+        </div>
+        
+        <!-- Batch Progress Section -->
+        <div id="batchProgressContainer" style="display: none; margin-top: 20px; padding: 20px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+            <h3 style="margin-top: 0; color: #e0e0e0;">Batch Processing Progress</h3>
+            <div id="batchProgressBar" style="width: 100%; height: 30px; background: #1e1e1e; border-radius: 4px; overflow: hidden; margin-bottom: 15px; border: 1px solid #555;">
+                <div id="batchProgressFill" style="height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); width: 0%; transition: width 0.3s ease;"></div>
+            </div>
+            <div id="batchProgressText" style="color: #e0e0e0; margin-bottom: 15px; font-weight: 500;">Preparing...</div>
+        </div>
+        
+        <div id="progressContainer" class="progress-container" style="display: none;">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p id="progressText"></p>
+        </div>
+        <div id="results" class="results"></div>
+    </section>
+</div>
+
+<script>
+// GLOBAL STATE
+window.appData = {
+    selectedImages: [],  // Array of {path, name, folder} objects in order
+    imageOrder: [],      // Ordered array of image paths (for selection-based ordering)
+    bulkMode: true,      // Bulk mode enabled by default
+    availableImages: [],
+    batchResults: {},
+    thumbnailsPerRow: 3,  // Number of thumbnails per row (3 or 4)
+    sortBy: 'name'  // Sort order: 'name' (default) or 'date'
+};
+
+// Initialize qualification/learner dropdowns
+(function() {
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    
+    function handleLearnerChange() {
+        const qualification = qualificationSelect.value;
+        const learner = learnerSelect.value;
+        
+        if (qualification && learner) {
+            loadImages();
+        } else {
+            document.getElementById('fileTreeContent').innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Please select both qualification and learner to view images</p>';
+        }
+    }
+    
+    if (qualificationSelect) {
+        qualificationSelect.addEventListener('change', function() {
+            const qualification = this.value;
+            learnerSelect.disabled = !qualification;
+            learnerSelect.innerHTML = '<option value="">Select Learner...</option>';
+            
+            if (qualification) {
+                fetch(`/v2p-formatter/learners?qualification=${encodeURIComponent(qualification)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.learners) {
+                            data.learners.forEach(learner => {
+                                const option = document.createElement('option');
+                                option.value = learner;
+                                option.textContent = learner;
+                                learnerSelect.appendChild(option);
+                            });
+                            // Don't auto-call handleLearnerChange here - wait for user to select learner
+                        }
+                    })
+                    .catch(err => console.error('Error loading learners:', err));
+            } else {
+                document.getElementById('fileTreeContent').innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Please select both qualification and learner to view images</p>';
+            }
+        });
+    }
+    
+    if (learnerSelect) {
+        learnerSelect.addEventListener('change', handleLearnerChange);
+    }
+    
+    // Auto-load if URL parameters are present
+    const urlParams = new URLSearchParams(window.location.search);
+    const selectedQualification = urlParams.get('qualification');
+    const selectedLearner = urlParams.get('learner');
+    
+    if (selectedQualification && qualificationSelect) {
+        qualificationSelect.value = selectedQualification;
+        qualificationSelect.dispatchEvent(new Event('change'));
+        
+        setTimeout(() => {
+            if (selectedLearner && learnerSelect) {
+                learnerSelect.value = selectedLearner;
+                handleLearnerChange();
+            }
+        }, 500);
+    }
+})();
+
+// Load images function
+function loadImages() {
+    const qualification = document.getElementById('qualificationSelect').value;
+    const learner = document.getElementById('learnerSelect').value;
+    
+    if (!qualification || !learner) {
+        return;
+    }
+    
+    const fileTreeContent = document.getElementById('fileTreeContent');
+    const fileTreeLoading = document.getElementById('fileTreeLoading');
+    
+    fileTreeContent.innerHTML = '';
+    fileTreeLoading.style.display = 'block';
+    
+    fetch(`/v2p-formatter/list_images?qualification=${encodeURIComponent(qualification)}&learner=${encodeURIComponent(learner)}`)
+        .then(r => r.json())
+        .then(data => {
+            fileTreeLoading.style.display = 'none';
+            
+            if (data.success && data.files) {
+                window.appData.availableImages = data.files;
+                renderImageList(data.files);
+            } else {
+                fileTreeContent.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No images found</p>';
+            }
+        })
+        .catch(err => {
+            fileTreeLoading.style.display = 'none';
+            fileTreeContent.innerHTML = `<p style="text-align: center; color: #f44; padding: 20px;">Error loading images: ${err.message}</p>`;
+            console.error('Error loading images:', err);
+        });
+}
+
+// Render image list with folder structure
+function renderImageList(images) {
+    const container = document.getElementById('fileTreeContent');
+    
+    if (!images || images.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No images found</p>';
+        return;
+    }
+    
+    // Organize by folder
+    const folders = {};
+    images.forEach(img => {
+        const folder = img.folder || 'root';
+        if (!folders[folder]) {
+            folders[folder] = [];
+        }
+        folders[folder].push(img);
+    });
+    
+    let html = '';
+    
+    // Render subfolders first (sorted)
+    const subfolders = Object.keys(folders).filter(f => f !== 'root').sort();
+    subfolders.forEach(folder => {
+        html += renderFolder(folder, folders[folder], true); // true = is subfolder
+    });
+    
+    // Render root images last
+    if (folders['root'] && folders['root'].length > 0) {
+        if (subfolders.length > 0) {
+            html += '<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #555;"><strong style="color: #e0e0e0;">Direct images:</strong></div>';
+        }
+        // Render root images directly (not in a folder wrapper)
+        folders['root'].sort((a, b) => a.name.localeCompare(b.name));
+        folders['root'].forEach((img, index) => {
+            const selectedImage = window.appData.selectedImages.find(s => s.path === img.path);
+            const isSelected = !!selectedImage;
+            const sequenceNumber = selectedImage ? selectedImage.sequence : null;
+            const cacheBuster = new Date().getTime();
+            // Increased thumbnail size for better quality: 240x180 (2x larger than before)
+            const thumbnailUrl = `/v2p-formatter/thumbnail?path=${encodeURIComponent(img.path)}&size=240x180&t=${cacheBuster}`;
+            
+            html += `<div class="image-item ${isSelected ? 'selected' : ''}" 
+                         data-path="${escapeHtml(img.path)}" 
+                         data-name="${escapeHtml(img.name)}"
+                         style="padding: 12px; margin: 8px; border-radius: 8px; cursor: pointer; 
+                                background: ${isSelected ? '#2a3a4a' : '#1e1e1e'}; 
+                                border: 2px solid ${isSelected ? '#667eea' : '#555'};
+                                display: inline-block; width: calc(${100 / (window.appData.thumbnailsPerRow || 3)}% - 16px); min-width: 200px; vertical-align: top;
+                                position: relative;"
+                         onclick="handleImageClick('${escapeHtml(img.path)}', '${escapeHtml(img.name)}')">
+                    <div style="width: 100%; padding-top: 75%; background: #1a1a1a; border-radius: 4px; overflow: hidden; position: relative; margin-bottom: 8px;">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleImageSelection('${escapeHtml(img.path)}', '${escapeHtml(img.name)}')" style="position: absolute; top: 8px; left: 8px; z-index: 10; width: 24px; height: 24px; cursor: pointer; accent-color: #667eea; border-radius: 4px;">
+                        ${isSelected && sequenceNumber ? `<div style="position: absolute; top: 8px; right: 8px; z-index: 10; background: #667eea; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.5);">${sequenceNumber}</div>` : ''}
+                        <img src="${thumbnailUrl}" 
+                             alt="${escapeHtml(img.name)}"
+                             style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                             onload="this.nextElementSibling.style.display='none';">
+                        <div style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; background: #1a1a1a;">
+                            <span style="font-size: 2em;">🖼️</span>
+                        </div>
+                    </div>
+                    <div style="padding: 0 4px;">
+                        <div style="color: #e0e0e0; font-weight: 500; font-size: 13px; word-break: break-word; text-align: center; margin-bottom: 4px;">${escapeHtml(img.name)}</div>
+                        <div style="color: #666; font-size: 11px; text-align: center;">(${(img.size_mb || 0).toFixed(2)} MB)</div>
+                    </div>
+                    </div>`;
+        });
+    }
+    
+    html += '</div>'; // Close grid container
+    
+    container.innerHTML = html;
+}
+
+// Render folder with images in 3-column grid
+function renderFolder(folderName, images, isSubfolder) {
+    const folderId = folderName === 'root' ? 'root' : 'folder-' + folderName.replace(/[^a-zA-Z0-9]/g, '-');
+    const isCollapsed = true; // All folders collapsed by default
+    
+    let html = '';
+    
+    if (isSubfolder) {
+        html += `<div class="image-folder" data-folder="${folderId}" style="width: 100%; margin-bottom: 20px;">`;
+        html += `<div class="folder-header" onclick="toggleImageFolder('${folderId}')" style="cursor: pointer; padding: 10px; margin: 5px 0; background: #2a2a2a; border-radius: 4px; display: flex; align-items: center; gap: 10px;">`;
+        html += `<span class="folder-icon">${isCollapsed ? '▶' : '▼'}</span>`;
+        html += `<strong style="color: #e0e0e0;">${escapeHtml(folderName)}</strong>`;
+        html += `<span style="color: #666; margin-left: 10px;">(${images.length} images)</span>`;
+        html += `</div>`;
+        html += `<div class="folder-content" id="${folderId}" style="display: ${isCollapsed ? 'none' : 'block'}; margin-top: 5px;">`;
+        html += '<div style="display: flex; flex-wrap: wrap; margin: -8px;">'; // Grid container
+    }
+    
+    // Sort images by name
+    images.sort((a, b) => a.name.localeCompare(b.name));
+    
+    images.forEach((img, index) => {
+        const selectedImage = window.appData.selectedImages.find(s => s.path === img.path);
+        const isSelected = !!selectedImage;
+        const sequenceNumber = selectedImage ? selectedImage.sequence : null;
+        const cacheBuster = new Date().getTime();
+        // Increased thumbnail size for better quality: 240x180 (2x larger than before)
+        const thumbnailUrl = `/v2p-formatter/thumbnail?path=${encodeURIComponent(img.path)}&size=240x180&t=${cacheBuster}`;
+        
+        html += `<div class="image-item ${isSelected ? 'selected' : ''}" 
+                     data-path="${escapeHtml(img.path)}" 
+                     data-name="${escapeHtml(img.name)}"
+                     style="padding: 12px; margin: 8px; border-radius: 8px; cursor: pointer; 
+                            background: ${isSelected ? '#2a3a4a' : '#1e1e1e'}; 
+                            border: 2px solid ${isSelected ? '#667eea' : '#555'};
+                            display: inline-block; width: calc(${100 / (window.appData.thumbnailsPerRow || 3)}% - 16px); min-width: 200px; vertical-align: top;
+                            position: relative;"
+                     onclick="handleImageClick('${escapeHtml(img.path)}', '${escapeHtml(img.name)}')">
+                    <div style="width: 100%; padding-top: 75%; background: #1a1a1a; border-radius: 4px; overflow: hidden; position: relative; margin-bottom: 8px;">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleImageSelection('${escapeHtml(img.path)}', '${escapeHtml(img.name)}')" style="position: absolute; top: 8px; left: 8px; z-index: 10; width: 24px; height: 24px; cursor: pointer; accent-color: #667eea; border-radius: 4px;">
+                        ${isSelected && sequenceNumber ? `<div style="position: absolute; top: 8px; right: 8px; z-index: 10; background: #667eea; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.5);">${sequenceNumber}</div>` : ''}
+                    <img src="${thumbnailUrl}" 
+                         alt="${escapeHtml(img.name)}"
+                         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                         onload="this.nextElementSibling.style.display='none';">
+                    <div style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; background: #1a1a1a;">
+                        <span style="font-size: 2em;">🖼️</span>
+                    </div>
+                </div>
+                <div style="padding: 0 4px;">
+                    <div style="color: #e0e0e0; font-weight: 500; font-size: 13px; word-break: break-word; text-align: center; margin-bottom: 4px;">${escapeHtml(img.name)}</div>
+                    <div style="color: #666; font-size: 11px; text-align: center;">(${(img.size_mb || 0).toFixed(2)} MB)</div>
+                </div>
+                </div>`;
+    });
+    
+    if (isSubfolder) {
+        html += `</div></div></div>`; // Close grid container, folder content, and folder
+    }
+    
+    return html;
+}
+
+// Toggle folder expand/collapse (Image to PDF specific)
+function toggleImageFolder(folderId) {
+    const content = document.getElementById(folderId);
+    if (content) {
+        const isVisible = content.style.display !== 'none';
+        content.style.display = isVisible ? 'none' : 'block';
+        
+        // Update icon - find the header that contains this folder's ID
+        const folderDiv = content.parentElement;
+        if (folderDiv && folderDiv.classList.contains('image-folder')) {
+            const header = folderDiv.querySelector('.folder-header');
+            if (header) {
+                const icon = header.querySelector('.folder-icon');
+                if (icon) {
+                    icon.textContent = isVisible ? '▶' : '▼';
+                }
+            }
+        }
+    }
+}
+
+// Handle image click (bulk mode always enabled)
+function handleImageClick(path, name) {
+    toggleImageSelection(path, name);
+}
+
+// Toggle image selection - assigns sequence numbers based on selection order
+function toggleImageSelection(path, name) {
+    const index = window.appData.selectedImages.findIndex(img => img.path === path);
+    
+    if (index >= 0) {
+        // Deselect - remove from selection
+        window.appData.selectedImages.splice(index, 1);
+        window.appData.imageOrder = window.appData.imageOrder.filter(p => p !== path);
+        // Renumber remaining images
+        updateSequenceNumbers();
+    } else {
+        // Select - add to end of selection (gets next sequence number)
+        const folder = window.appData.availableImages.find(img => img.path === path)?.folder || 'root';
+        window.appData.selectedImages.push({path, name, folder});
+        window.appData.imageOrder.push(path);
+        // Update sequence numbers
+        updateSequenceNumbers();
+    }
+    
+    updateSelectionUI();
+    renderImageList(window.appData.availableImages); // Re-render to show sequence numbers
+}
+
+// Update sequence numbers for all selected images
+function updateSequenceNumbers() {
+    window.appData.selectedImages.forEach((img, index) => {
+        img.sequence = index + 1; // 1-based sequence number
+    });
+}
+
+// Update selection UI
+function updateSelectionUI() {
+    const count = window.appData.selectedImages.length;
+    const countBadge = document.getElementById('selectionCountBadge');
+    const selectionCount = document.getElementById('selectionCount');
+    const selectAllContainer = document.getElementById('selectAllContainer');
+    const orderControls = document.getElementById('orderControls');
+    const outputSection = document.getElementById('outputSettingsSection');
+    const processingSection = document.getElementById('processingSection');
+    
+    // Ensure sequence numbers are up to date
+    updateSequenceNumbers();
+    
+    if (countBadge && selectionCount) {
+        if (count > 0) {
+            countBadge.style.display = 'block';
+            selectionCount.textContent = count;
+        } else {
+            countBadge.style.display = 'none';
+        }
+    }
+    
+    if (orderControls) {
+        orderControls.style.display = count > 0 ? 'flex' : 'none';
+    }
+    
+    if (selectAllContainer) {
+        selectAllContainer.style.display = 'flex'; // Always visible
+    }
+    
+    // Output settings always visible (no need to hide)
+    // Processing section only shown if images selected
+    if (processingSection) {
+        processingSection.style.display = count > 0 ? 'block' : 'none';
+    }
+    
+    // Update batch indicator
+    const batchIndicator = document.getElementById('batchSettingsIndicator');
+    const batchInfo = document.getElementById('batchSettingsInfo');
+    if (batchIndicator && batchInfo) {
+        if (count > 0) {
+            batchIndicator.style.display = 'block';
+            batchInfo.textContent = `These settings will apply to all ${count} selected images.`;
+        } else {
+            batchIndicator.style.display = 'none';
+        }
+    }
+}
+
+// Bulk mode is always enabled - no toggle needed
+// This function kept for backward compatibility but does nothing
+function toggleBulkMode() {
+    // Bulk mode is always enabled, no action needed
+}
+
+// Select all images
+function toggleSelectAll() {
+    const checkbox = document.getElementById('selectAllCheckbox');
+    if (!checkbox) return;
+    
+    if (checkbox.checked) {
+        // Select all - maintain current order if images already selected, then add new ones
+        const existingPaths = new Set(window.appData.selectedImages.map(img => img.path));
+        const newImages = window.appData.availableImages
+            .filter(img => !existingPaths.has(img.path))
+            .map(img => ({
+                path: img.path,
+                name: img.name,
+                folder: img.folder
+            }));
+        window.appData.selectedImages = [...window.appData.selectedImages, ...newImages];
+        window.appData.imageOrder = window.appData.selectedImages.map(img => img.path);
+    } else {
+        // Deselect all
+        window.appData.selectedImages = [];
+        window.appData.imageOrder = [];
+    }
+    
+    updateSequenceNumbers();
+    updateSelectionUI();
+    renderImageList(window.appData.availableImages);
+}
+
+// Reset order to default
+function resetOrder() {
+    if (!window.appData.selectedImages || window.appData.selectedImages.length === 0) return;
+    
+    // Reset to folder structure order (subfolders first, then root, then alphabetical)
+    const sorted = [...window.appData.selectedImages].sort((a, b) => {
+        if (a.folder !== b.folder) {
+            if (a.folder === 'root') return 1;
+            if (b.folder === 'root') return -1;
+            return a.folder.localeCompare(b.folder);
+        }
+        return a.name.localeCompare(b.name);
+    });
+    
+    window.appData.selectedImages = sorted;
+    window.appData.imageOrder = sorted.map(img => img.path);
+    
+    updateSequenceNumbers();
+    updateSelectionUI();
+    renderImageList(window.appData.availableImages);
+}
+
+// Utility function
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Initialize bulk mode toggle
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const resetOrderBtn = document.getElementById('resetOrderBtn');
+    
+    // Bulk mode is always enabled - no toggle needed
+    window.appData.bulkMode = true; // Always true
+    updateSelectionUI(); // Update UI to show bulk mode controls
+    
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', toggleSelectAll);
+    }
+    
+    if (resetOrderBtn) {
+        resetOrderBtn.addEventListener('click', resetOrder);
+    }
+    
+    // Thumbnails per row selector
+    const thumbnailsPerRowSelect = document.getElementById('thumbnailsPerRow');
+    if (thumbnailsPerRowSelect) {
+        thumbnailsPerRowSelect.value = window.appData.thumbnailsPerRow || 3;
+        thumbnailsPerRowSelect.addEventListener('change', function() {
+            window.appData.thumbnailsPerRow = parseInt(this.value) || 3;
+            // Re-render image list with new layout
+            if (window.appData.availableImages && window.appData.availableImages.length > 0) {
+                renderImageList(window.appData.availableImages);
+            }
+        });
+    }
+    
+    // Quality slider
+    const qualitySlider = document.getElementById('qualitySlider');
+    const qualityValue = document.getElementById('qualityValue');
+    if (qualitySlider && qualityValue) {
+        qualitySlider.addEventListener('input', function() {
+            qualityValue.textContent = this.value;
+        });
+    }
+    
+    // Generate documents button
+    const generateBtn = document.getElementById('generateDocumentsBtn');
+    if (generateBtn) {
+        generateBtn.addEventListener('click', function() {
+            if (window.appData.selectedImages.length === 0) {
+                alert('Please select at least one image');
+                return;
+            }
+            
+            generateImageDocuments();
+        });
+    }
+});
+
+// Generate documents function
+function generateImageDocuments() {
+    const selectedImages = window.appData.selectedImages || [];
+    if (selectedImages.length === 0) {
+        alert('Please select at least one image');
+        return;
+    }
+    
+    // Get settings
+    const quality = parseInt(document.getElementById('qualitySlider').value) || 95;
+    const maxSize = document.getElementById('resolutionSelect').value || '640x480';
+    const outputFormat = document.getElementById('outputFormat').value || 'pdf';
+    const layout = document.getElementById('layoutSelect').value || 'grid';
+    const imagesPerPage = parseInt(document.getElementById('imagesPerPage').value) || 2;
+    
+    // Use custom order if available, otherwise use selection order
+    const imageOrder = window.appData.imageOrder && window.appData.imageOrder.length > 0 
+        ? window.appData.imageOrder 
+        : selectedImages.map(img => img.path);
+    
+    const imagePaths = imageOrder;
+    const imageNames = imageOrder.map(path => {
+        const img = selectedImages.find(i => i.path === path);
+        if (img) {
+            // Remove extension from filename
+            const name = img.name;
+            const lastDot = name.lastIndexOf('.');
+            return lastDot > 0 ? name.substring(0, lastDot) : name;
+        }
+        // Fallback: extract from path
+        const pathParts = path.split('/');
+        const filename = pathParts[pathParts.length - 1];
+        const lastDot = filename.lastIndexOf('.');
+        return lastDot > 0 ? filename.substring(0, lastDot) : filename;
+    });
+    
+    // Show progress
+    const progressContainer = document.getElementById('progressContainer');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const resultsDiv = document.getElementById('results');
+    
+    progressContainer.style.display = 'block';
+    progressFill.style.width = '0%';
+    progressText.textContent = 'Generating documents...';
+    resultsDiv.innerHTML = '';
+    
+    // Disable button
+    const generateBtn = document.getElementById('generateOutputBtn');
+    if (generateBtn) {
+        generateBtn.disabled = true;
+        generateBtn.textContent = 'Generating...';
+    }
+    
+    // Get qualification and learner for output folder
+    const qualification = document.getElementById('qualificationSelect')?.value;
+    const learner = document.getElementById('learnerSelect')?.value;
+    
+    // Call API
+    fetch('/v2p-formatter/generate_image_documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            image_paths: selectedImages.map(img => img.path),
+            image_order: imageOrder,
+            quality: quality,
+            max_size: maxSize,
+            output_format: outputFormat,
+            layout: layout,
+            images_per_page: imagesPerPage,
+            qualification: qualification,
+            learner: learner
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (progressFill) progressFill.style.width = '100%';
+        if (progressText) progressText.textContent = 'Complete!';
+        
+        if (data.success) {
+            let html = '<div style="padding: 20px; background: #2a2a2a; border-radius: 6px; margin-top: 20px;">';
+            html += '<h3 style="color: #e0e0e0; margin-top: 0;">✅ Documents Generated Successfully!</h3>';
+            
+            // Add link to output folder
+            if (data.output_folder_path) {
+                html += `<p style="margin-bottom: 15px;"><strong style="color: #e0e0e0;">Output Folder:</strong></p>`;
+                html += `<p style="margin-bottom: 15px; padding: 10px; background: #1e1e1e; border-radius: 4px; word-break: break-all; font-family: monospace; color: #999; font-size: 12px;">${data.output_folder_path}</p>`;
+                html += `<p style="margin-bottom: 20px;"><a href="#" onclick="openFolderInFinder('${data.output_folder_path.replace(/'/g, "\\'")}'); return false;" style="color: #667eea; text-decoration: underline; font-weight: 500; cursor: pointer;">📁 Open Output Folder</a></p>`;
+                html += '<hr style="border: none; border-top: 1px solid #555; margin: 15px 0;">';
+            }
+            
+            if (data.pdf_path) {
+                const pdfPath = data.pdf_relative_path || data.pdf_path;
+                html += `<p style="color: #e0e0e0; margin-bottom: 10px;"><strong>PDF:</strong> <a href="#" onclick="openFileInPreview('${pdfPath.replace(/'/g, "\\'")}'); return false;" style="color: #667eea; text-decoration: underline; cursor: pointer;">📄 Open PDF</a></p>`;
+            }
+            if (data.docx_path) {
+                const relativePath = data.docx_relative_path || data.docx_path;
+                const docxUrl = `/v2p-formatter/download?path=${encodeURIComponent(relativePath)}`;
+                html += `<p style="color: #e0e0e0; margin-bottom: 10px;"><strong>DOCX:</strong> <a href="${docxUrl}" download style="color: #667eea; text-decoration: underline;">📝 Download DOCX</a></p>`;
+            }
+            
+            html += '</div>';
+            resultsDiv.innerHTML = html;
+        } else {
+            resultsDiv.innerHTML = `<div style="padding: 20px; background: #4a2a2a; border-radius: 6px; margin-top: 20px; color: #f44;">❌ Error: ${data.error || 'Unknown error'}</div>`;
+        }
+        
+        // Re-enable button
+        if (generateBtn) {
+            generateBtn.disabled = false;
+            generateBtn.textContent = 'Generate Documents';
+        }
+    })
+    .catch(err => {
+        if (progressFill) progressFill.style.width = '0%';
+        if (progressText) progressText.textContent = 'Error occurred';
+        resultsDiv.innerHTML = `<div style="padding: 20px; background: #4a2a2a; border-radius: 6px; margin-top: 20px; color: #f44;">❌ Error: ${err.message}</div>`;
+        
+        // Re-enable button
+        if (generateBtn) {
+            generateBtn.disabled = false;
+            generateBtn.textContent = 'Generate Documents';
+        }
+    });
+}
+
+// Open folder in macOS Finder
+function openFolderInFinder(folderPath) {
+    fetch('/v2p-formatter/open_folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: folderPath })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Folder opened in Finder:', folderPath);
+        } else {
+            console.error('Failed to open folder:', data.error);
+            alert('Failed to open folder: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error opening folder:', error);
+        alert('Error opening folder: ' + error.message);
+    });
+}
+
+// Open file in macOS Preview (for PDFs) or default app
+function openFileInPreview(filePath) {
+    fetch('/v2p-formatter/open_file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: filePath })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('File opened in Preview:', filePath);
+        } else {
+            console.error('Failed to open file:', data.error);
+            alert('Failed to open file: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error opening file:', error);
+        alert('Error opening file: ' + error.message);
+    });
+}
+
+// Initialize Full Screen Selector button
+document.addEventListener('DOMContentLoaded', function() {
+    const openFullScreenBtn = document.getElementById('openFullScreenSelectorBtn');
+    if (openFullScreenBtn) {
+        openFullScreenBtn.addEventListener('click', function() {
+            if (window.MediaBulkImageSelector) {
+                window.MediaBulkImageSelector.open();
+            } else {
+                console.error('MediaBulkImageSelector not loaded');
+            }
+        });
+    }
+});
+</script>
+
+<!-- Media Bulk Image Selector Modal -->
+<link rel="stylesheet" href="{{ url_for('v2p_formatter.serve_static', filename='css/media-bulk-image-selector.css') }}">
+<script src="{{ url_for('v2p_formatter.serve_static', filename='js/media-bulk-image-selector.js') }}"></script>
+
+{% endblock %}
+

@@ -1,0 +1,199 @@
+/**
+ * Observation Report - Standards Component CSS
+ * 
+ * ⚠️ IMPORTANT: This is a NEW module - no legacy code from old modules.
+ * 
+ * Author: UX Designer (Agent-3)
+ * Created: Stage 3
+ */
+
+/* ============================================================================
+   Standards Container
+   ============================================================================ */
+#standards {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.standards-header {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--obs-border, #555);
+    margin-bottom: 15px;
+}
+
+.standards-header h3 {
+    margin: 0 0 10px 0;
+    color: var(--obs-text-primary, #e0e0e0);
+    font-size: 16px;
+}
+
+.standards-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.standards-controls button {
+    padding: 6px 12px;
+    background: var(--obs-bg-secondary, #2a2a2a);
+    border: 1px solid var(--obs-border, #555);
+    color: var(--obs-text-primary, #e0e0e0);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.standards-controls button:hover {
+    background: var(--obs-bg-tertiary, #333);
+    border-color: var(--obs-accent, #667eea);
+}
+
+.search-container {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.search-input {
+    flex: 1;
+    padding: 6px 10px;
+    background: var(--obs-bg-primary, #1e1e1e);
+    color: var(--obs-text-primary, #e0e0e0);
+    border: 1px solid var(--obs-border, #555);
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--obs-accent, #667eea);
+}
+
+.clear-search-btn {
+    padding: 6px 10px;
+    background: var(--obs-bg-secondary, #2a2a2a);
+    border: 1px solid var(--obs-border, #555);
+    color: var(--obs-text-primary, #e0e0e0);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.clear-search-btn:hover {
+    background: var(--obs-error, #ff6b6b);
+    border-color: var(--obs-error, #ff6b6b);
+}
+
+.unit-filter {
+    margin-bottom: 10px;
+}
+
+.unit-select {
+    width: 100%;
+    padding: 6px 10px;
+    background: var(--obs-bg-primary, #1e1e1e);
+    color: var(--obs-text-primary, #e0e0e0);
+    border: 1px solid var(--obs-border, #555);
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.standards-content {
+    flex: 1;
+    overflow-y: auto;
+}
+
+/* ============================================================================
+   Unit Container
+   ============================================================================ */
+.unit-container {
+    margin-bottom: 15px;
+    border: 1px solid var(--obs-border, #555);
+    border-radius: 4px;
+    background: var(--obs-bg-secondary, #2a2a2a);
+}
+
+.unit-header {
+    padding: 10px 15px;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: background 0.2s;
+}
+
+.unit-header:hover {
+    background: var(--obs-bg-tertiary, #333);
+}
+
+.unit-toggle {
+    font-size: 12px;
+    color: var(--obs-text-secondary, #999);
+}
+
+.unit-title {
+    color: var(--obs-text-primary, #e0e0e0);
+    font-size: 14px;
+}
+
+.unit-content {
+    padding: 10px 15px;
+    border-top: 1px solid var(--obs-border, #555);
+}
+
+/* ============================================================================
+   AC Item
+   ============================================================================ */
+.ac-item {
+    padding: 10px;
+    margin-bottom: 10px;
+    background: var(--obs-bg-primary, #1e1e1e);
+    border: 1px solid var(--obs-border-light, #444);
+    border-radius: 4px;
+    border-left: 3px solid var(--obs-accent, #667eea);
+}
+
+.ac-id {
+    font-weight: bold;
+    color: var(--obs-accent, #667eea);
+    font-size: 13px;
+    margin-bottom: 5px;
+}
+
+.ac-text {
+    color: var(--obs-text-primary, #e0e0e0);
+    font-size: 12px;
+    line-height: 1.5;
+    margin-bottom: 8px;
+}
+
+.ac-text mark {
+    background: var(--obs-accent, #667eea);
+    color: white;
+    padding: 2px 4px;
+    border-radius: 2px;
+}
+
+.ac-coverage {
+    font-size: 11px;
+    color: var(--obs-text-secondary, #999);
+    margin-top: 8px;
+}
+
+.section-link {
+    color: var(--obs-accent, #667eea);
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.section-link:hover {
+    color: var(--obs-accent-hover, #5568d3);
+    text-decoration: underline;
+}
+
+
+

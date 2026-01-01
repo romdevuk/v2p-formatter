@@ -1,0 +1,47 @@
+/**
+ * Observation Report - Column Resizer Component CSS
+ * 
+ * ⚠️ IMPORTANT: This is a NEW module - no legacy code from old modules.
+ * 
+ * Author: UX Designer (Agent-3)
+ * Created: Stage 3
+ */
+
+/* ============================================================================
+   Column Resizer
+   ============================================================================ */
+.column-resizer {
+    width: 4px;
+    background: var(--obs-border, #555);
+    cursor: col-resize;
+    user-select: none;
+    position: relative;
+    flex-shrink: 0;
+    transition: background 0.2s;
+}
+
+.column-resizer:hover {
+    background: var(--obs-accent, #667eea);
+}
+
+.column-resizer:active {
+    background: var(--obs-accent-hover, #5568d3);
+}
+
+/* Visual indicator during resize */
+.column-resizer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -2px;
+    width: 8px;
+    height: 100%;
+    background: transparent;
+}
+
+.column-resizer:hover::before {
+    background: rgba(102, 126, 234, 0.2);
+}
+
+
+

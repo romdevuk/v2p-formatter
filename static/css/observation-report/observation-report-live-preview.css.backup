@@ -1,0 +1,296 @@
+/**
+ * Observation Report - Live Preview Component CSS
+ * 
+ * ⚠️ IMPORTANT: This is a NEW module - no legacy code from old modules.
+ * 
+ * Author: UX Designer (Agent-3)
+ * Created: Stage 3
+ */
+
+/* ============================================================================
+   Live Preview Container
+   ============================================================================ */
+.live-preview-container {
+    width: 100% !important;
+    height: 100% !important;
+    overflow-y: auto !important;
+    padding: 15px !important;
+    background: var(--obs-bg-primary, #1e1e1e) !important;
+    color: var(--obs-text-primary, #e0e0e0) !important;
+    line-height: 1.6 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    font-size: 14px !important;
+}
+
+/* Preview Content */
+.preview-content {
+    padding: 20px !important;
+    white-space: pre-wrap !important; /* Preserve newlines and whitespace */
+    word-wrap: break-word !important;
+    line-height: 1.6 !important;
+    color: var(--obs-text-primary, #e0e0e0) !important;
+    background: transparent !important;
+}
+
+/* Preview Text - preserves newlines */
+.preview-text {
+    white-space: pre-wrap !important; /* Preserve newlines */
+    word-wrap: break-word !important;
+    display: inline-block !important;
+    width: 100% !important;
+    color: var(--obs-text-primary, #e0e0e0) !important;
+}
+
+/* ============================================================================
+   Placeholder Container
+   ============================================================================ */
+.placeholder-container {
+    margin: 20px 0 !important;
+    padding: 15px !important;
+    background: var(--obs-bg-secondary, #2a2a2a) !important;
+    border-radius: 6px !important;
+    border: 1px solid var(--obs-border, #555) !important;
+}
+
+.placeholder-label {
+    display: inline-block !important;
+    padding: 4px 8px !important;
+    border-radius: 4px !important;
+    font-weight: bold !important;
+    margin-bottom: 10px !important;
+    font-size: 14px !important;
+    color: inherit !important;
+}
+
+/* ============================================================================
+   Placeholder Table
+   ============================================================================ */
+.placeholder-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-top: 10px !important;
+    background: var(--obs-bg-primary, #1e1e1e) !important;
+    border: 1px solid var(--obs-border, #555) !important;
+}
+
+.placeholder-table.empty {
+    border: 2px dashed var(--obs-border, #555) !important;
+}
+
+.placeholder-table td {
+    padding: 10px !important;
+    border: 1px solid var(--obs-border, #555) !important;
+    vertical-align: top !important;
+    min-height: 100px !important;
+    transition: all 0.2s !important;
+    background: var(--obs-bg-primary, #1e1e1e) !important;
+}
+
+/* ⚠️ CRITICAL: Drop Zone Styling */
+.drop-zone {
+    min-height: 100px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: var(--obs-text-secondary, #999) !important;
+    font-size: 12px !important;
+    text-align: center !important;
+    border: 2px dashed var(--obs-border, #555) !important;
+    border-radius: 4px !important;
+    transition: all 0.2s !important;
+    background: transparent !important;
+}
+
+.drop-zone.drag-over {
+    border: 2px dashed var(--obs-accent, #667eea) !important;
+    background: rgba(102, 126, 234, 0.1) !important;
+    color: var(--obs-accent, #667eea) !important;
+}
+
+.drop-zone.drop-invalid {
+    border: 2px dashed var(--obs-error, #ff6b6b) !important;
+    background: rgba(255, 107, 107, 0.1) !important;
+}
+
+/* ============================================================================
+   Media Item in Table
+   ============================================================================ */
+.media-item {
+    position: relative !important;
+    padding: 10px !important;
+    background: var(--obs-bg-secondary, #2a2a2a) !important;
+    border: 1px solid var(--obs-border, #555) !important;
+    border-radius: 4px !important;
+    transition: all 0.3s !important;
+    cursor: move !important;
+    display: block !important;
+    width: 100% !important;
+}
+
+.media-item:hover {
+    border-color: var(--obs-accent, #667eea) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ⚠️ CRITICAL: Reordering States */
+.media-item.dragging {
+    z-index: 1000;
+    opacity: 0.8;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    cursor: grabbing;
+}
+
+.media-item.reorder-target {
+    border: 2px solid var(--obs-accent, #667eea);
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.media-item.insert-before::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--obs-accent, #667eea);
+    z-index: 1001;
+}
+
+.media-item.insert-after::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--obs-accent, #667eea);
+    z-index: 1001;
+}
+
+.media-item img {
+    max-width: 100% !important;
+    height: auto !important;
+    border-radius: 4px !important;
+    display: block !important;
+    margin: 0 auto !important;
+}
+
+.media-filename {
+    font-size: 12px !important;
+    color: var(--obs-text-primary, #e0e0e0) !important;
+    margin-top: 5px !important;
+    text-align: center !important;
+    word-break: break-word !important;
+}
+
+/* ============================================================================
+   Reorder Buttons
+   ============================================================================ */
+.remove-media,
+.reorder-up,
+.reorder-down {
+    position: absolute;
+    background: var(--obs-bg-tertiary, #333);
+    border: 1px solid var(--obs-border, #555);
+    color: var(--obs-text-primary, #e0e0e0);
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: all 0.2s;
+    z-index: 10;
+}
+
+.remove-media {
+    top: 5px;
+    right: 5px;
+    background: var(--obs-error, #ff6b6b);
+    color: white;
+}
+
+.remove-media:hover {
+    background: #e55555;
+    transform: scale(1.1);
+}
+
+.reorder-up {
+    top: 5px;
+    left: 5px;
+}
+
+.reorder-down {
+    top: 35px;
+    left: 5px;
+}
+
+.reorder-up:hover:not(:disabled),
+.reorder-down:hover:not(:disabled) {
+    background: var(--obs-accent, #667eea);
+    border-color: var(--obs-accent, #667eea);
+    color: white;
+    transform: scale(1.1);
+}
+
+.reorder-up:disabled,
+.reorder-down:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* ============================================================================
+   Section Styling
+   ============================================================================ */
+.preview-section {
+    margin: 30px 0 !important;
+    border-top: 2px solid var(--obs-border, #555) !important;
+    padding-top: 20px !important;
+}
+
+.section-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    cursor: pointer !important;
+    user-select: none !important;
+    padding: 10px !important;
+    border-radius: 4px !important;
+    transition: background 0.2s !important;
+    background: transparent !important;
+}
+
+.section-header:hover {
+    background: var(--obs-bg-secondary, #2a2a2a) !important;
+}
+
+.section-toggle {
+    font-size: 14px !important;
+    color: var(--obs-text-secondary, #999) !important;
+    font-weight: bold !important;
+}
+
+.section-title {
+    margin: 0 !important;
+    color: var(--obs-text-primary, #e0e0e0) !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+}
+
+.section-content {
+    padding: 15px !important;
+    margin-top: 10px !important;
+    display: none !important; /* Default to collapsed */
+    color: var(--obs-text-primary, #e0e0e0) !important;
+    background: transparent !important;
+}
+
+.section-content[style*="display: block"],
+.section-content.expanded {
+    display: block !important;
+}
+

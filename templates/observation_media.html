@@ -11,8 +11,14 @@
             <a href="/v2p-formatter/media-converter" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
                 Media Converter
             </a>
+            <a href="/v2p-formatter/ac-matrix" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                AC Matrix
+            </a>
             <a href="/v2p-formatter/observation-media" style="padding: 12px 24px; background: #1e1e1e; color: #667eea; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #667eea; border-bottom: none; font-weight: bold;">
                 Observation Media
+            </a>
+            <a href="/v2p-formatter/observation-report" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Observation Report
             </a>
         </div>
     </div>
@@ -24,17 +30,23 @@
             <div id="currentDraftDisplay" style="display: none; padding: 8px 12px; background: #1e1e1e; border: 1px solid #667eea; border-radius: 4px; color: #e0e0e0; font-size: 14px; flex: 0 0 auto;">
                 <span style="color: #999; margin-right: 8px;">📄 Current Draft:</span>
                 <span id="currentDraftName" style="color: #667eea; font-weight: bold;"></span>
-                <button onclick="clearCurrentDraft()" style="margin-left: 10px; padding: 4px 8px; background: #555; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">✕ Clear</button>
+                <button onclick="if(typeof clearCurrentDraft === 'function') { clearCurrentDraft(); } else if(typeof window.clearCurrentDraft === 'function') { window.clearCurrentDraft(); }" style="margin-left: 10px; padding: 4px 8px; background: #555; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">✕ Clear</button>
             </div>
-            <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 300px;">
-                <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Select Subfolder:</label>
-                <select id="observationSubfolderSelect" style="flex: 1; padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
-                    <option value="">Select Subfolder...</option>
-                    {% for subfolder in observation_subfolders %}
-                    <option value="{{ subfolder }}">{{ subfolder }}</option>
+            <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 400px;">
+                <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Select Qualification:</label>
+                <select id="qualificationSelect" style="flex: 1; padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
+                    <option value="">Select Qualification...</option>
+                    {% for qualification in qualifications %}
+                    <option value="{{ qualification }}" {% if qualification == selected_qualification %}selected{% endif %}>{{ qualification }}</option>
                     {% endfor %}
                 </select>
-                <button id="observationLoadBtn" class="btn btn-primary" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">📂 Load</button>
+                <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Select Learner:</label>
+                <select id="learnerSelect" style="flex: 1; padding: 8px 12px; background: #1e1e1e; color: #999; border: 1px solid #555; border-radius: 4px; font-size: 14px;" {% if not selected_qualification %}disabled{% endif %}>
+                    <option value="">Select Learner...</option>
+                    {% for learner in learners %}
+                    <option value="{{ learner }}" {% if learner == selected_learner %}selected{% endif %}>{{ learner }}</option>
+                    {% endfor %}
+                </select>
                 <button id="observationRefreshBtn" class="btn btn-secondary" onclick="window.location.reload();" style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🔄 Refresh</button>
             </div>
             <div style="display: flex; gap: 10px; align-items: center;">
@@ -45,7 +57,7 @@
                 </div>
             </div>
             <div style="display: flex; gap: 10px; align-items: center;">
-                <button id="loadDraftBtn" class="btn btn-secondary" onclick="showLoadDraftDialog()" 
+                <button id="loadDraftBtn" class="btn btn-secondary" 
                         style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
                     📂 Load Draft
                 </button>
@@ -57,9 +69,17 @@
     <div id="observationMediaContent">
         <script>
         // Embed data from server (API-free approach)
-        window.observationMediaData = {{ observation_subfolder_media | tojson }};
-        window.observationSubfolders = {{ observation_subfolders | tojson }};
+        window.qualifications = {{ qualifications | tojson }};
+        window.learnersData = {}; // Will be populated dynamically
+        window.learnerMedia = {{ learner_media | tojson }};
+        window.selectedQualification = {{ selected_qualification | tojson }};
+        window.selectedLearner = {{ selected_learner | tojson }};
         window.observationMediaAssignments = {}; // Will store media assignments
+        
+        // Store learners for current qualification
+        {% if selected_qualification %}
+        window.learnersData['{{ selected_qualification }}'] = {{ learners | tojson }};
+        {% endif %}
         </script>
         
         <div class="observation-media-container">
@@ -91,12 +111,23 @@
                 </div>
                 <!-- Media Browser Content (Scrollable) -->
                 <div id="observationMediaGrid" class="media-browser-content">
-                    <p style="color: #999; text-align: center; padding: 20px;">Select a subfolder to view media</p>
+                    <p style="color: #999; text-align: center; padding: 20px;" id="mediaBrowserMessage">
+                        {% if not selected_qualification %}
+                        Please select a qualification and learner to view media
+                        {% elif not selected_learner %}
+                        Please select a learner to view media
+                        {% else %}
+                        Click Load to view media files
+                        {% endif %}
+                    </p>
                 </div>
             </div>
             
-            <!-- Right Panel: Preview & Text Editor -->
-            <div class="observation-media-right-panel">
+            <!-- Resizer 1: Between Media Browser and Live Preview -->
+            <div class="column-resizer" id="resizer1" onmousedown="startColumnResize(event, 1)"></div>
+            
+            <!-- Middle Panel: Live Preview -->
+            <div class="observation-media-middle-panel">
                 <!-- Live Preview Section -->
                 <div class="preview-section">
                     <div class="preview-section-header">
@@ -112,11 +143,6 @@
                                     ▶ Collapse All
                                 </button>
                             </div>
-                            <button id="reshuffleBtn" onclick="toggleReshuffleMode()" 
-                                    style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; display: none;"
-                                    title="Enable drag-and-drop to reorder media in tables">
-                                🔄 Reshuffle
-                            </button>
                         </div>
                     </div>
                     <div id="observationPreview" class="observation-preview preview-section-content" 
@@ -124,6 +150,84 @@
                          ondragover="handlePreviewDragOver(event)">
                         <p style="color: #999; text-align: center;">Start typing to see preview...</p>
                     </div>
+                </div>
+            </div>
+            
+            <!-- Resizer 2: Between Live Preview and Standards -->
+            <div class="column-resizer" id="resizer2" onmousedown="startColumnResize(event, 2)"></div>
+            
+            <!-- Right Panel: Standards -->
+            <div class="observation-media-right-panel">
+                <!-- Standards Section -->
+                <div class="standards-section">
+                    <div class="standards-section-header">
+                        <h3 style="color: #e0e0e0; margin: 0;">Standards</h3>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button onclick="expandAllStandardsUnits()" 
+                                    style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                ▼ Expand All
+                            </button>
+                            <button onclick="collapseAllStandardsUnits()" 
+                                    style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                ▶ Collapse All
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Search Bar -->
+                    <div class="standards-search-container">
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <span style="position: absolute; left: 12px; color: #999; font-size: 14px;">🔍</span>
+                            <input type="text" 
+                                   id="standardsSearchInput" 
+                                   class="standards-search-input"
+                                   placeholder="Search standards..."
+                                   oninput="handleStandardsSearch(this.value)"
+                                   onkeydown="if(event.key === 'Escape') clearStandardsSearch()">
+                            <button id="standardsSearchClear" 
+                                    onclick="clearStandardsSearch()"
+                                    class="standards-search-clear"
+                                    style="display: none;">
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+                    <div id="standardsContent" class="standards-section-content">
+                        <p style="color: #999; text-align: center; padding: 20px;">No draft loaded. Load a draft to view standards.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Header Section (Above Text Editor) -->
+    <div class="header-section collapsed" style="margin-top: 20px;">
+        <div class="header-section-header" onclick="toggleHeaderSection()" style="cursor: pointer;">
+            <h3 style="color: #e0e0e0; margin: 0; display: flex; align-items: center; gap: 10px;">
+                <span class="header-section-icon" style="font-size: 14px; transition: transform 0.3s ease;">▶</span>
+                <span>Header</span>
+            </h3>
+        </div>
+        <div class="header-section-content-wrapper">
+            <div class="header-section-content" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; padding: 15px;">
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <label style="color: #e0e0e0; font-size: 12px; font-weight: 500;">Learner:</label>
+                    <input type="text" id="headerLearner" class="header-field" placeholder="Enter learner name" style="padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <label style="color: #e0e0e0; font-size: 12px; font-weight: 500;">Assessor:</label>
+                    <input type="text" id="headerAssessor" class="header-field" value="roman chekanenko" placeholder="Enter assessor name" style="padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <label style="color: #e0e0e0; font-size: 12px; font-weight: 500;">Visit Date:</label>
+                    <input type="date" id="headerVisitDate" class="header-field" style="padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <label style="color: #e0e0e0; font-size: 12px; font-weight: 500;">Location:</label>
+                    <input type="text" id="headerLocation" class="header-field" placeholder="Enter location" style="padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px; grid-column: 1 / -1;">
+                    <label style="color: #e0e0e0; font-size: 12px; font-weight: 500;">Address:</label>
+                    <input type="text" id="headerAddress" class="header-field" placeholder="Enter address" style="padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
                 </div>
             </div>
         </div>
@@ -145,6 +249,14 @@
                     </div>
         <div class="editor-section-content-wrapper">
             <textarea id="observationTextEditor" class="observation-text-editor editor-section-content" placeholder="Enter text with placeholders like {{Placeholder_Name}}..."></textarea>
+        </div>
+    </div>
+    
+    <!-- Assessor Feedback Section -->
+    <div style="margin-top: 20px;">
+        <div style="background: #2a2a2a; border: 1px solid #555; border-radius: 6px; padding: 15px;">
+            <label for="assessorFeedback" style="display: block; color: #e0e0e0; font-size: 14px; font-weight: 500; margin-bottom: 10px;">Assessor Feedback:</label>
+            <textarea id="assessorFeedback" class="assessor-feedback-textarea" placeholder="Enter assessor feedback..." style="width: 100%; min-height: 150px; padding: 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px; font-family: inherit; resize: vertical;"></textarea>
         </div>
     </div>
     
@@ -178,77 +290,6 @@
                             disabled title="Redo">
                         ↷ Redo
                     </button>
-                    <div style="position: relative;">
-                        <button id="previewSettingsBtn" onclick="togglePreviewSettings()" 
-                                style="padding: 6px 12px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;" 
-                                title="Settings">
-                            ⚙️ Settings
-                        </button>
-                        <div id="previewSettingsMenu" class="preview-settings-menu" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 5px; background: #1e1e1e; border: 1px solid #555; border-radius: 6px; padding: 15px; min-width: 250px; z-index: 10001; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
-                            <!-- Font Settings -->
-                            <div style="margin-bottom: 15px;">
-                                <label style="display: block; color: #e0e0e0; font-size: 12px; font-weight: 500; margin-bottom: 8px;">Font Settings:</label>
-                                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
-                                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                                        <label style="color: #e0e0e0; font-size: 11px;">Size:</label>
-                                        <select id="previewFontSize" onchange="updatePreviewDisplay()" style="padding: 4px 8px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 12px;">
-                                            <option value="10pt">10pt</option>
-                                            <option value="11pt">11pt</option>
-                                            <option value="12pt">12pt</option>
-                                            <option value="13pt">13pt</option>
-                                            <option value="14pt">14pt</option>
-                                            <option value="16pt" selected>16pt</option>
-                                            <option value="18pt">18pt</option>
-                                        </select>
-                                    </div>
-                                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                                        <label style="color: #e0e0e0; font-size: 11px;">Type:</label>
-                                        <select id="previewFontType" onchange="updatePreviewDisplay()" style="padding: 4px 8px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 12px;">
-                                            <option value="'Times New Roman', serif" selected>Times New Roman</option>
-                                            <option value="Arial, sans-serif">Arial</option>
-                                            <option value="'Courier New', monospace">Courier New</option>
-                                            <option value="Georgia, serif">Georgia</option>
-                                            <option value="Verdana, sans-serif">Verdana</option>
-                                            <option value="'Calibri', sans-serif">Calibri</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Hide Elements -->
-                            <div id="hideElementsSection" style="border-top: 1px solid #555; padding-top: 15px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <label style="color: #e0e0e0; font-size: 12px; font-weight: 500;">Hide Elements:</label>
-                                    <div style="display: flex; gap: 6px;">
-                                        <button onclick="selectAllHideElements()" style="padding: 4px 8px; background: #555; color: #e0e0e0; border: 1px solid #666; border-radius: 3px; cursor: pointer; font-size: 11px;">Select All</button>
-                                        <button onclick="deselectAllHideElements()" style="padding: 4px 8px; background: #555; color: #e0e0e0; border: 1px solid #666; border-radius: 3px; cursor: pointer; font-size: 11px;">Deselect All</button>
-                                    </div>
-                                </div>
-                                <div id="hideElementsContent" style="display: flex; flex-direction: column; gap: 8px;">
-                                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
-                                        <input type="checkbox" id="hideSectionTitles" onchange="updatePreviewDisplay()" style="margin: 0;">
-                                        <span>Section Titles</span>
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
-                                        <input type="checkbox" id="hideAcCovered" onchange="updatePreviewDisplay()" style="margin: 0;">
-                                        <span>AC covered</span>
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
-                                        <input type="checkbox" id="hideImageSuggestion" onchange="updatePreviewDisplay()" style="margin: 0;">
-                                        <span>Image suggestion</span>
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
-                                        <input type="checkbox" id="hideParagraphNumbers" onchange="updatePreviewDisplay()" style="margin: 0;">
-                                        <span>Paragraph numbers</span>
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
-                                        <input type="checkbox" id="hideEmptyMediaFields" onchange="updatePreviewDisplay()" style="margin: 0;">
-                                        <span>Empty media fields</span>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                     <button onclick="closeDraftPreview()" style="background: none; border: none; color: #e0e0e0; font-size: 28px; cursor: pointer; padding: 0; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; border-radius: 4px; transition: background 0.2s;" 
                             onmouseover="this.style.background='#555'" onmouseout="this.style.background='none'">
                         ✕
@@ -256,7 +297,7 @@
                 </div>
             </div>
             
-            <!-- Two Column Layout: Sections Navigation + Preview Content -->
+            <!-- Three Column Layout: Sections Navigation + Preview Content + Settings -->
             <div id="previewColumnsContainer" style="display: flex; flex: 1; min-height: 0; gap: 0; position: relative;">
                 <!-- Left Column: Sections Navigation -->
                 <div id="previewSectionsNav" style="width: 250px; min-width: 200px; max-width: 400px; background: #1e1e1e; border: 1px solid #555; border-radius: 6px 0 0 6px; overflow-y: auto; flex-shrink: 0;">
@@ -268,15 +309,104 @@
                     </div>
                 </div>
                 
-                <!-- Resizable Divider -->
+                <!-- Resizable Divider 1 (between Sections and Preview) -->
                 <div id="previewResizer" style="width: 4px; background: #555; cursor: col-resize; flex-shrink: 0; position: relative;" 
                      onmousedown="startResizePreview(event)">
                     <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 2px; height: 30px; background: #999; border-radius: 1px;"></div>
                 </div>
                 
-                <!-- Right Column: Preview Content (Scrollable) - Dark Theme -->
-                <div id="draftPreviewContent" style="background: #1e1e1e; padding: 40px; min-height: 400px; color: #e0e0e0; font-family: 'Times New Roman', serif; font-size: 16pt; line-height: 1.5; overflow-y: auto; flex: 1; min-height: 0; border: 1px solid #555; border-left: none; border-radius: 0 6px 6px 0;">
+                <!-- Middle Column: Preview Content (Scrollable) - Dark Theme -->
+                <div id="draftPreviewContent" style="background: #1e1e1e; padding: 40px; min-height: 400px; color: #e0e0e0; font-family: 'Times New Roman', serif; font-size: 16pt; line-height: 1.5; overflow-y: auto; flex: 1; min-height: 0; border: 1px solid #555; border-left: none; border-right: none;">
                     <!-- Preview content will be inserted here -->
+                </div>
+                
+                <!-- Resizable Divider 2 (between Preview and Settings) -->
+                <div id="previewResizer2" style="width: 4px; background: #555; cursor: col-resize; flex-shrink: 0; position: relative;" 
+                     onmousedown="startResizePreview2(event)">
+                    <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 2px; height: 30px; background: #999; border-radius: 1px;"></div>
+                </div>
+                
+                <!-- Right Column: Settings (Always Visible) -->
+                <div id="previewSettingsColumn" style="width: 280px; min-width: 250px; max-width: 400px; background: #1e1e1e; border: 1px solid #555; border-radius: 0 6px 6px 0; overflow-y: auto; flex-shrink: 0;">
+                    <div style="padding: 15px; border-bottom: 1px solid #555;">
+                        <h3 style="color: #e0e0e0; margin: 0; font-size: 14px; font-weight: 600;">⚙️ Actions</h3>
+                    </div>
+                    <div style="padding: 15px;">
+                        <!-- Font Settings -->
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; color: #e0e0e0; font-size: 12px; font-weight: 500; margin-bottom: 10px;">Font Settings:</label>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <label style="color: #e0e0e0; font-size: 11px;">Size:</label>
+                                    <select id="previewFontSize" onchange="updatePreviewDisplay()" style="padding: 4px 8px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 12px;">
+                                        <option value="10pt">10pt</option>
+                                        <option value="11pt">11pt</option>
+                                        <option value="12pt">12pt</option>
+                                        <option value="13pt">13pt</option>
+                                        <option value="14pt">14pt</option>
+                                        <option value="16pt" selected>16pt</option>
+                                        <option value="18pt">18pt</option>
+                                    </select>
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <label style="color: #e0e0e0; font-size: 11px;">Type:</label>
+                                    <select id="previewFontType" onchange="updatePreviewDisplay()" style="padding: 4px 8px; background: #2a2a2a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 12px;">
+                                        <option value="'Times New Roman', serif" selected>Times New Roman</option>
+                                        <option value="Arial, sans-serif">Arial</option>
+                                        <option value="'Courier New', monospace">Courier New</option>
+                                        <option value="Georgia, serif">Georgia</option>
+                                        <option value="Verdana, sans-serif">Verdana</option>
+                                        <option value="'Calibri', sans-serif">Calibri</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Hide Elements -->
+                        <div id="hideElementsSection" style="border-top: 1px solid #555; padding-top: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <label style="color: #e0e0e0; font-size: 12px; font-weight: 500;">Hide Elements:</label>
+                                <div style="display: flex; gap: 6px;">
+                                    <button onclick="selectAllHideElements()" style="padding: 4px 8px; background: #555; color: #e0e0e0; border: 1px solid #666; border-radius: 3px; cursor: pointer; font-size: 11px;">All</button>
+                                    <button onclick="deselectAllHideElements()" style="padding: 4px 8px; background: #555; color: #e0e0e0; border: 1px solid #666; border-radius: 3px; cursor: pointer; font-size: 11px;">None</button>
+                                </div>
+                            </div>
+                            <div id="hideElementsContent" style="display: flex; flex-direction: column; gap: 8px;">
+                                <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
+                                    <input type="checkbox" id="hideSectionTitles" onchange="updatePreviewDisplay()" style="margin: 0;">
+                                    <span>Section Titles</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
+                                    <input type="checkbox" id="hideAcCovered" onchange="updatePreviewDisplay()" style="margin: 0;">
+                                    <span>AC covered</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
+                                    <input type="checkbox" id="hideImageSuggestion" onchange="updatePreviewDisplay()" style="margin: 0;">
+                                    <span>Image suggestion</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
+                                    <input type="checkbox" id="hideParagraphNumbers" onchange="updatePreviewDisplay()" style="margin: 0;">
+                                    <span>Paragraph numbers</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
+                                    <input type="checkbox" id="hideEmptyMediaFields" onchange="updatePreviewDisplay()" style="margin: 0;">
+                                    <span>Empty media fields</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
+                                    <input type="checkbox" id="trimEmptyParagraphs" onchange="updatePreviewDisplay()" style="margin: 0;">
+                                    <span>Trim empty paragraphs</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
+                                    <input type="checkbox" id="showHeader" onchange="updatePreviewDisplay()" style="margin: 0;">
+                                    <span>Show header</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; color: #e0e0e0; cursor: pointer; font-size: 12px;">
+                                    <input type="checkbox" id="showAssessorFeedback" onchange="updatePreviewDisplay()" style="margin: 0;">
+                                    <span>Show assessor feedback</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -381,65 +511,1280 @@
 {% block scripts %}
 <script>
 // Define essential functions inline to ensure they're always available
-function loadObservationMedia() {
-    const subfolder = document.getElementById('observationSubfolderSelect').value;
+
+/**
+ * Handle qualification dropdown change
+ */
+function handleQualificationChange() {
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
     
-    if (!subfolder) {
-        document.getElementById('observationMediaGrid').innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Please select a subfolder</p>';
-        document.getElementById('observationMediaCount').textContent = '0 files';
+    if (!qualificationSelect || !learnerSelect) {
+        console.error('Qualification or learner select elements not found');
         return;
     }
     
-    // Get media from embedded data (API-free)
-    if (!window.observationMediaData) {
-        document.getElementById('observationMediaGrid').innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Media data not loaded</p>';
-        return;
-    }
+    const qualification = qualificationSelect.value;
     
-    const mediaFiles = window.observationMediaData[subfolder] || [];
+    // Clear learner selection
+    learnerSelect.innerHTML = '<option value="">Select Learner...</option>';
+    learnerSelect.disabled = !qualification;
+    learnerSelect.style.color = qualification ? '#e0e0e0' : '#999';
     
-    // Display media
-    if (typeof displayObservationMedia === 'function') {
-        displayObservationMedia(mediaFiles);
-    } else if (typeof window.displayObservationMedia === 'function') {
-        window.displayObservationMedia(mediaFiles);
+    // Clear media browser
+    const grid = document.getElementById('observationMediaGrid');
+    const message = document.getElementById('mediaBrowserMessage');
+    if (message) {
+        message.textContent = qualification ? 'Please select a learner to view media' : 'Please select a qualification and learner to view media';
     } else {
-        document.getElementById('observationMediaGrid').innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Display function not available</p>';
+        grid.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;" id="mediaBrowserMessage">' + 
+            (qualification ? 'Please select a learner to view media' : 'Please select a qualification and learner to view media') + '</p>';
+    }
+    document.getElementById('observationMediaCount').textContent = '0 files';
+    
+    if (!qualification) {
         return;
     }
     
-    document.getElementById('observationMediaCount').textContent = `${mediaFiles.length} files`;
+    // Load learners for selected qualification
+    if (window.learnersData[qualification]) {
+        // Use cached data
+        populateLearnerDropdown(window.learnersData[qualification]);
+    } else {
+        // Fetch learners from server
+        fetch(`/v2p-formatter/media-converter/observation-media/learners?qualification=${encodeURIComponent(qualification)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.learnersData[qualification] = data.learners;
+                    populateLearnerDropdown(data.learners);
+                } else {
+                    console.error('Failed to load learners:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error loading learners:', error);
+            });
+    }
+}
+
+/**
+ * Populate learner dropdown
+ */
+function populateLearnerDropdown(learners) {
+    const learnerSelect = document.getElementById('learnerSelect');
+    if (!learnerSelect) {
+        console.error('Learner select element not found');
+        return;
+    }
+    
+    learnerSelect.innerHTML = '<option value="">Select Learner...</option>';
+    
+    learners.forEach(learner => {
+        const option = document.createElement('option');
+        option.value = learner;
+        option.textContent = learner;
+        learnerSelect.appendChild(option);
+    });
+    
+    learnerSelect.disabled = false;
+    learnerSelect.style.color = '#e0e0e0';
+    
+    console.log('Learner dropdown populated with', learners.length, 'learners');
+    
+    // Re-setup all event listeners after repopulating dropdown
+    if (typeof setupObservationMediaEventListeners === 'function') {
+        setupObservationMediaEventListeners();
+    }
+    
+    // If a learner is already selected (e.g., from URL parameter), call loadObservationMedia directly
+    // instead of triggering change event to avoid race conditions
+    setTimeout(() => {
+        if (learnerSelect.value) {
+            console.log('Learner already selected:', learnerSelect.value, '- calling loadObservationMedia directly');
+            const qualificationSelect = document.getElementById('qualificationSelect');
+            if (qualificationSelect && qualificationSelect.value) {
+                if (typeof window !== 'undefined' && typeof window.loadObservationMedia === 'function') {
+                    try {
+                        window.loadObservationMedia();
+                    } catch (e) {
+                        console.error('Error calling loadObservationMedia:', e);
+                    }
+                } else {
+                    console.warn('loadObservationMedia not available yet');
+                }
+            }
+        }
+    }, 200);
+}
+
+/**
+ * Handle learner dropdown change
+ */
+function handleLearnerChange(event) {
+    console.log('handleLearnerChange called', event);
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    
+    if (!qualificationSelect || !learnerSelect) {
+        console.error('Qualification or learner select elements not found');
+        return;
+    }
+    
+    const qualification = qualificationSelect.value;
+    const learner = learnerSelect.value;
+    
+    console.log('Selected qualification:', qualification, 'learner:', learner);
+    
+    // Auto-load media when both qualification and learner are selected
+    if (qualification && learner) {
+        console.log('Both qualification and learner selected, calling loadObservationMedia...');
+        // Don't clear the grid here - let loadObservationMedia handle it
+        if (typeof window !== 'undefined' && typeof window.loadObservationMedia === 'function') {
+            try {
+                window.loadObservationMedia();
+            } catch (e) {
+                console.error('Error calling loadObservationMedia:', e);
+            }
+        } else {
+            console.warn('loadObservationMedia not available yet');
+        }
+    } else {
+        console.log('Missing qualification or learner, clearing media browser');
+        // Only clear if we're not currently loading
+        const grid = document.getElementById('observationMediaGrid');
+        const message = document.getElementById('mediaBrowserMessage');
+        if (grid && message && !message.textContent.includes('Loading')) {
+            // Update message
+            if (message) {
+                message.textContent = 'Please select a learner to view media';
+            }
+            // Clear media browser
+            if (grid) {
+                grid.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;" id="mediaBrowserMessage">Please select a learner to view media</p>';
+            }
+            const countEl = document.getElementById('observationMediaCount');
+            if (countEl) {
+                countEl.textContent = '0 files';
+            }
+        }
+    }
+}
+
+/**
+ * Load observation media for selected qualification and learner
+ */
+function loadObservationMedia() {
+    console.log('loadObservationMedia called');
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    
+    if (!qualificationSelect || !learnerSelect) {
+        console.error('Qualification or learner select elements not found');
+        return;
+    }
+    
+    const qualification = qualificationSelect.value;
+    const learner = learnerSelect.value;
+    
+    console.log('Loading media for qualification:', qualification, 'learner:', learner);
+    
+    if (!qualification || !learner) {
+        console.warn('Missing qualification or learner');
+        const message = document.getElementById('mediaBrowserMessage');
+        if (message) {
+            message.textContent = 'Please select both qualification and learner';
+        }
+        const countEl = document.getElementById('observationMediaCount');
+        if (countEl) {
+            countEl.textContent = '0 files';
+        }
+        return;
+    }
+    
+    // Update URL without reload
+    const url = new URL(window.location);
+    url.searchParams.set('qualification', qualification);
+    url.searchParams.set('learner', learner);
+    window.history.pushState({}, '', url);
+    
+    // Show loading message
+    const grid = document.getElementById('observationMediaGrid');
+    if (grid) {
+        grid.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;" id="mediaBrowserMessage">Loading media files...</p>';
+        console.log('Set loading message in grid');
+    } else {
+        console.error('observationMediaGrid not found!');
+    }
+    
+    const fetchUrl = `/v2p-formatter/media-converter/observation-media/media?qualification=${encodeURIComponent(qualification)}&learner=${encodeURIComponent(learner)}`;
+    console.log('Fetching media from:', fetchUrl);
+    
+    // Add timeout to fetch
+    const fetchWithTimeout = (url, options = {}, timeout = 30000) => {
+        return Promise.race([
+            fetch(url, options),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Request timeout')), timeout)
+            )
+        ]);
+    };
+    
+    // Load media from server
+    fetchWithTimeout(fetchUrl, {}, 30000)
+        .then(response => {
+            console.log('Fetch response received, status:', response.status, response.statusText);
+            if (!response.ok) {
+                // Try to get error message from response
+                return response.json().then(errData => {
+                    throw new Error(errData.error || `HTTP ${response.status}: ${response.statusText}`);
+                }).catch(() => {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Media data received:', data);
+            console.log('Success:', data.success, 'Media count:', data.media ? data.media.length : 0);
+            
+            // Handle case where data.success is false or undefined
+            if (!data || data.success === false) {
+                console.error('Media load failed:', data?.error || 'Unknown error');
+                const grid = document.getElementById('observationMediaGrid');
+                if (grid) {
+                    grid.innerHTML = `<p style="color: #999; text-align: center; padding: 20px;" id="mediaBrowserMessage">Error: ${data?.error || 'Failed to load media'}</p>`;
+                }
+                const countEl = document.getElementById('observationMediaCount');
+                if (countEl) {
+                    countEl.textContent = '0 files';
+                }
+                return;
+            }
+            
+            if (data.success) {
+                const mediaFiles = data.media || [];
+                console.log('Media files count:', mediaFiles.length);
+                
+                if (mediaFiles.length === 0) {
+                    console.warn('No media files returned');
+                    const grid = document.getElementById('observationMediaGrid');
+                    if (grid) {
+                        grid.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;" id="mediaBrowserMessage">No media files found</p>';
+                    }
+                    const countEl = document.getElementById('observationMediaCount');
+                    if (countEl) {
+                        countEl.textContent = '0 files';
+                    }
+                    return;
+                }
+                
+                // Display media
+                console.log('Calling displayObservationMedia with', mediaFiles.length, 'files');
+                if (typeof displayObservationMedia === 'function') {
+                    displayObservationMedia(mediaFiles);
+                    console.log('displayObservationMedia called successfully');
+                } else if (typeof window.displayObservationMedia === 'function') {
+                    window.displayObservationMedia(mediaFiles);
+                    console.log('window.displayObservationMedia called successfully');
+                } else {
+                    console.error('displayObservationMedia function not found');
+                    const grid = document.getElementById('observationMediaGrid');
+                    if (grid) {
+                        grid.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Display function not available</p>';
+                    }
+                    return;
+                }
+                
+                    // Count will be updated by displayObservationMedia, don't set it here
+                    // This prevents incorrect counts from cached data
+            } else {
+                console.error('Media load failed:', data.error);
+                const grid = document.getElementById('observationMediaGrid');
+                if (grid) {
+                    grid.innerHTML = `<p style="color: #999; text-align: center; padding: 20px;" id="mediaBrowserMessage">Error: ${data.error || 'Failed to load media'}</p>`;
+                }
+                const countEl = document.getElementById('observationMediaCount');
+                if (countEl) {
+                    countEl.textContent = '0 files';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error loading media:', error);
+            console.error('Error name:', error.name);
+            console.error('Error message:', error.message);
+            if (error.stack) {
+                console.error('Error stack:', error.stack);
+            }
+            const grid = document.getElementById('observationMediaGrid');
+            if (grid) {
+                const errorMsg = error.message || 'Unknown error';
+                // Simple HTML escaping
+                const escapedMsg = errorMsg.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                grid.innerHTML = '<p style="color: #ff6b6b; text-align: center; padding: 20px;" id="mediaBrowserMessage">Error loading media files: ' + escapedMsg + '</p>';
+            }
+            const countEl = document.getElementById('observationMediaCount');
+            if (countEl) {
+                countEl.textContent = '0 files';
+            }
+        });
 }
 
 // Make it globally available immediately
 window.loadObservationMedia = loadObservationMedia;
+window.handleQualificationChange = handleQualificationChange;
+window.handleLearnerChange = handleLearnerChange;
+
+// Set up event listeners - use both DOMContentLoaded and immediate setup
+function setupObservationMediaEventListeners() {
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    
+    if (qualificationSelect) {
+        // Create a named function so we can remove it properly
+        const qualificationChangeHandler = function(e) {
+            console.log('Qualification dropdown change event fired, value:', qualificationSelect.value);
+            handleQualificationChange(e);
+        };
+        // Remove existing listener to avoid duplicates
+        qualificationSelect.removeEventListener('change', qualificationChangeHandler);
+        qualificationSelect.addEventListener('change', qualificationChangeHandler);
+        console.log('Qualification select event listener attached');
+    }
+    
+    if (learnerSelect) {
+        // Create a wrapper to prevent multiple calls
+        let isHandlingChange = false;
+        const learnerChangeWrapper = function(e) {
+            if (isHandlingChange) {
+                console.log('handleLearnerChange already in progress, skipping');
+                return;
+            }
+            isHandlingChange = true;
+            console.log('Learner dropdown change event fired, value:', learnerSelect.value);
+            try {
+                handleLearnerChange(e);
+            } finally {
+                // Reset flag after a short delay to allow async operations
+                setTimeout(() => {
+                    isHandlingChange = false;
+                }, 1000);
+            }
+        };
+        // Remove existing listener to avoid duplicates
+        learnerSelect.removeEventListener('change', learnerChangeWrapper);
+        learnerSelect.addEventListener('change', learnerChangeWrapper);
+        console.log('Learner select event listener attached');
+    }
+}
+
+// Set up event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    setupObservationMediaEventListeners();
+    
+    // Auto-load if both are selected (from URL parameters)
+    if (window.selectedQualification && window.selectedLearner) {
+        const qualificationSelect = document.getElementById('qualificationSelect');
+        const learnerSelect = document.getElementById('learnerSelect');
+        
+        // Trigger change events to populate dropdowns
+        if (qualificationSelect && qualificationSelect.value === window.selectedQualification) {
+            handleQualificationChange();
+            // Wait a bit for learner dropdown to populate
+            setTimeout(() => {
+                if (learnerSelect && learnerSelect.value === window.selectedLearner) {
+                    handleLearnerChange(); // This will auto-load
+                }
+            }, 200);
+        }
+    }
+});
 
 // Define loadSelectedSubfolder inline to ensure it's always available
 function loadSelectedSubfolder() {
-    const subfolderSelect = document.getElementById('observationSubfolderSelect');
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
     
-    if (!subfolderSelect) {
-        alert('Error: Subfolder selector not found. Please refresh the page.');
+    if (!qualificationSelect || !learnerSelect) {
+        alert('Error: Dropdown selectors not found. Please refresh the page.');
         return;
     }
-    
-    const subfolder = subfolderSelect.value;
-    
-    if (!subfolder) {
-        alert('Please select a subfolder first');
+
+    const qualification = qualificationSelect.value;
+    const learner = learnerSelect.value;
+
+    if (!qualification || !learner) {
+        alert('Please select both qualification and learner first');
         return;
     }
-    
-    // Reload the page with subfolder query parameter to auto-select it
-    // This will trigger a server-side re-scan of all subfolders
-    window.location.href = `/v2p-formatter/observation-media?subfolder=${encodeURIComponent(subfolder)}`;
+
+    // Reload the page with qualification and learner query parameters
+    window.location.href = `/v2p-formatter/observation-media?qualification=${encodeURIComponent(qualification)}&learner=${encodeURIComponent(learner)}`;
 }
 
 // Make it globally available immediately
 window.loadSelectedSubfolder = loadSelectedSubfolder;
 </script>
+<script>
+// Define showLoadDraftDialog function inline to ensure it's available immediately
+function showLoadDraftDialog() {
+    // Load list of drafts
+    fetch('/v2p-formatter/media-converter/observation-media/drafts')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.drafts.length > 0) {
+                // Call the function from the external script if available, otherwise use inline version
+                if (typeof window.showDraftSelectionDialog === 'function') {
+                    window.showDraftSelectionDialog(data.drafts);
+                } else {
+                    // Fallback: simple alert with draft list
+                    const draftList = data.drafts.map(d => `- ${d.name}`).join('\n');
+                    const selected = prompt(`Select a draft to load:\n\n${draftList}\n\nEnter draft name:`, '');
+                    if (selected) {
+                        const draft = data.drafts.find(d => d.name === selected);
+                        if (draft && typeof window.loadDraft === 'function') {
+                            window.loadDraft(draft.id);
+                        } else {
+                            alert('Error: Cannot load draft. Please refresh the page.');
+                        }
+                    }
+                }
+            } else {
+                alert('No drafts found.');
+            }
+        })
+        .catch(error => {
+            console.error('Load drafts error:', error);
+            alert(`Error loading drafts: ${error.message}`);
+        });
+}
+// Make it available globally immediately
+window.showLoadDraftDialog = showLoadDraftDialog;
+
+// Define showDraftSelectionDialog function inline to ensure it's available immediately
+function showDraftSelectionDialog(drafts) {
+    // Create backdrop overlay
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 9999;
+    `;
+    backdrop.onclick = function() {
+        closeDraftDialog();
+    };
+    document.body.appendChild(backdrop);
+
+    const dialog = document.createElement('div');
+    dialog.className = 'draft-selection-dialog';
+    dialog.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #2a2a2a;
+        border: 2px solid #667eea;
+        border-radius: 8px;
+        padding: 25px;
+        z-index: 10000;
+        min-width: 550px;
+        max-width: 700px;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    `;
+    dialog.onclick = function(e) {
+        e.stopPropagation();
+    };
+
+    let dialogHTML = `
+        <h3 style="color: #e0e0e0; margin-bottom: 20px; font-size: 18px; border-bottom: 1px solid #555; padding-bottom: 10px;">Select a draft to load</h3>
+        <div style="max-height: 400px; overflow-y: auto;">
+    `;
+
+    drafts.forEach(draft => {
+        const date = new Date(draft.updated_at || draft.created_at);
+        const dateStr = date.toLocaleString();
+        // Escape draft ID for use in HTML attributes
+        const draftIdEscaped = String(draft.id).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+        dialogHTML += `
+            <div class="draft-item" 
+                 style="padding: 12px; margin-bottom: 8px; background: #1e1e1e; border: 1px solid #555; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="flex: 1;">
+                        <div style="color: #e0e0e0; font-weight: bold; margin-bottom: 4px;">${escapeHtml(draft.name)}</div>
+                        <div style="color: #999; font-size: 11px;">
+                            Updated: ${dateStr}
+                            ${draft.selected_subfolder ? ` • Subfolder: ${escapeHtml(draft.selected_subfolder)}` : ''}
+                            ${draft.placeholder_count ? ` • ${draft.placeholder_count} placeholders` : ''}
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px; margin-left: 15px;">
+                        <button onclick="event.stopPropagation(); handleLoadDraft('${draftIdEscaped}');" 
+                                style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 0.2s;"
+                                onmouseover="this.style.background='#5568d3'"
+                                onmouseout="this.style.background='#667eea'">
+                            Load
+                        </button>
+                        <button onclick="event.stopPropagation(); handleDeleteDraft('${draftIdEscaped}');" 
+                                style="padding: 8px 16px; background: #ff6b6b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 0.2s;"
+                                onmouseover="this.style.background='#ee5a5a'"
+                                onmouseout="this.style.background='#ff6b6b'">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    dialogHTML += `
+        </div>
+        <div style="margin-top: 15px; text-align: right;">
+            <button onclick="closeDraftDialog()" 
+                    style="padding: 8px 16px; background: #555; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                Cancel
+            </button>
+        </div>
+    `;
+
+    dialog.innerHTML = dialogHTML;
+    document.body.appendChild(dialog);
+
+    // Store dialog and backdrop references
+    window.currentDraftDialog = dialog;
+    backdrop.className = 'draft-selection-backdrop';
+}
+
+function closeDraftDialog() {
+    if (window.currentDraftDialog) {
+        window.currentDraftDialog.remove();
+        window.currentDraftDialog = null;
+    }
+    // Remove backdrop if it exists
+    const backdrop = document.querySelector('.draft-selection-backdrop');
+    if (backdrop) {
+        backdrop.remove();
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Simple fallback preview update function
+function updatePreviewSimple() {
+    try {
+        const preview = document.getElementById('observationPreview');
+        const editor = document.getElementById('observationTextEditor');
+        if (preview && editor) {
+            const text = editor.value || '';
+            // Simple HTML escape and line break conversion
+            // Also handle placeholders with basic styling
+            let html = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\n/g, '<br>')
+                .replace(/\{\{([^}]+)\}\}/g, function(match, p1) {
+                    return '<span style="background: #667eea; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold;">{{' + p1 + '}}</span>';
+                });
+            preview.innerHTML = html || '<p style="color: #999;">No content</p>';
+            console.log('updatePreviewSimple: Preview updated');
+        }
+    } catch (e) {
+        console.error('updatePreviewSimple: Error updating preview:', e);
+    }
+}
+
+// Inline clearCurrentDraft function
+function clearCurrentDraftInline() {
+    console.log('clearCurrentDraftInline: Clearing draft');
+    // Clear draft info
+    if (!window.currentDraft) {
+        window.currentDraft = { id: null, name: null, selected_subfolder: null, qualification: null, learner: null };
+    }
+    window.currentDraft.id = null;
+    window.currentDraft.name = null;
+    window.currentDraft.selected_subfolder = null;
+    window.currentDraft.qualification = null;
+    window.currentDraft.learner = null;
+    
+    // Clear localStorage
+    try {
+        localStorage.removeItem('observationMediaCurrentDraftId');
+    } catch (e) {
+        console.warn('Failed to clear draft ID from localStorage:', e);
+    }
+    
+    // Clear text editor
+    const editor = document.getElementById('observationTextEditor');
+    if (editor) {
+        editor.value = '';
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    
+    // Clear header fields
+    const headerFields = ['headerLearner', 'headerAssessor', 'headerVisitDate', 'headerLocation', 'headerAddress'];
+    headerFields.forEach(id => {
+        const field = document.getElementById(id);
+        if (field) field.value = '';
+    });
+    
+    // Clear assessor feedback
+    const feedbackField = document.getElementById('assessorFeedback');
+    if (feedbackField) {
+        feedbackField.value = '';
+    }
+    
+    // Clear assignments
+    if (window.observationMediaAssignments) {
+        window.observationMediaAssignments = {};
+    }
+    
+    // Update preview
+    try {
+        if (typeof window !== 'undefined' && typeof window.updatePreview === 'function') {
+            window.updatePreview();
+        } else {
+            updatePreviewSimple();
+        }
+    } catch (e) {
+        console.error('clearCurrentDraftInline: Error updating preview:', e);
+        updatePreviewSimple();
+    }
+    
+    // Update draft display
+    try {
+        if (typeof window !== 'undefined' && typeof window.updateCurrentDraftDisplay === 'function') {
+            window.updateCurrentDraftDisplay();
+        } else {
+            const display = document.getElementById('currentDraftDisplay');
+            if (display) {
+                display.style.display = 'none';
+            }
+        }
+    } catch (e) {
+        console.error('clearCurrentDraftInline: Error updating draft display:', e);
+        const display = document.getElementById('currentDraftDisplay');
+        if (display) {
+            display.style.display = 'none';
+        }
+    }
+    
+    // Clear standards
+    try {
+        if (typeof window !== 'undefined' && typeof window.clearStandards === 'function') {
+            window.clearStandards();
+        } else {
+            const standardsContent = document.getElementById('standardsContent');
+            if (standardsContent) {
+                standardsContent.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No draft loaded. Load a draft to view standards.</p>';
+            }
+        }
+    } catch (e) {
+        console.error('clearCurrentDraftInline: Error clearing standards:', e);
+        const standardsContent = document.getElementById('standardsContent');
+        if (standardsContent) {
+            standardsContent.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No draft loaded. Load a draft to view standards.</p>';
+        }
+    }
+    
+    console.log('clearCurrentDraftInline: Draft cleared');
+}
+
+// Wrapper for clearCurrentDraft
+function clearCurrentDraft() {
+    if (typeof window.clearCurrentDraft === 'function') {
+        try {
+            window.clearCurrentDraft();
+        } catch (e) {
+            console.error('Error calling external clearCurrentDraft:', e);
+            clearCurrentDraftInline();
+        }
+    } else {
+        clearCurrentDraftInline();
+    }
+}
+
+// Make available globally immediately
+window.clearCurrentDraft = clearCurrentDraft;
+
+function loadDraftInline(draftId) {
+    if (!draftId) {
+        alert('Error: No draft ID provided');
+        return;
+    }
+    
+    console.log('loadDraftInline: Loading draft', draftId);
+    
+    fetch(`/v2p-formatter/media-converter/observation-media/drafts/${draftId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.draft) {
+                try {
+                    const draft = data.draft;
+                    console.log('loadDraftInline: Draft loaded', draft.name);
+
+                // Store current draft info
+                if (!window.currentDraft) {
+                    window.currentDraft = { id: null, name: null, selected_subfolder: null, qualification: null, learner: null };
+                }
+                window.currentDraft.id = draftId;
+                window.currentDraft.name = draft.name;
+                window.currentDraft.selected_subfolder = draft.selected_subfolder || null;
+                window.currentDraft.qualification = draft.qualification || null;
+                window.currentDraft.learner = draft.learner || null;
+                console.log('loadDraftInline: Stored draft info:', {
+                    id: window.currentDraft.id,
+                    name: window.currentDraft.name,
+                    qualification: window.currentDraft.qualification,
+                    learner: window.currentDraft.learner,
+                    selected_subfolder: window.currentDraft.selected_subfolder
+                });
+                
+                // IMPORTANT: Clear old media data when loading a new draft to avoid incorrect counts
+                // This ensures the media browser only shows files from this draft's learner path
+                if (window.observationMediaData) {
+                    const oldKeys = Object.keys(window.observationMediaData);
+                    console.log('loadDraftInline: Clearing', oldKeys.length, 'old media data keys');
+                    // Clear all old data - it will be reloaded for this draft's path
+                    window.observationMediaData = {};
+                }
+                
+                // Update draft display immediately
+                setTimeout(() => {
+                    if (typeof window !== 'undefined' && typeof window.updateCurrentDraftDisplay === 'function') {
+                        console.log('loadDraftInline: Calling updateCurrentDraftDisplay');
+                        try {
+                            window.updateCurrentDraftDisplay();
+                        } catch (e) {
+                            console.error('loadDraftInline: Error calling updateCurrentDraftDisplay:', e);
+                            // Manual fallback
+                            const display = document.getElementById('currentDraftDisplay');
+                            const nameSpan = document.getElementById('currentDraftName');
+                            if (display && nameSpan) {
+                                display.style.display = 'block';
+                                nameSpan.textContent = draft.name;
+                            }
+                        }
+                    } else {
+                        console.warn('loadDraftInline: updateCurrentDraftDisplay not available, trying manual update');
+                        // Manual fallback: update draft display manually
+                        const display = document.getElementById('currentDraftDisplay');
+                        const nameSpan = document.getElementById('currentDraftName');
+                        if (display && nameSpan) {
+                            display.style.display = 'block';
+                            nameSpan.textContent = draft.name;
+                        }
+                    }
+                }, 50);
+                
+                // Save draft ID to localStorage
+                try {
+                    localStorage.setItem('observationMediaCurrentDraftId', draftId);
+                } catch (e) {
+                    console.warn('Failed to save draft ID to localStorage:', e);
+                }
+
+                // Load text content
+                const editor = document.getElementById('observationTextEditor');
+                if (editor) {
+                    editor.value = draft.text_content || '';
+                    // Trigger multiple events to ensure all listeners are notified
+                    editor.dispatchEvent(new Event('input', { bubbles: true }));
+                    editor.dispatchEvent(new Event('change', { bubbles: true }));
+                    // Also trigger keyup to simulate typing (some listeners use this)
+                    editor.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+                    console.log('loadDraftInline: Text content loaded', draft.text_content ? draft.text_content.length + ' chars' : 'empty');
+                    
+                    // Immediately try to update preview if function is available
+                    // Retry multiple times in case external script hasn't loaded yet
+                    let retryCount = 0;
+                    const maxRetries = 10;
+                    const tryUpdatePreview = () => {
+                        if (typeof window !== 'undefined' && typeof window.updatePreview === 'function') {
+                            console.log('loadDraftInline: Calling updatePreview immediately after text load');
+                            try {
+                                window.updatePreview();
+                            } catch (e) {
+                                console.error('loadDraftInline: Error calling updatePreview:', e);
+                                updatePreviewSimple();
+                            }
+                        } else if (retryCount < maxRetries) {
+                            retryCount++;
+                            setTimeout(tryUpdatePreview, 200);
+                        } else {
+                            console.warn('loadDraftInline: updatePreview not available after retries, using simple fallback');
+                            updatePreviewSimple();
+                        }
+                    };
+                    setTimeout(tryUpdatePreview, 100);
+                } else {
+                    console.warn('loadDraftInline: Text editor not found');
+                }
+
+                // Load header fields
+                if (draft.header_data) {
+                    const headerData = draft.header_data;
+                    const headerFields = {
+                        'headerLearner': headerData.learner || '',
+                        'headerAssessor': headerData.assessor || '',
+                        'headerVisitDate': headerData.visit_date || '',
+                        'headerLocation': headerData.location || '',
+                        'headerAddress': headerData.address || ''
+                    };
+                    Object.keys(headerFields).forEach(id => {
+                        const field = document.getElementById(id);
+                        if (field) field.value = headerFields[id];
+                    });
+                }
+                
+                // Load assessor feedback
+                if (draft.assessor_feedback !== undefined) {
+                    const feedbackField = document.getElementById('assessorFeedback');
+                    if (feedbackField) {
+                        feedbackField.value = draft.assessor_feedback || '';
+                    }
+                }
+
+                // Load assignments
+                if (!window.observationMediaAssignments) {
+                    window.observationMediaAssignments = {};
+                }
+                window.observationMediaAssignments = draft.assignments || {};
+
+                // Restore qualification and learner FIRST if saved in draft
+                // This must happen before loading subfolder
+                if (draft.qualification) {
+                    const qualificationSelect = document.getElementById('qualificationSelect');
+                    if (qualificationSelect) {
+                        qualificationSelect.value = draft.qualification;
+                        qualificationSelect.dispatchEvent(new Event('change'));
+                    }
+                }
+                
+                // Wait for qualification to load, then set learner
+                if (draft.learner) {
+                    const learnerSelect = document.getElementById('learnerSelect');
+                    if (learnerSelect) {
+                        setTimeout(() => {
+                            learnerSelect.value = draft.learner;
+                            learnerSelect.dispatchEvent(new Event('change'));
+                            
+                            // After learner is set, wait for media to load, then set subfolder
+                            setTimeout(() => {
+                                // Load selected subfolder AFTER qualification/learner are set
+                                if (draft.selected_subfolder) {
+                                    const select = document.getElementById('observationSubfolderSelect');
+                                    if (select) {
+                                        // Wait a bit for subfolder options to populate
+                                        setTimeout(() => {
+                                            select.value = draft.selected_subfolder;
+                                            // Trigger change event to load media for that subfolder
+                                            select.dispatchEvent(new Event('change'));
+                                            
+                                            // Also ensure media loads - retry if displayObservationMedia not available
+                                            let mediaRetryCount = 0;
+                                            const maxMediaRetries = 15;
+                                            const tryLoadMedia = () => {
+                                                if (typeof loadObservationMedia === 'function') {
+                                                    console.log('loadDraftInline: Calling loadObservationMedia after subfolder set');
+                                                    try {
+                                                        loadObservationMedia();
+                                                    } catch (e) {
+                                                        console.error('loadDraftInline: Error calling loadObservationMedia:', e);
+                                                    }
+                                                } else if (typeof window.loadObservationMedia === 'function') {
+                                                    console.log('loadDraftInline: Calling window.loadObservationMedia');
+                                                    try {
+                                                        window.loadObservationMedia();
+                                                    } catch (e) {
+                                                        console.error('loadDraftInline: Error calling window.loadObservationMedia:', e);
+                                                    }
+                                                } else if (mediaRetryCount < maxMediaRetries) {
+                                                    mediaRetryCount++;
+                                                    setTimeout(tryLoadMedia, 400);
+                                                } else {
+                                                    console.warn('loadDraftInline: loadObservationMedia not available after retries');
+                                                }
+                                            };
+                                            setTimeout(tryLoadMedia, 800);
+                                        }, 1000);
+                                    }
+                                } else {
+                                    // No subfolder, but still try to load media
+                                    let mediaRetryCount = 0;
+                                    const maxMediaRetries = 15;
+                                    const tryLoadMedia = () => {
+                                        if (typeof loadObservationMedia === 'function' || typeof window.loadObservationMedia === 'function') {
+                                            const func = typeof loadObservationMedia === 'function' ? loadObservationMedia : window.loadObservationMedia;
+                                            console.log('loadDraftInline: Calling loadObservationMedia (no subfolder)');
+                                            try {
+                                                func();
+                                            } catch (e) {
+                                                console.error('loadDraftInline: Error calling loadObservationMedia:', e);
+                                            }
+                                        } else if (mediaRetryCount < maxMediaRetries) {
+                                            mediaRetryCount++;
+                                            setTimeout(tryLoadMedia, 400);
+                                        }
+                                    };
+                                    setTimeout(tryLoadMedia, 1500);
+                                }
+                                
+                                // Update UI functions after everything is loaded
+                                // Use retry mechanism to wait for external functions
+                                let uiRetryCount = 0;
+                                const maxUIRetries = 15;
+                                const tryUpdateUI = () => {
+                                    console.log('loadDraftInline: Updating UI functions (attempt ' + (uiRetryCount + 1) + ')');
+                                    let allAvailable = true;
+                                    
+                                    // Update preview first
+                                    if (typeof window !== 'undefined' && typeof window.updatePreview === 'function') {
+                                        console.log('loadDraftInline: Calling updatePreview');
+                                        try {
+                                            window.updatePreview();
+                                        } catch (e) {
+                                            console.error('loadDraftInline: Error calling updatePreview:', e);
+                                            updatePreviewSimple();
+                                        }
+                                    } else {
+                                        console.warn('loadDraftInline: updatePreview not available, using simple fallback');
+                                        updatePreviewSimple();
+                                        allAvailable = false;
+                                    }
+                                    // Then highlight placeholders
+                                    if (typeof window !== 'undefined' && typeof window.highlightPlaceholdersInEditor === 'function') {
+                                        console.log('loadDraftInline: Calling highlightPlaceholdersInEditor');
+                                        try {
+                                            window.highlightPlaceholdersInEditor();
+                                        } catch (e) {
+                                            console.error('loadDraftInline: Error calling highlightPlaceholdersInEditor:', e);
+                                        }
+                                    } else {
+                                        allAvailable = false;
+                                    }
+                                    // Update media card states
+                                    if (typeof window !== 'undefined' && typeof window.updateMediaCardStates === 'function') {
+                                        console.log('loadDraftInline: Calling updateMediaCardStates');
+                                        try {
+                                            window.updateMediaCardStates();
+                                        } catch (e) {
+                                            console.error('loadDraftInline: Error calling updateMediaCardStates:', e);
+                                        }
+                                    }
+                                    // Update draft display
+                                    if (typeof window !== 'undefined' && typeof window.updateCurrentDraftDisplay === 'function') {
+                                        console.log('loadDraftInline: Calling updateCurrentDraftDisplay');
+                                        try {
+                                            window.updateCurrentDraftDisplay();
+                                        } catch (e) {
+                                            console.error('loadDraftInline: Error calling updateCurrentDraftDisplay:', e);
+                                        }
+                                    }
+                                    
+                                    if (allAvailable || uiRetryCount >= maxUIRetries) {
+                                        console.log('loadDraftInline: UI update complete');
+                                    } else {
+                                        uiRetryCount++;
+                                        setTimeout(tryUpdateUI, 300);
+                                    }
+                                };
+                                setTimeout(tryUpdateUI, 1500);
+                            }, 800);
+                        }, 500);
+                    }
+                } else {
+                    // No learner, just update UI immediately
+                    console.log('loadDraftInline: No learner in draft, updating UI immediately');
+                    setTimeout(() => {
+                        // Update preview first
+                        if (typeof window !== 'undefined' && typeof window.updatePreview === 'function') {
+                            console.log('loadDraftInline: Calling updatePreview (no learner)');
+                            try {
+                                window.updatePreview();
+                            } catch (e) {
+                                console.error('loadDraftInline: Error calling updatePreview:', e);
+                                updatePreviewSimple();
+                            }
+                        } else {
+                            updatePreviewSimple();
+                        }
+                        if (typeof window !== 'undefined' && typeof window.highlightPlaceholdersInEditor === 'function') {
+                            try {
+                                window.highlightPlaceholdersInEditor();
+                            } catch (e) {
+                                console.error('loadDraftInline: Error calling highlightPlaceholdersInEditor:', e);
+                            }
+                        }
+                        if (typeof window !== 'undefined' && typeof window.updateMediaCardStates === 'function') {
+                            try {
+                                window.updateMediaCardStates();
+                            } catch (e) {
+                                console.error('loadDraftInline: Error calling updateMediaCardStates:', e);
+                            }
+                        }
+                        if (typeof window !== 'undefined' && typeof window.updateCurrentDraftDisplay === 'function') {
+                            try {
+                                window.updateCurrentDraftDisplay();
+                            } catch (e) {
+                                console.error('loadDraftInline: Error calling updateCurrentDraftDisplay:', e);
+                            }
+                        }
+                        console.log('loadDraftInline: UI update complete (no learner)');
+                    }, 300);
+                }
+
+                // Load standards if JSON file is assigned - with retry mechanism
+                // Wait longer to ensure external script is loaded
+                setTimeout(() => {
+                    if (draft.json_file_id) {
+                        console.log('loadDraftInline: Loading standards from draft, json_file_id:', draft.json_file_id);
+                        let standardsRetryCount = 0;
+                        const maxStandardsRetries = 25;
+                        const tryLoadStandards = () => {
+                            if (typeof loadStandardsFromDraft === 'function') {
+                                console.log('loadDraftInline: Calling loadStandardsFromDraft');
+                                try {
+                                    loadStandardsFromDraft(draft).catch(error => {
+                                        console.error('loadDraftInline: Error loading standards:', error);
+                                    });
+                                } catch (e) {
+                                    console.error('loadDraftInline: Error calling loadStandardsFromDraft:', e);
+                                }
+                            } else if (typeof window.loadStandardsFromDraft === 'function') {
+                                console.log('loadDraftInline: Calling window.loadStandardsFromDraft');
+                                try {
+                                    window.loadStandardsFromDraft(draft).catch(error => {
+                                        console.error('loadDraftInline: Error loading standards:', error);
+                                    });
+                                } catch (e) {
+                                    console.error('loadDraftInline: Error calling window.loadStandardsFromDraft:', e);
+                                }
+                            } else if (standardsRetryCount < maxStandardsRetries) {
+                                standardsRetryCount++;
+                                setTimeout(tryLoadStandards, 500);
+                            } else {
+                                console.warn('loadDraftInline: loadStandardsFromDraft not available after retries');
+                                const standardsContent = document.getElementById('standardsContent');
+                                if (standardsContent) {
+                                    standardsContent.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Standards loading function not available. Please refresh the page.</p>';
+                                }
+                            }
+                        };
+                        tryLoadStandards();
+                    } else {
+                        console.log('loadDraftInline: No JSON file assigned, clearing standards');
+                        if (typeof clearStandards === 'function') {
+                            clearStandards();
+                        } else if (typeof window.clearStandards === 'function') {
+                            window.clearStandards();
+                        } else {
+                            const standardsContent = document.getElementById('standardsContent');
+                            if (standardsContent) {
+                                standardsContent.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No JSON Standards File assigned to this draft.</p>';
+                            }
+                        }
+                    }
+                }, 2500);
+
+                    console.log('loadDraftInline: Draft loading complete');
+                    closeDraftDialog();
+                } catch (error) {
+                    console.error('Error in loadDraftInline draft loading:', error);
+                    console.error('Error name:', error.name);
+                    console.error('Error message:', error.message);
+                    // Don't show alert for ReferenceError - it's likely a timing issue
+                    if (error.name !== 'ReferenceError') {
+                        alert('Error loading draft: ' + error.message);
+                    } else {
+                        console.warn('ReferenceError in draft loading - draft may still be partially loaded');
+                    }
+                }
+            } else {
+                // If draft failed to load, clear localStorage
+                try {
+                    const savedDraftId = localStorage.getItem('observationMediaCurrentDraftId');
+                    if (savedDraftId === draftId) {
+                        localStorage.removeItem('observationMediaCurrentDraftId');
+                    }
+                } catch (e) {
+                    console.warn('Failed to clear draft ID from localStorage:', e);
+                }
+                alert(`Error loading draft: ${data.error || 'Unknown error'}`);
+            }
+        })
+        .catch(error => {
+            console.error('Load draft error:', error);
+            console.error('Error name:', error.name);
+            console.error('Error message:', error.message);
+            if (error.stack) {
+                console.error('Error stack:', error.stack);
+            }
+            try {
+                const savedDraftId = localStorage.getItem('observationMediaCurrentDraftId');
+                if (savedDraftId === draftId) {
+                    localStorage.removeItem('observationMediaCurrentDraftId');
+                }
+            } catch (e) {
+                console.warn('Failed to clear draft ID from localStorage:', e);
+            }
+            // Don't show alert for ReferenceError - it's likely a timing issue
+            if (error.name !== 'ReferenceError') {
+                alert('Error loading draft: ' + error.message);
+            } else {
+                console.warn('ReferenceError caught - this is likely a timing issue. Draft may still load.');
+            }
+        });
+}
+
+function handleLoadDraft(draftId) {
+    console.log('handleLoadDraft called with draftId:', draftId);
+    if (!draftId) {
+        alert('Error: No draft ID provided');
+        return;
+    }
+    
+    // Try to use external function if available, otherwise use inline version
+    if (typeof window.loadDraft === 'function') {
+        try {
+            window.loadDraft(draftId);
+            closeDraftDialog();
+        } catch (error) {
+            console.error('Error loading draft with external function:', error);
+            // Fallback to inline version
+            loadDraftInline(draftId);
+        }
+    } else {
+        // Use inline version directly
+        loadDraftInline(draftId);
+    }
+}
+
+function deleteDraftInline(draftId) {
+    if (!draftId) {
+        alert('Error: No draft ID provided');
+        return;
+    }
+    
+    if (!confirm('Are you sure you want to delete this draft?')) {
+        return;
+    }
+    
+    fetch(`/v2p-formatter/media-converter/observation-media/drafts/${draftId}`, {
+        method: 'DELETE'
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Clear current draft if it was the one deleted
+                if (window.currentDraft && window.currentDraft.id === draftId) {
+                    window.currentDraft.id = null;
+                    window.currentDraft.name = null;
+                    try {
+                        localStorage.removeItem('observationMediaCurrentDraftId');
+                    } catch (e) {
+                        console.warn('Failed to clear draft ID from localStorage:', e);
+                    }
+                    if (typeof updateCurrentDraftDisplay === 'function') {
+                        updateCurrentDraftDisplay();
+                    }
+                }
+                closeDraftDialog();
+                // Refresh the dialog after deletion
+                setTimeout(function() {
+                    showLoadDraftDialog();
+                }, 300);
+            } else {
+                alert(`Error deleting draft: ${data.error || 'Unknown error'}`);
+            }
+        })
+        .catch(error => {
+            console.error('Delete draft error:', error);
+            alert('Error deleting draft: ' + error.message);
+        });
+}
+
+function handleDeleteDraft(draftId) {
+    console.log('handleDeleteDraft called with draftId:', draftId);
+    if (!draftId) {
+        alert('Error: No draft ID provided');
+        return;
+    }
+    
+    // Try to use external function if available, otherwise use inline version
+    if (typeof window.deleteDraft === 'function') {
+        try {
+            window.deleteDraft(draftId);
+            closeDraftDialog();
+            setTimeout(function() {
+                showLoadDraftDialog();
+            }, 300);
+        } catch (error) {
+            console.error('Error deleting draft with external function:', error);
+            // Fallback to inline version
+            deleteDraftInline(draftId);
+        }
+    } else {
+        // Use inline version directly
+        deleteDraftInline(draftId);
+    }
+}
+
+// Initialize currentDraft object if it doesn't exist
+if (!window.currentDraft) {
+    window.currentDraft = {
+        id: null,
+        name: null
+    };
+}
+
+// Make functions available globally immediately
+window.showDraftSelectionDialog = showDraftSelectionDialog;
+window.closeDraftDialog = closeDraftDialog;
+window.handleLoadDraft = handleLoadDraft;
+window.handleDeleteDraft = handleDeleteDraft;
+</script>
+<!-- Standalone libraries - load first to avoid timing issues -->
+<script src="{{ url_for('v2p_formatter.serve_static', filename='js/live-preview.js') }}"></script>
+<script src="{{ url_for('v2p_formatter.serve_static', filename='js/media-browser.js') }}"></script>
+<script src="{{ url_for('v2p_formatter.serve_static', filename='js/standards.js') }}"></script>
+<script src="{{ url_for('v2p_formatter.serve_static', filename='js/reshuffle.js') }}"></script>
 <script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-media.js') }}"></script>
 <script>
+// Set up load draft button with event listener
+document.addEventListener('DOMContentLoaded', function() {
+    const loadDraftBtn = document.getElementById('loadDraftBtn');
+    if (loadDraftBtn) {
+        loadDraftBtn.addEventListener('click', function() {
+            if (typeof window.showLoadDraftDialog === 'function') {
+                window.showLoadDraftDialog();
+            } else {
+                console.error('showLoadDraftDialog is not available');
+                alert('Error: Draft loading function not available. Please refresh the page.');
+            }
+        });
+    }
+});
+
+// Toggle header section collapse/expand
+function toggleHeaderSection() {
+    const headerSection = document.querySelector('.header-section');
+    if (headerSection) {
+        headerSection.classList.toggle('collapsed');
+    }
+}
+
 // Toggle editor section collapse/expand
 function toggleEditorSection() {
     const editorSection = document.querySelector('.editor-section');
@@ -448,23 +1793,38 @@ function toggleEditorSection() {
     }
 }
 
-// Make function globally available
+// Make functions globally available
+window.toggleHeaderSection = toggleHeaderSection;
 window.toggleEditorSection = toggleEditorSection;
 
-// Update panel layout when expand/collapse
+// Update panel layout when expand/collapse (for media browser expand)
 function updatePanelLayout() {
     const leftPanel = document.querySelector('.observation-media-left-panel');
+    const middlePanel = document.querySelector('.observation-media-middle-panel');
     const rightPanel = document.querySelector('.observation-media-right-panel');
-    if (!leftPanel || !rightPanel) return;
+    if (!leftPanel || !middlePanel || !rightPanel) return;
     
     const isExpanded = leftPanel.classList.contains('expanded');
     
     if (isExpanded) {
+        // When expanded, hide middle and right panels
         leftPanel.style.width = '100%';
+        middlePanel.style.display = 'none';
         rightPanel.style.display = 'none';
     } else {
-        leftPanel.style.width = '50%';
-        rightPanel.style.display = 'block';
+        // When not expanded, show all panels and restore column widths
+        leftPanel.style.display = 'flex';
+        middlePanel.style.display = 'flex';
+        rightPanel.style.display = 'flex';
+        // Restore saved widths or use defaults
+        if (typeof loadColumnWidths === 'function') {
+            loadColumnWidths();
+        } else {
+            // Default equal widths
+            leftPanel.style.flex = '1';
+            middlePanel.style.flex = '1';
+            rightPanel.style.flex = '1';
+        }
     }
 }
 
@@ -630,9 +1990,12 @@ function applyMediaBrowserSettings() {
     }
     
     // Reload media to apply new thumbnail size
-    const subfolder = document.getElementById('observationSubfolderSelect')?.value;
-    if (subfolder && typeof loadObservationMedia === 'function') {
-        loadObservationMedia();
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    if (qualificationSelect && learnerSelect && qualificationSelect.value && learnerSelect.value) {
+        if (typeof loadObservationMedia === 'function') {
+            loadObservationMedia();
+        }
     }
     
     // Close modal
@@ -690,79 +2053,116 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize media browser settings
     initializeMediaBrowserSettings();
     
+    // Load column widths from localStorage
+    if (typeof loadColumnWidths === 'function') {
+        loadColumnWidths();
+    }
+    
     // Initialize current draft display
     if (typeof updateCurrentDraftDisplay === 'function') {
         updateCurrentDraftDisplay();
     }
     
+    // Load draft from localStorage if available (persistence across page refreshes)
+    try {
+        const savedDraftId = localStorage.getItem('observationMediaCurrentDraftId');
+        if (savedDraftId && typeof loadDraft === 'function') {
+            // Wait a bit for all initialization to complete
+            setTimeout(() => {
+                console.log('Restoring draft from localStorage:', savedDraftId);
+                loadDraft(savedDraftId);
+            }, 500);
+        }
+    } catch (e) {
+        console.warn('Failed to load draft from localStorage:', e);
+    }
+    
     // Update panel layout
     updatePanelLayout();
     
-    // Auto-select subfolder from query parameter if present
+    // Auto-select qualification and learner from query parameters if present
     const urlParams = new URLSearchParams(window.location.search);
-    const selectedSubfolder = urlParams.get('subfolder');
-    const subfolderSelect = document.getElementById('observationSubfolderSelect');
+    const selectedQualification = urlParams.get('qualification');
+    const selectedLearner = urlParams.get('learner');
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
     
-    if (subfolderSelect && selectedSubfolder) {
-        subfolderSelect.value = selectedSubfolder;
+    if (qualificationSelect && selectedQualification) {
+        qualificationSelect.value = selectedQualification;
         
-        // Load media for the selected subfolder
-        if (typeof loadObservationMedia === 'function') {
-            loadObservationMedia();
-        } else if (typeof window.loadObservationMedia === 'function') {
-            window.loadObservationMedia();
-        }
-    }
-    
-    // Subfolder selection handler
-    if (subfolderSelect) {
-        subfolderSelect.addEventListener('change', function(e) {
-            const funcToCall = typeof loadObservationMedia === 'function' 
-                ? loadObservationMedia 
-                : (typeof window.loadObservationMedia === 'function' ? window.loadObservationMedia : null);
-            
-            if (funcToCall) {
-                try {
-                    funcToCall();
-                } catch (error) {
-                    // Fallback: manually load media using embedded data
-                    const selectedSubfolder = e.target.value;
-                    if (selectedSubfolder && window.observationMediaData) {
-                        const mediaFiles = window.observationMediaData[selectedSubfolder] || [];
-                        if (typeof displayObservationMedia === 'function') {
-                            displayObservationMedia(mediaFiles);
-                        } else if (typeof window.displayObservationMedia === 'function') {
-                            window.displayObservationMedia(mediaFiles);
-                        }
-                        const countElement = document.getElementById('observationMediaCount');
-                        if (countElement) {
-                            countElement.textContent = `${mediaFiles.length} files`;
+        // Function to set learner and load media after learners are loaded
+        const setLearnerAndLoad = () => {
+            if (learnerSelect && selectedLearner) {
+                // Check if learner option exists
+                const learnerOption = Array.from(learnerSelect.options).find(opt => opt.value === selectedLearner);
+                if (learnerOption) {
+                    learnerSelect.value = selectedLearner;
+                    console.log('Learner set from URL parameter:', selectedLearner);
+                    
+                    if (typeof handleLearnerChange === 'function') {
+                        handleLearnerChange();
+                    }
+                    
+                    // Auto-load if both are selected
+                    if (selectedQualification && selectedLearner) {
+                        const funcToCall = typeof loadObservationMedia === 'function' 
+                            ? loadObservationMedia 
+                            : (typeof window.loadObservationMedia === 'function' ? window.loadObservationMedia : null);
+                        
+                        if (funcToCall) {
+                            try {
+                                funcToCall();
+                            } catch (error) {
+                                console.error('Error loading media:', error);
+                            }
                         }
                     }
+                } else {
+                    console.warn('Learner not found in dropdown:', selectedLearner);
                 }
             }
-        });
-    }
-    
-    // Load button click handler
-    const loadBtn = document.getElementById('observationLoadBtn');
-    if (loadBtn) {
-        loadBtn.addEventListener('click', function(e) {
-            const funcToCall = typeof loadSelectedSubfolder === 'function' 
-                ? loadSelectedSubfolder 
-                : (typeof window.loadSelectedSubfolder === 'function' ? window.loadSelectedSubfolder : null);
-            
-            if (funcToCall) {
-                try {
-                    funcToCall();
-                } catch (error) {
-                    alert(`Error loading subfolder: ${error.message}`);
+        };
+        
+        // Trigger change to populate learner dropdown
+        if (typeof handleQualificationChange === 'function') {
+            // Check if learners are already cached
+            if (window.learnersData && window.learnersData[selectedQualification]) {
+                console.log('Using cached learners data');
+                if (typeof populateLearnerDropdown === 'function') {
+                    populateLearnerDropdown(window.learnersData[selectedQualification]);
+                    // Wait a bit for DOM to update
+                    setTimeout(setLearnerAndLoad, 100);
+                } else {
+                    handleQualificationChange();
+                    // Wait longer if we need to fetch
+                    setTimeout(setLearnerAndLoad, 1000);
                 }
             } else {
-                alert('Load function not available. Please refresh the page.');
+                handleQualificationChange();
+                // Wait for learners to be fetched and dropdown populated
+                // Check periodically if learner dropdown has been populated
+                let attempts = 0;
+                const maxAttempts = 20; // 2 seconds max wait
+                const checkInterval = setInterval(() => {
+                    attempts++;
+                    const learnerOption = Array.from(learnerSelect.options).find(opt => opt.value === selectedLearner);
+                    if (learnerOption || attempts >= maxAttempts) {
+                        clearInterval(checkInterval);
+                        if (learnerOption) {
+                            setLearnerAndLoad();
+                        } else {
+                            console.error('Timeout waiting for learner dropdown to populate');
+                        }
+                    }
+                }, 100);
             }
-        });
+        }
+    } else if (learnerSelect && selectedLearner) {
+        // If only learner is in URL but qualification is not set, we can't proceed
+        console.warn('Learner specified in URL but qualification is not set');
     }
+    
+    // Legacy handlers removed - now handled by event listeners set up earlier
     
     // Font size toggle
     const fontSizeRegular = document.getElementById('fontSizeRegular');
@@ -785,8 +2185,17 @@ document.addEventListener('DOMContentLoaded', function() {
             if (typeof highlightPlaceholdersInEditor === 'function') {
                 highlightPlaceholdersInEditor();
             }
-            if (typeof updatePreview === 'function') {
-                updatePreview();
+            if (typeof window !== 'undefined' && typeof window.updatePreview === 'function') {
+                try {
+                    window.updatePreview();
+                } catch (e) {
+                    console.error('Error calling updatePreview:', e);
+                    if (typeof updatePreviewSimple === 'function') {
+                        updatePreviewSimple();
+                    }
+                }
+            } else if (typeof updatePreviewSimple === 'function') {
+                updatePreviewSimple();
             }
         });
     }
@@ -803,15 +2212,170 @@ document.addEventListener('DOMContentLoaded', function() {
         e.stopPropagation();
         
         try {
-            const mediaData = JSON.parse(e.dataTransfer.getData('application/json'));
+            // Safely get data from dataTransfer - try multiple methods
+            let dataStr = '';
+            let mediaData = null;
+            
+            // Method 1: Try application/json (standard)
+            try {
+                if (e.dataTransfer) {
+                    dataStr = e.dataTransfer.getData('application/json');
+                    if (dataStr && dataStr.trim() !== '') {
+                        mediaData = JSON.parse(dataStr);
+                        console.log('[DROP] Got data from application/json:', mediaData);
+                    }
+                }
+            } catch (err) {
+                console.warn('[DROP] Error getting application/json:', err);
+            }
+            
+            // Method 2: Try text/plain as fallback
+            if (!mediaData || !mediaData.path) {
+                try {
+                    if (e.dataTransfer) {
+                        const textData = e.dataTransfer.getData('text/plain');
+                        if (textData && textData.trim() !== '') {
+                            // Try to parse as JSON
+                            try {
+                                mediaData = JSON.parse(textData);
+                                console.log('[DROP] Got data from text/plain (JSON):', mediaData);
+                            } catch (parseErr) {
+                                // If not JSON, might be a path
+                                if (textData.includes('/') || textData.includes('\\')) {
+                                    mediaData = { path: textData };
+                                    console.log('[DROP] Got path from text/plain:', textData);
+                                }
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.warn('[DROP] Error getting text/plain:', err);
+                }
+            }
+            
+            // Method 3: Try to get data from the drag source element
+            if (!mediaData || !mediaData.path) {
+                try {
+                    // Look for the dragged element by class (don't use querySelector with HTML content)
+                    const dragSource = document.querySelector('.observation-media-card.dragging') ||
+                                     document.querySelector('.media-cell.dragging');
+                    
+                    if (dragSource) {
+                        const path = dragSource.dataset.mediaPath;
+                        const name = dragSource.dataset.mediaName;
+                        const type = dragSource.dataset.mediaType;
+                        
+                        if (path) {
+                            mediaData = { path: path, name: name || '', type: type || 'image' };
+                            console.log('[DROP] Got data from drag source element:', mediaData);
+                        } else {
+                            // Try to find nested element with data attributes
+                            const nestedPath = dragSource.querySelector('[data-media-path]');
+                            if (nestedPath) {
+                                mediaData = {
+                                    path: nestedPath.dataset.mediaPath,
+                                    name: nestedPath.dataset.mediaName || nestedPath.textContent || '',
+                                    type: nestedPath.dataset.mediaType || 'image'
+                                };
+                                console.log('[DROP] Got data from nested element:', mediaData);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.warn('[DROP] Error getting data from drag source:', err);
+                }
+            }
+            
+            // Method 3b: Try to extract from text/html using regex (not querySelector)
+            if (!mediaData || !mediaData.path) {
+                try {
+                    if (e.dataTransfer) {
+                        const htmlData = e.dataTransfer.getData('text/html');
+                        if (htmlData && htmlData.trim() !== '') {
+                            // Extract path from HTML using regex
+                            const pathMatch = htmlData.match(/data-media-path=["']([^"']+)["']/);
+                            if (pathMatch) {
+                                const path = decodeURIComponent(pathMatch[1]);
+                                const nameMatch = htmlData.match(/alt=["']([^"']+)["']/) || htmlData.match(/data-media-name=["']([^"']+)["']/);
+                                const name = nameMatch ? decodeURIComponent(nameMatch[1]) : path.split('/').pop();
+                                const typeMatch = htmlData.match(/data-media-type=["']([^"']+)["']/);
+                                const type = typeMatch ? decodeURIComponent(typeMatch[1]) : 'image';
+                                mediaData = { path: path, name: name, type: type };
+                                console.log('[DROP] Extracted from HTML using regex:', mediaData);
+                            } else {
+                                // Try to extract from img src URL
+                                const srcMatch = htmlData.match(/src=["']([^"']+)["']/);
+                                if (srcMatch) {
+                                    const src = decodeURIComponent(srcMatch[1]);
+                                    const pathMatch2 = src.match(/path=([^&]+)/);
+                                    if (pathMatch2) {
+                                        const path = decodeURIComponent(pathMatch2[1]);
+                                        const nameMatch = htmlData.match(/alt=["']([^"']+)["']/);
+                                        const name = nameMatch ? decodeURIComponent(nameMatch[1]) : path.split('/').pop();
+                                        mediaData = { path: path, name: name, type: 'image' };
+                                        console.log('[DROP] Extracted path from HTML img src:', mediaData);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.warn('[DROP] Error extracting from HTML:', err);
+                }
+            }
+            
+            // Method 4: Check if there's a stored drag data in window
+            if (!mediaData || !mediaData.path) {
+                if (window.lastDragData) {
+                    mediaData = window.lastDragData;
+                    console.log('[DROP] Got data from window.lastDragData:', mediaData);
+                    window.lastDragData = null; // Clear after use
+                }
+            }
+            
+            // Final check - if still no data, log and return
+            if (!mediaData || !mediaData.path) {
+                console.warn('[DROP] No data in dataTransfer - cannot process drop. Tried all methods.');
+                console.log('[DROP] Event details:', {
+                    dataTransfer: !!e.dataTransfer,
+                    types: e.dataTransfer ? Array.from(e.dataTransfer.types) : [],
+                    target: e.target ? e.target.className : 'unknown'
+                });
+                return;
+            }
+            
             if (mediaData && mediaData.path) {
-                const placeholders = extractPlaceholders(textEditor.value);
+                const textEditor = document.getElementById('observationTextEditor');
+                if (!textEditor) {
+                    console.error('Text editor not found');
+                    return;
+                }
+                
+                // Extract placeholders from text
+                let placeholders = [];
+                if (typeof window.extractPlaceholders === 'function') {
+                    placeholders = window.extractPlaceholders(textEditor.value);
+                } else if (typeof extractPlaceholders === 'function') {
+                    placeholders = extractPlaceholders(textEditor.value);
+                } else {
+                    // Fallback: simple regex extraction
+                    const matches = textEditor.value.match(/\{\{([^}]+)\}\}/g);
+                    if (matches) {
+                        placeholders = matches.map(m => m.replace(/\{\{|\}\}/g, ''));
+                    }
+                }
+                
                 if (placeholders.length === 0) {
                     alert('No placeholders found in text. Add placeholders like {{Placeholder_Name}} first.');
                     return;
                 }
-                if (typeof showPlaceholderSelectionDialog === 'function') {
+                
+                if (typeof window.showPlaceholderSelectionDialog === 'function') {
+                    window.showPlaceholderSelectionDialog(mediaData, placeholders);
+                } else if (typeof showPlaceholderSelectionDialog === 'function') {
                     showPlaceholderSelectionDialog(mediaData, placeholders);
+                } else {
+                    console.error('showPlaceholderSelectionDialog function not available');
                 }
             }
         } catch (err) {
@@ -830,7 +2394,7 @@ document.addEventListener('DOMContentLoaded', function() {
 /* Observation Media Styles */
 .observation-media-container {
     display: flex;
-    gap: 20px;
+    gap: 0;
     width: 100%;
     position: relative;
     /* Calculate height: viewport - navigation tabs (30px) - top controls bar (70px) - bottom bar (70px) - margins (50px) */
@@ -841,37 +2405,245 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .observation-media-left-panel {
     flex: 1;
-    width: 50%;
+    min-width: 200px;
+    max-width: 60%;
     background: #2a2a2a;
     border: 1px solid #555;
-    border-radius: 6px;
+    border-radius: 6px 0 0 6px;
     padding: 15px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    transition: width 0.3s ease-in-out;
     height: 100%;
-    /* Independent height - not constrained by right panel */
 }
 
 .observation-media-left-panel.expanded {
-    z-index: 200;                  /* Above right panel when expanded */
+    z-index: 200;                  /* Above other panels when expanded */
+}
+
+.observation-media-middle-panel {
+    flex: 1;
+    min-width: 250px;
+    max-width: 60%;
+    background: #2a2a2a;
+    border: 1px solid #555;
+    border-left: none;
+    border-right: none;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100%;
+    gap: 0;
 }
 
 .observation-media-right-panel {
     flex: 1;
-    width: 50%;
+    min-width: 250px;
+    max-width: 60%;
     background: #2a2a2a;
     border: 1px solid #555;
-    border-radius: 6px;
+    border-radius: 0 6px 6px 0;
     padding: 15px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     height: 100%;
-    /* Independent height - not constrained by left panel */
-    /* Ensure children (preview and editor) split space equally */
     gap: 0;
+}
+
+/* Standards Section */
+.standards-section {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.standards-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #555;
+    margin-bottom: 15px;
+    flex-shrink: 0;
+}
+
+.standards-search-container {
+    padding: 12px 15px;
+    background: #2a2a2a;
+    border-bottom: 1px solid #555;
+    flex-shrink: 0;
+}
+
+.standards-search-input {
+    width: 100%;
+    padding: 8px 12px 8px 35px;
+    background: #1e1e1e;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.standards-search-input:focus {
+    border-color: #667eea;
+    background: #2a2a2a;
+}
+
+.standards-search-input::placeholder {
+    color: #999;
+}
+
+.standards-search-clear {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 4px 8px;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.standards-search-clear:hover {
+    color: #e0e0e0;
+}
+
+.standards-section-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 5px;
+    min-height: 0; /* Ensure flex child can shrink and enable scrolling */
+}
+
+.standards-search-highlight {
+    background-color: #FFD700;
+    color: #000;
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-weight: normal;
+}
+
+.standards-no-results {
+    color: #999;
+    font-size: 14px;
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+}
+
+.standards-unit {
+    margin-bottom: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.standards-unit-header {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    padding: 12px 15px;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: background 0.2s;
+}
+
+.standards-unit-header:hover {
+    background: #333;
+}
+
+.standards-unit-header.expanded {
+    border-bottom: 1px solid #444;
+}
+
+.standards-unit-icon {
+    font-size: 12px;
+    color: #999;
+    transition: transform 0.2s;
+}
+
+.standards-unit.expanded .standards-unit-icon {
+    transform: rotate(90deg);
+}
+
+.standards-unit-title {
+    flex: 1;
+    color: #e0e0e0;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.standards-unit-content {
+    display: none;
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-top: none;
+    padding: 10px 15px;
+}
+
+.standards-unit.expanded .standards-unit-content {
+    display: block;
+}
+
+.standards-ac {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    padding: 10px 12px;
+    margin: 6px 0;
+    border-radius: 3px;
+}
+
+.standards-ac-id {
+    font-weight: bold;
+    color: #667eea;
+    font-size: 14px;
+}
+
+.standards-ac-text {
+    color: #e0e0e0;
+    font-size: 14px;
+    line-height: 1.5;
+    margin-top: 4px;
+}
+
+
+.column-resizer {
+    width: 4px;
+    background: #444;
+    cursor: col-resize;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+    transition: background 0.2s;
+}
+
+.column-resizer:hover {
+    background: #667eea;
+}
+
+.column-resizer:active {
+    background: #5568d3;
+}
+
+.column-resizer::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 30px;
+    background: #999;
+    border-radius: 1px;
 }
 
 .observation-media-header {
@@ -1125,6 +2897,61 @@ document.addEventListener('DOMContentLoaded', function() {
     font-size: 12px;
 }
 
+.audio-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.pdf-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(200, 0, 0, 0.8);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.audio-player-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    cursor: pointer;
+}
+
+.observation-media-thumbnail:hover .audio-player-overlay {
+    opacity: 1;
+}
+
+.audio-play-button {
+    background: rgba(102, 126, 234, 0.9);
+    color: white;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    border: 3px solid white;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
 .assigned-badge {
     position: absolute;
     bottom: 5px;
@@ -1215,6 +3042,11 @@ document.addEventListener('DOMContentLoaded', function() {
 .media-cell.drag-over {
     background-color: rgba(102, 126, 234, 0.3) !important;
     border: 2px dashed #667eea !important;
+}
+
+.media-cell:hover .remove-media-btn,
+.placeholder-table:hover .remove-media-btn {
+    opacity: 1 !important;
 }
 
 .remove-media-btn:hover {
@@ -1371,6 +3203,90 @@ document.addEventListener('DOMContentLoaded', function() {
 .observation-preview.preview-section-content {
     scrollbar-width: auto !important;
     scrollbar-color: #666 #1e1e1e !important;
+}
+
+/* Header Section (Above Text Editor) */
+.header-section {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 50px;
+    max-height: 300px;
+    overflow: hidden;
+    background: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 6px;
+    padding: 15px;
+    transition: max-height 0.3s ease, min-height 0.3s ease;
+}
+
+.header-section.collapsed {
+    min-height: auto;
+    max-height: 60px;
+}
+
+.header-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+    padding: 5px 0;
+    user-select: none;
+}
+
+.header-section-icon {
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
+
+.header-section.collapsed .header-section-icon {
+    transform: rotate(0deg);
+}
+
+.header-section:not(.collapsed) .header-section-icon {
+    transform: rotate(90deg);
+}
+
+.header-section-content-wrapper {
+    flex: 1 1 0;
+    overflow: hidden;
+    min-height: 150px;
+    max-height: 250px;
+    transition: opacity 0.3s ease, max-height 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    margin-top: 10px;
+}
+
+.header-section.collapsed .header-section-content-wrapper {
+    display: none !important;
+    max-height: 0 !important;
+    opacity: 0;
+    overflow: hidden;
+}
+
+.header-section:not(.collapsed) .header-section-content-wrapper {
+    display: flex;
+    opacity: 1;
+}
+
+.header-section-content {
+    width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
+}
+
+.header-field {
+    transition: border-color 0.2s;
+}
+
+.header-field:focus {
+    outline: none;
+    border-color: #667eea;
+    background: #2a2a2a;
 }
 
 /* Editor Section (Independent, at bottom of page) */
@@ -1617,15 +3533,78 @@ document.addEventListener('DOMContentLoaded', function() {
     opacity: 1 !important;
 }
 
-#previewResizer {
+/* Header Table Styles */
+.preview-header-container {
+    margin-bottom: 20px;
+}
+
+.preview-header-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 12pt;
+    font-family: 'Times New Roman', serif;
+    font-size: 16pt;
+    border: 1px solid #555;
+}
+
+.preview-header-table td {
+    border: 1px solid #555;
+    padding: 8px 12px;
+    vertical-align: top;
+    color: #e0e0e0;
+}
+
+.preview-header-table td:first-child {
+    width: 150px;
+    font-weight: normal;
+    background-color: #2a2a2a;
+}
+
+.preview-header-table td:last-child {
+    background-color: #1e1e1e;
+}
+
+/* Assessor Feedback Table Styles */
+.preview-assessor-feedback-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-family: 'Times New Roman', serif;
+    font-size: 16pt;
+    border: 1px solid #555;
+}
+
+.preview-assessor-feedback-table td {
+    border: 1px solid #555;
+    padding: 8px 12px;
+    vertical-align: top;
+    color: #e0e0e0;
+    background-color: #1e1e1e;
+}
+
+.preview-assessor-feedback-table tr:first-child td {
+    font-weight: normal;
+    background-color: #2a2a2a;
+}
+
+.preview-assessor-feedback-table tr:last-child td {
+    min-height: 100px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+#previewResizer,
+#previewResizer2 {
     transition: background 0.2s;
 }
 
-#previewResizer:hover {
+#previewResizer:hover,
+#previewResizer2:hover {
     background: #667eea;
 }
 
-#previewResizer:active {
+#previewResizer:active,
+#previewResizer2:active {
     background: #5568d3;
 }
 
@@ -1701,4 +3680,5 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 </style>
 {% endblock %}
+
 

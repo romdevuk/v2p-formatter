@@ -175,3 +175,6 @@ The reshuffle functionality is **mostly working** as expected:
 All screenshots have been captured and saved for review. The functionality appears to be working, but further investigation is needed to confirm that the drag and drop actually reorders the media items in the underlying data structure.
 
 
+
+
+

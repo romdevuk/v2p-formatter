@@ -1,0 +1,193 @@
+/**
+ * Observation Report - Preview Draft Component CSS
+ * 
+ * ⚠️ IMPORTANT: This is a NEW module - no legacy code from old modules.
+ * 
+ * Author: UX Designer (Agent-3)
+ * Created: Stage 3
+ */
+
+/* ============================================================================
+   Preview Dialog Overlay
+   ============================================================================ */
+.preview-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.preview-dialog {
+    width: 95%;
+    height: 95%;
+    background: var(--obs-bg-primary, #1e1e1e);
+    border: 1px solid var(--obs-border, #555);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.preview-dialog-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--obs-border, #555);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    background: var(--obs-bg-secondary, #2a2a2a);
+}
+
+.preview-dialog-header h2 {
+    margin: 0;
+    color: var(--obs-text-primary, #e0e0e0);
+}
+
+.preview-dialog-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+/* ============================================================================
+   Preview Columns
+   ============================================================================ */
+#preview-left-column,
+#preview-center-column,
+#preview-right-column {
+    overflow-y: auto;
+    padding: 15px;
+}
+
+#preview-left-column {
+    width: 200px;
+    min-width: 150px;
+    border-right: 1px solid var(--obs-border, #555);
+    background: var(--obs-bg-secondary, #2a2a2a);
+}
+
+#preview-center-column {
+    flex: 1;
+    min-width: 300px;
+    border-right: 1px solid var(--obs-border, #555);
+}
+
+#preview-right-column {
+    width: 250px;
+    min-width: 200px;
+    background: var(--obs-bg-secondary, #2a2a2a);
+}
+
+/* ============================================================================
+   Sections List
+   ============================================================================ */
+.sections-list-header {
+    font-weight: bold;
+    color: var(--obs-text-primary, #e0e0e0);
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.section-item {
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    margin: 4px 0;
+    color: var(--obs-text-primary, #e0e0e0);
+    font-size: 13px;
+    transition: background 0.2s;
+}
+
+.section-item:hover {
+    background: var(--obs-bg-tertiary, #333);
+}
+
+/* ============================================================================
+   Preview Actions Panel
+   ============================================================================ */
+.preview-actions {
+    color: var(--obs-text-primary, #e0e0e0);
+}
+
+.preview-actions h3 {
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    color: var(--obs-text-primary, #e0e0e0);
+}
+
+.action-group {
+    margin: 15px 0;
+    padding: 15px;
+    background: var(--obs-bg-primary, #1e1e1e);
+    border: 1px solid var(--obs-border, #555);
+    border-radius: 4px;
+}
+
+.action-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--obs-text-primary, #e0e0e0);
+    font-size: 13px;
+}
+
+.action-group input[type="number"],
+.action-group select {
+    width: 100%;
+    padding: 6px 10px;
+    background: var(--obs-bg-secondary, #2a2a2a);
+    color: var(--obs-text-primary, #e0e0e0);
+    border: 1px solid var(--obs-border, #555);
+    border-radius: 4px;
+    font-size: 12px;
+    margin-bottom: 10px;
+}
+
+.action-group input[type="checkbox"] {
+    margin-right: 8px;
+    accent-color: var(--obs-accent, #667eea);
+}
+
+.action-buttons {
+    margin: 15px 0;
+}
+
+.action-buttons button {
+    width: 100%;
+    padding: 10px;
+    margin: 5px 0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.action-buttons .update-draft-btn {
+    background: var(--obs-accent, #667eea);
+    color: white;
+}
+
+.action-buttons .update-draft-btn:hover {
+    background: var(--obs-accent-hover, #5568d3);
+    transform: translateY(-1px);
+}
+
+.action-buttons .export-docx-btn {
+    background: var(--obs-success, #00b894);
+    color: white;
+}
+
+.action-buttons .export-docx-btn:hover {
+    background: #00a085;
+    transform: translateY(-1px);
+}
+
+
+

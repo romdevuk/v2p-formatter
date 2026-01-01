@@ -179,6 +179,12 @@ function handleFileSelect(file) {
             appState.videoPath = data.filepath;
             appState.videoInfo = data;
             
+            // Also sync to window.appData for compatibility with index.html functions
+            if (typeof window.appData !== 'undefined') {
+                window.appData.videoPath = data.filepath;
+                window.appData.videoInfo = data;
+            }
+            
             debugOutput(`Video duration: ${data.duration}s`, 'info');
             debugOutput(`Resolution: ${data.width}x${data.height}`, 'info');
             

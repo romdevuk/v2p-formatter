@@ -4,8 +4,8 @@
 function loadFileTree() {
     console.log('📂 loadFileTree() called');
     
-    if (typeof debugOutput !== 'undefined') {
-        debugOutput('📂 Loading file tree...', 'info');
+    if (typeof window.debugOutput === 'function') {
+        window.debugOutput('📂 Loading file tree...', 'info');
     }
     
     const fileTree = document.getElementById('fileTree');
@@ -27,9 +27,20 @@ function loadFileTree() {
     if (fileTreeLoading) {
         fileTreeLoading.style.display = 'block';
     }
-    fileTreeContent.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">Loading MP4 files from input folder...</p>';
+    fileTreeContent.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">Loading MP4 files from output folder...</p>';
     
-    const url = '/v2p-formatter/list_files';
+    // Get qualification and learner from dropdowns or URL parameters
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    const urlParams = new URLSearchParams(window.location.search);
+    const qualification = (qualificationSelect && qualificationSelect.value) || urlParams.get('qualification') || '';
+    const learner = (learnerSelect && learnerSelect.value) || urlParams.get('learner') || '';
+    
+    // Build URL with parameters
+    let url = '/v2p-formatter/list_files';
+    if (qualification && learner) {
+        url += `?qualification=${encodeURIComponent(qualification)}&learner=${encodeURIComponent(learner)}`;
+    }
     console.log('🌐 Fetching:', url);
     
     fetch(url)
@@ -47,13 +58,13 @@ function loadFileTree() {
             }
             
             if (data.success) {
-                if (typeof debugOutput !== 'undefined') {
-                    debugOutput(`✅ Found ${data.count} MP4 files`, 'success');
+                if (typeof window.debugOutput === 'function') {
+                    window.debugOutput(`✅ Found ${data.count} MP4 files`, 'success');
                     if (data.input_folder) {
-                        debugOutput(`📁 Input folder: ${data.input_folder}`, 'info');
+                        window.debugOutput(`📁 Input folder: ${data.input_folder}`, 'info');
                     }
                     if (data.output_folder) {
-                        debugOutput(`📁 Output folder: ${data.output_folder}`, 'info');
+                        window.debugOutput(`📁 Output folder: ${data.output_folder}`, 'info');
                     }
                 }
                 console.log(`✅ Found ${data.count} MP4 files`);
@@ -66,8 +77,8 @@ function loadFileTree() {
                 renderFileTree(data.files, fileTreeContent);
                 fileTree.style.display = 'block';
             } else {
-                if (typeof debugOutput !== 'undefined') {
-                    debugOutput(`❌ Error loading files: ${data.error}`, 'error');
+                if (typeof window.debugOutput === 'function') {
+                    window.debugOutput(`❌ Error loading files: ${data.error}`, 'error');
                 }
                 console.error('❌ Error:', data.error);
                 fileTreeContent.innerHTML = `<p style="color: red; padding: 10px;">Error: ${data.error}</p>`;
@@ -77,8 +88,8 @@ function loadFileTree() {
         .catch(error => {
             console.error('❌ Fetch error:', error);
             fileTreeLoading.style.display = 'none';
-            if (typeof debugOutput !== 'undefined') {
-                debugOutput(`❌ Error: ${error.message}`, 'error');
+            if (typeof window.debugOutput === 'function') {
+                window.debugOutput(`❌ Error: ${error.message}`, 'error');
             }
             fileTreeContent.innerHTML = `<p style="color: red; padding: 10px;">Error loading files: ${error.message}<br>Please check that the Flask server is running.</p>`;
             fileTree.style.display = 'block';
@@ -160,9 +171,9 @@ function toggleFolder(element) {
 }
 
 function selectFile(filePath, fileName) {
-    if (typeof debugOutput !== 'undefined') {
-        debugOutput(`📁 File selected: ${fileName}`, 'info');
-        debugOutput(`   Path: ${filePath}`, 'info');
+    if (typeof window.debugOutput === 'function') {
+        window.debugOutput(`📁 File selected: ${fileName}`, 'info');
+        window.debugOutput(`   Path: ${filePath}`, 'info');
     }
     console.log('File selected:', fileName, filePath);
     
@@ -188,16 +199,22 @@ function selectFile(filePath, fileName) {
     })
     .then(data => {
         if (data.success) {
-            if (typeof debugOutput !== 'undefined') {
-                debugOutput('✅ File loaded successfully!', 'success');
-                debugOutput(`   Duration: ${data.duration}s`, 'info');
-                debugOutput(`   Resolution: ${data.width}x${data.height}`, 'info');
+            if (typeof window.debugOutput === 'function') {
+                window.debugOutput('✅ File loaded successfully!', 'success');
+                window.debugOutput(`   Duration: ${data.duration}s`, 'info');
+                window.debugOutput(`   Resolution: ${data.width}x${data.height}`, 'info');
             }
             console.log('File loaded:', data);
             
             appState.videoFile = { name: fileName, path: filePath };
             appState.videoPath = data.filepath;
             appState.videoInfo = data;
+            
+            // Also sync to window.appData for compatibility with index.html functions
+            if (typeof window.appData !== 'undefined') {
+                window.appData.videoPath = data.filepath;
+                window.appData.videoInfo = data;
+            }
             
             // Show video preview
             const videoPlayer = document.getElementById('videoPlayer');
@@ -208,8 +225,8 @@ function selectFile(filePath, fileName) {
                 const videoUrl = `/v2p-formatter/video_file?path=${encodeURIComponent(filePath)}`;
                 videoPlayer.src = videoUrl;
                 console.log('Video URL:', videoUrl);
-                if (typeof debugOutput !== 'undefined') {
-                    debugOutput('✅ Video player source set', 'success');
+                if (typeof window.debugOutput === 'function') {
+                    window.debugOutput('✅ Video player source set', 'success');
                 }
             } else {
                 console.error('Video player element not found');
@@ -235,8 +252,8 @@ function selectFile(filePath, fileName) {
                         <span>${data.filename}</span>
                     </div>
                 `;
-                if (typeof debugOutput !== 'undefined') {
-                    debugOutput('✅ Video info displayed', 'success');
+                if (typeof window.debugOutput === 'function') {
+                    window.debugOutput('✅ Video info displayed', 'success');
                 }
             }
             showStatus('Video loaded successfully!', 'success');
@@ -255,22 +272,22 @@ function selectFile(filePath, fileName) {
                 }
             }, 1000);
             
-            if (typeof debugOutput !== 'undefined') {
-                debugOutput('✅✅✅ ALL SECTIONS SHOWN - READY TO USE! ✅✅✅', 'success');
+            if (typeof window.debugOutput === 'function') {
+                window.debugOutput('✅✅✅ ALL SECTIONS SHOWN - READY TO USE! ✅✅✅', 'success');
             }
             console.log('All sections shown');
         } else {
             const errorMsg = data.error || 'Failed to load file';
-            if (typeof debugOutput !== 'undefined') {
-                debugOutput(`❌ Error: ${errorMsg}`, 'error');
+            if (typeof window.debugOutput === 'function') {
+                window.debugOutput(`❌ Error: ${errorMsg}`, 'error');
             }
             console.error('Error:', errorMsg);
             showStatus(errorMsg, 'error');
         }
     })
     .catch(error => {
-        if (typeof debugOutput !== 'undefined') {
-            debugOutput(`❌ Error loading file: ${error.message}`, 'error');
+        if (typeof window.debugOutput === 'function') {
+            window.debugOutput(`❌ Error loading file: ${error.message}`, 'error');
         }
         console.error('Error loading file:', error);
         showStatus('Failed to load file: ' + error.message, 'error');

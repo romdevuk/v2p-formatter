@@ -11,21 +11,41 @@
             <a href="/v2p-formatter/media-converter" style="padding: 12px 24px; background: #1e1e1e; color: #667eea; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #667eea; border-bottom: none; font-weight: bold;">
                 Media Converter
             </a>
-            <a href="/v2p-formatter/observation-media" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
-                Observation Media
+            <a href="/v2p-formatter/image-to-pdf" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Image to PDF
             </a>
         </div>
     </div>
 
     <!-- Media Converter Content -->
     <div id="mediaConverterContent">
+    <!-- Qualification/Learner Selection Section -->
+    <section class="upload-section" style="margin-bottom: 20px;">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+            <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Select Qualification:</label>
+            <select id="qualificationSelect" style="flex: 1; min-width: 200px; padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
+                <option value="">Select Qualification...</option>
+                {% for qualification in qualifications %}
+                <option value="{{ qualification }}" {% if qualification == selected_qualification %}selected{% endif %}>{{ qualification }}</option>
+                {% endfor %}
+            </select>
+            <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Select Learner:</label>
+            <select id="learnerSelect" style="flex: 1; min-width: 200px; padding: 8px 12px; background: #1e1e1e; color: #999; border: 1px solid #555; border-radius: 4px; font-size: 14px;" {% if not selected_qualification %}disabled{% endif %}>
+                <option value="">Select Learner...</option>
+                {% for learner in learners %}
+                <option value="{{ learner }}" {% if learner == selected_learner %}selected{% endif %}>{{ learner }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-secondary" id="refreshFilesBtn" onclick="loadMediaFiles()" style="padding: 8px 16px;">🔄 Refresh</button>
+        </div>
+    </section>
+    
     <!-- File Selection Section -->
     <section class="upload-section">
         <h2>1. Select Media Files</h2>
         <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
             <input type="text" id="fileSearch" placeholder="🔍 Search files..." 
-                   style="flex: 1; padding: 10px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e; color: #e0e0e0; font-size: 14px;">
-            <button class="btn btn-secondary" id="refreshFilesBtn" onclick="loadMediaFiles()">🔄 Refresh</button>
+                   style="flex: 1; padding: 10px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e; color: #e0e0e0; font-size: 14px;" {% if not selected_qualification or not selected_learner %}disabled{% endif %}>
         </div>
 
         <div id="fileSelectionContainer" style="margin-top: 20px;">
@@ -307,8 +327,30 @@ function toggleDebugPanel() {
 
 // Load media files
 function loadMediaFiles() {
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    
+    if (!qualificationSelect || !learnerSelect) {
+        debug('Dropdown elements not found', 'error');
+        return;
+    }
+    
+    const qualification = qualificationSelect.value;
+    const learner = learnerSelect.value;
+    
+    // Only load files if both qualification and learner are selected
+    if (!qualification || !learner) {
+        window.mediaConverterData.videos = [];
+        window.mediaConverterData.images = [];
+        renderFileLists();
+        updateSelectionSummary();
+        debug('Please select both qualification and learner to view files', 'info');
+        return;
+    }
+    
     debug('Loading media files...', 'info');
-    fetch('/v2p-formatter/media-converter/list')
+    const url = `/v2p-formatter/media-converter/list?qualification=${encodeURIComponent(qualification)}&learner=${encodeURIComponent(learner)}`;
+    fetch(url)
         .then(r => r.json())
         .then(data => {
             if (data.success) {
@@ -324,6 +366,113 @@ function loadMediaFiles() {
         .catch(err => {
             debug('Error: ' + err.message, 'error');
         });
+}
+
+/**
+ * Handle qualification dropdown change
+ */
+function handleQualificationChange() {
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    
+    if (!qualificationSelect || !learnerSelect) {
+        return;
+    }
+    
+    const qualification = qualificationSelect.value;
+    
+    // Clear learner selection
+    learnerSelect.value = '';
+    learnerSelect.disabled = true;
+    learnerSelect.style.color = '#999';
+    
+    // Clear file lists
+    window.mediaConverterData.videos = [];
+    window.mediaConverterData.images = [];
+    renderFileLists();
+    updateSelectionSummary();
+    
+    // Disable search
+    const fileSearch = document.getElementById('fileSearch');
+    if (fileSearch) {
+        fileSearch.disabled = true;
+    }
+    
+    if (qualification) {
+        // Fetch learners for this qualification
+        fetch(`/v2p-formatter/media-converter/learners?qualification=${encodeURIComponent(qualification)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    populateLearnerDropdown(data.learners);
+                } else {
+                    debug('Error loading learners: ' + (data.error || 'Unknown'), 'error');
+                }
+            })
+            .catch(err => {
+                debug('Error: ' + err.message, 'error');
+            });
+    }
+}
+
+/**
+ * Populate learner dropdown
+ */
+function populateLearnerDropdown(learners) {
+    const learnerSelect = document.getElementById('learnerSelect');
+    if (!learnerSelect) {
+        return;
+    }
+    
+    learnerSelect.innerHTML = '<option value="">Select Learner...</option>';
+    
+    learners.forEach(learner => {
+        const option = document.createElement('option');
+        option.value = learner;
+        option.textContent = learner;
+        learnerSelect.appendChild(option);
+    });
+    
+    learnerSelect.disabled = false;
+    learnerSelect.style.color = '#e0e0e0';
+}
+
+/**
+ * Handle learner dropdown change
+ */
+function handleLearnerChange() {
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    const fileSearch = document.getElementById('fileSearch');
+    
+    if (!qualificationSelect || !learnerSelect) {
+        return;
+    }
+    
+    const qualification = qualificationSelect.value;
+    const learner = learnerSelect.value;
+    
+    // Enable search if both are selected
+    if (fileSearch) {
+        fileSearch.disabled = !(qualification && learner);
+    }
+    
+    // Auto-load media when both qualification and learner are selected
+    if (qualification && learner) {
+        // Update URL without reload
+        const url = new URL(window.location);
+        url.searchParams.set('qualification', qualification);
+        url.searchParams.set('learner', learner);
+        window.history.pushState({}, '', url);
+        
+        loadMediaFiles();
+    } else {
+        // Clear file lists
+        window.mediaConverterData.videos = [];
+        window.mediaConverterData.images = [];
+        renderFileLists();
+        updateSelectionSummary();
+    }
 }
 
 // Render file lists
@@ -2701,13 +2850,51 @@ function initTrimMarkerDragging() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     debug('Media Converter page loaded', 'info');
-    loadMediaFiles();
+    
+    // Set up dropdown event listeners
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    
+    if (qualificationSelect) {
+        qualificationSelect.addEventListener('change', handleQualificationChange);
+    }
+    
+    if (learnerSelect) {
+        learnerSelect.addEventListener('change', handleLearnerChange);
+    }
+    
+    // Auto-load if both are selected (from URL parameters)
+    const urlParams = new URLSearchParams(window.location.search);
+    const selectedQualification = urlParams.get('qualification');
+    const selectedLearner = urlParams.get('learner');
+    
+    if (selectedQualification && qualificationSelect) {
+        qualificationSelect.value = selectedQualification;
+        handleQualificationChange();
+        
+        // Wait a bit for learner dropdown to populate
+        setTimeout(() => {
+            if (selectedLearner && learnerSelect) {
+                learnerSelect.value = selectedLearner;
+                handleLearnerChange();
+            }
+        }, 200);
+    } else {
+        // No selection - show empty lists
+        window.mediaConverterData.videos = [];
+        window.mediaConverterData.images = [];
+        renderFileLists();
+        updateSelectionSummary();
+    }
     
     // Search functionality
-    document.getElementById('fileSearch').addEventListener('input', function(e) {
-        const searchTerm = e.target.value.toLowerCase();
-        // TODO: Implement search filtering
-    });
+    const fileSearch = document.getElementById('fileSearch');
+    if (fileSearch) {
+        fileSearch.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            // TODO: Implement search filtering
+        });
+    }
     
 });
 </script>

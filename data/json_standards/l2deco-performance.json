@@ -1,0 +1,588 @@
+{
+  "export_info": {
+    "format": "standards_report",
+    "version": "1.0",
+    "exported_at": "2025-12-05T22:48:28.205343"
+  },
+  "qualifications": [
+    {
+      "qualification_name": "Level 2 NVQ Diploma in Decorative Finishing",
+      "units": [
+        {
+          "unit_name": "Applying surface coatings by brush and roller in the workplace",
+          "unit_internal_id": "333v3",
+          "learning_outcomes": [
+            {
+              "learning_outcome_name": "Interpret the given information relating to the work and resources when applying surface coatings by brush and roller.",
+              "learning_outcome_number": "1",
+              "questions": [
+                {
+                  "question_id": "1.1",
+                  "question_name": "Interpret and extract relevant information from drawings, specifications, current regulations, schedules, risk assessments, method statements and manufacturers’ information.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "1.2",
+                  "question_name": "Comply with information and/or instructions derived from risk assessments and method statements.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Know how to comply with relevant legislation and official guidance when applying surface coatings by brush and roller.",
+              "learning_outcome_number": "2",
+              "questions": []
+            },
+            {
+              "learning_outcome_name": "Maintain safe and healthy working practices when applying surface coatings by brush and roller.",
+              "learning_outcome_number": "3",
+              "questions": [
+                {
+                  "question_id": "3.1",
+                  "question_name": "Use health and safety control equipment safely and comply with the methods of work to carry out the activity in accordance with current legislation and organisational requirements when applying surface coatings by brush and roller.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "3.2",
+                  "question_name": "Demonstrate compliance with given information and relevant legislation when applying surface coatings by brush and roller:\n– safe use of access equipment\n– safe use, storage and handling of materials, tools and equipment\n– specific risks to health.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Select the required quantity and quality of resources for the methods of work to apply surface coatings by brush and roller.",
+              "learning_outcome_number": "4",
+              "questions": [
+                {
+                  "question_id": "4.1",
+                  "question_name": "Select resources associated with own work in relation to materials, components, fixings, tools and equipment.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Minimise the risk of damage to the work and surrounding area when applying surface coatings by brush and roller.",
+              "learning_outcome_number": "5",
+              "questions": [
+                {
+                  "question_id": "5.1",
+                  "question_name": "Protect the work and its surrounding area from damage in accordance with safe working practices and organisational procedures.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "5.2",
+                  "question_name": "Maintain a clear and tidy work space.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "5.3",
+                  "question_name": "Dispose of waste in accordance with current legislation.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Complete the work within the allocated time when applying surface coatings by brush and roller.",
+              "learning_outcome_number": "6",
+              "questions": [
+                {
+                  "question_id": "6.1",
+                  "question_name": "Demonstrate completion of the work within the allocated time.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Comply with the given contract information to apply surface coatings by brush and roller to the required specification.",
+              "learning_outcome_number": "7",
+              "questions": [
+                {
+                  "question_id": "7.1",
+                  "question_name": "Demonstrate the following work skills when applying surface coatings by brush and roller:\n– matching, mixing, pouring, diluting, loading, laying-on, laying-off and cutting-in.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "7.2",
+                  "question_name": "Use and maintain hand tools, portable power tools and ancillary equipment.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "7.3",
+                  "question_name": "Apply water-borne and/or solvent-borne coatings to internal and/or external surfaces for industrial and/or non-industrial situations, to given working instructions, for:\n– trim, broad areas and structural and architectural work by brush and/or roller.",
+                  "question_type": "Practical"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "unit_name": "Conforming to General Health, Safety and Welfare in the Workplace",
+          "unit_internal_id": "641",
+          "learning_outcomes": [
+            {
+              "learning_outcome_name": "Comply with all workplace health, safety and welfare legislation requirements.",
+              "learning_outcome_number": "1",
+              "questions": [
+                {
+                  "question_id": "1.1",
+                  "question_name": "Comply with information from workplace inductions and any health, safety and welfare briefings attended relevant to the occupational area",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "1.2",
+                  "question_name": "Use health and safety control equipment safely to carry out the activity in accordance with legislation and organisational requirements",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "1.3",
+                  "question_name": "Comply with statutory requirements, safety notices and warning notices displayed within the workplace and/or on equipment.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Recognise hazards associated with the workplace that have not been previously controlled and report them in accordance with organisational procedures",
+              "learning_outcome_number": "2",
+              "questions": [
+                {
+                  "question_id": "2.1",
+                  "question_name": "Report any hazards created by changing circumstances within the workplace in accordance with organisational procedures",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Comply with organisational policies and procedures to contribute to health, safety and welfare",
+              "learning_outcome_number": "3",
+              "questions": [
+                {
+                  "question_id": "3.1",
+                  "question_name": "Interpret and comply with given instructions to maintain safe systems of work and quality working practices",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "3.2",
+                  "question_name": "Contribute to discussions by offering/providing feedback relating to health, safety and welfare",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "3.3",
+                  "question_name": "Contribute to the maintenance of workplace welfare facilities in accordance with workplace welfare procedures.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "3.4",
+                  "question_name": "Safely store health and safety control equipment in accordance with given instructions",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "3.5",
+                  "question_name": "Dispose of waste and/or consumable items in accordance with legislation.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Work responsibly to contribute to workplace health, safety and welfare whilst carrying out work in the relevant occupational area.",
+              "learning_outcome_number": "4",
+              "questions": [
+                {
+                  "question_id": "4.1",
+                  "question_name": "Demonstrate behaviour which shows personal responsibility for general workplace health, safety and welfare",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Comply with and support all organisational security arrangements and approved procedures.",
+              "learning_outcome_number": "5",
+              "questions": [
+                {
+                  "question_id": "5.1",
+                  "question_name": "Provide appropriate support for security arrangements in accordance with approved procedures:\n\t- during the working day\n\t- on completion of the day’s work\n\t- for unauthorised personnel (other operatives and the general public)\n\t- for theft",
+                  "question_type": "Practical"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "unit_name": "Conforming to Productive Working Practices in the Workplace",
+          "unit_internal_id": "642",
+          "learning_outcomes": [
+            {
+              "learning_outcome_name": "Communicate with others to establish productive work practices",
+              "learning_outcome_number": "1",
+              "questions": [
+                {
+                  "question_id": "1.1",
+                  "question_name": "Communicate in an appropriate manner with line management, colleagues and/or customers to ensure that work is carried out productively",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Follow organisational procedures to plan the sequence of work",
+              "learning_outcome_number": "2",
+              "questions": [
+                {
+                  "question_id": "2.1",
+                  "question_name": "Interpret relevant information from organisational procedures in order to plan the sequence of work",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "2.2",
+                  "question_name": "Plan the sequence of work, using appropriate resources, in accordance with organisational procedures to ensure work is completed productively",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Maintain relevant records in accordance with the organisational procedures",
+              "learning_outcome_number": "3",
+              "questions": [
+                {
+                  "question_id": "3.1",
+                  "question_name": "Complete relevant documentation according to the occupation as required by the organisation",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Maintain good working relationships when conforming to productive working practices",
+              "learning_outcome_number": "4",
+              "questions": [
+                {
+                  "question_id": "4.1",
+                  "question_name": "Carry out work productively, to the agreed specification, in conjunction with line management, colleagues, customers and/or other relevant people involved in the work to maintain good working relationships",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "4.2",
+                  "question_name": "Apply the principles of equality and diversity and respect the needs of individuals when communicating and working with others",
+                  "question_type": "Practical"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "unit_name": "Erecting and Dismantling Access/Working Platforms in the Workplace",
+          "unit_internal_id": "250",
+          "learning_outcomes": [
+            {
+              "learning_outcome_name": "Interpret the given information relating to the work and resources when erecting and dismantling access/working platforms.",
+              "learning_outcome_number": "1",
+              "questions": [
+                {
+                  "question_id": "1.1",
+                  "question_name": "Interpret and extract information from specifications, method statements, risk assessments and manufacturers’ information.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "1.2",
+                  "question_name": "Comply with information and/or instructions derived from risk assessments and method statement.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Know how to comply with relevant legislation and official guidance when erecting and dismantling access/working platforms.",
+              "learning_outcome_number": "2",
+              "questions": []
+            },
+            {
+              "learning_outcome_name": "Maintain safe working practices when erecting and dismantling access/working platforms.",
+              "learning_outcome_number": "3",
+              "questions": [
+                {
+                  "question_id": "3.1",
+                  "question_name": "Use personal protective equipment (PPE) and access equipment safely to carry out the activity in accordance with legislation and organisational requirements when erecting and dismantling access/working platforms",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Select the required quantity and quality of resources for the methods of work to erect and dismantle access/working platforms.",
+              "learning_outcome_number": "4",
+              "questions": [
+                {
+                  "question_id": "4.2",
+                  "question_name": "Select resources associated with own work in relation to materials, components, tools and equipment.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Minimise the risk of damage to the work and surrounding area when erecting and dismantling access/working platforms.",
+              "learning_outcome_number": "5",
+              "questions": [
+                {
+                  "question_id": "5.1",
+                  "question_name": "Protect the work and its surrounding area from damage.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "5.2",
+                  "question_name": "Minimise damage and maintain a clean work space.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "5.4",
+                  "question_name": "Dispose of waste in accordance with legislation.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Complete the work within the allocated time when erecting and dismantling access/working platforms.",
+              "learning_outcome_number": "6",
+              "questions": [
+                {
+                  "question_id": "6.1",
+                  "question_name": "Demonstrate completion of the work within the allocated time.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Comply with the given contract information to erect and dismantle access/ working platforms to the required specification.",
+              "learning_outcome_number": "7",
+              "questions": [
+                {
+                  "question_id": "7.1",
+                  "question_name": "Demonstrate the following work skills when erecting and dismantling access/working platforms:– moving, positioning/ erecting, securing, checking, dismantling and removing.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "7.2",
+                  "question_name": "Erect, dismantle and store two of the following access equipment to given access regulations:– ladders/crawler boards – stepladders/platform steps – proprietary towers – trestle platforms – mobile scaffold towers – proprietary staging/podiums.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "7.4",
+                  "question_name": "Safely use and store materials, hand tools and ancillary equipment.",
+                  "question_type": "Practical"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "unit_name": "Moving, Handling and Storing Resources in the Workplace",
+          "unit_internal_id": "643",
+          "learning_outcomes": [
+            {
+              "learning_outcome_name": "Comply with given information when moving, handling and/or storing resources",
+              "learning_outcome_number": "1",
+              "questions": [
+                {
+                  "question_id": "1.1",
+                  "question_name": "Interpret the given information relating to moving, handling and/or storing resources, relevant to the given occupation",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "1.2",
+                  "question_name": "Interpret the given information relating to the use and storage of lifting aids and equipment",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Know how to comply with relevant legislation and official guidance when moving, handling and/or storing resources",
+              "learning_outcome_number": "2",
+              "questions": []
+            },
+            {
+              "learning_outcome_name": "Maintain safe working practices when moving, handling and/or storing resources",
+              "learning_outcome_number": "3",
+              "questions": [
+                {
+                  "question_id": "3.1",
+                  "question_name": "Use health and safety control equipment safely to carry out the activity in accordance with legislation and organisational requirements when moving, handling and/or storing resources",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "3.2",
+                  "question_name": "Use lifting aids safely as appropriate to the work",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "3.3",
+                  "question_name": "Protect the environment in accordance with safe working practices as appropriate to the work.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Select the required quantity and quality of resources for the methods of work to move, handle and/or store occupational resources",
+              "learning_outcome_number": "4",
+              "questions": [
+                {
+                  "question_id": "4.1",
+                  "question_name": "Select the relevant resources to be moved, handled and/or stored, associated with own work",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Prevent the risk of damage to occupational resources and surrounding environment when moving, handling and/or storing resources",
+              "learning_outcome_number": "5",
+              "questions": [
+                {
+                  "question_id": "5.1",
+                  "question_name": "Protect occupational resources and their surrounding area from damage in accordance with safe working practices and organisational procedures",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "5.2",
+                  "question_name": "Dispose of waste and packaging in accordance with legislation",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "5.3",
+                  "question_name": "Maintain a clean work space when moving, handling or storing resources",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Complete the work within the allocated time when moving, handling and/or storing resources.",
+              "learning_outcome_number": "6",
+              "questions": [
+                {
+                  "question_id": "6.1",
+                  "question_name": "Demonstrate completion of the work within the allocated time",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Comply with the given occupational resource information to move, handle and/or store resources to the required guidance",
+              "learning_outcome_number": "7",
+              "questions": [
+                {
+                  "question_id": "7.1",
+                  "question_name": "Demonstrate the following work skills when moving, handling and/or storing occupational resources: moving, positioning, storing, securing and/or using lifting aids and kinetic lifting techniques",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "7.2",
+                  "question_name": "Move, handle and/or store occupational resources to meet product information and organisational requirements relating to three of the following: sheet material, loose material, bagged or wrapped material, components, fragile material, tools and equipment, liquids",
+                  "question_type": "Practical"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "unit_name": "Preparing surfaces for painting and/or decorating in the workplace",
+          "unit_internal_id": "332v3",
+          "learning_outcomes": [
+            {
+              "learning_outcome_name": "Interpret the given information relating to the work and resources when preparing surfaces for painting and/or decorating.",
+              "learning_outcome_number": "1",
+              "questions": [
+                {
+                  "question_id": "1.1",
+                  "question_name": "Interpret and extract relevant information from drawings, specifications, current regulations, schedules, risk assessments, method statements and manufacturers’ information.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "1.2",
+                  "question_name": "Comply with information and/or instructions derived from risk assessments and method statements.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Know how to comply with relevant legislation and official guidance when preparing surfaces for painting and/or decorating.",
+              "learning_outcome_number": "2",
+              "questions": []
+            },
+            {
+              "learning_outcome_name": "Maintain safe and healthy work practices when preparing surfaces for painting and/or decorating.",
+              "learning_outcome_number": "3",
+              "questions": [
+                {
+                  "question_id": "3.1",
+                  "question_name": "Use health and safety control equipment safely and comply with the methods of work to carry out the activity in accordance with current legislation and organisational requirements when preparing surfaces for painting and/or decorating.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "3.2",
+                  "question_name": "Demonstrate compliance with given information and relevant legislation when preparing surfaces for painting and/or decorating in relation to all of the following:\n– safe use of access equipment\n– safe use, storage and handling of materials, tools and equipment\n– specific risks to health.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Select the required quantity and quality of resources for the methods of work to prepare surfaces for painting and/or decorating.",
+              "learning_outcome_number": "4",
+              "questions": [
+                {
+                  "question_id": "4.1",
+                  "question_name": "Select resources associated with own work in relation to materials, tools and equipment.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Minimise the risk of damage to the work and surrounding area when preparing surfaces for painting and/or decorating.",
+              "learning_outcome_number": "5",
+              "questions": [
+                {
+                  "question_id": "5.1",
+                  "question_name": "Protect the work and its surrounding area from damage in accordance with safe working practices and organisational procedures.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "5.2",
+                  "question_name": "Maintain a clear and tidy work space.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "5.3",
+                  "question_name": "Dispose of waste in accordance with current legislation.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Complete the work within the allocated time when preparing surfaces for painting and/or decorating.",
+              "learning_outcome_number": "6",
+              "questions": [
+                {
+                  "question_id": "6.1",
+                  "question_name": "Demonstrate completion of the work within the allocated time.",
+                  "question_type": "Practical"
+                }
+              ]
+            },
+            {
+              "learning_outcome_name": "Comply with the given contract information to prepare surfaces for painting and/or decorating to the required specification.",
+              "learning_outcome_number": "7",
+              "questions": [
+                {
+                  "question_id": "7.1",
+                  "question_name": "Demonstrate the following work skills when preparing surfaces for painting and/or decorating:\n– washing, stripping and/or scraping, abrading and keying, mixing, filling, levelling and/or flattening and brushing-down.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "7.2",
+                  "question_name": "Use and maintain hand tools, portable power tools and ancillary equipment.",
+                  "question_type": "Practical"
+                },
+                {
+                  "question_id": "7.3",
+                  "question_name": "Prepare, prime and seal exterior and/or interior surfaces for industrial and/or non-industrial situations to given working instructions for the following:\n– bare substrates and previously painted and/or decorated surfaces in sound condition including surface defects\n– removal of existing covering and/or material where required.",
+                  "question_type": "Practical"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

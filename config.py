@@ -93,3 +93,13 @@ DEBUG_LOG_LEVEL = 'DEBUG'
 DEBUG_CONSOLE_OUTPUT = True
 DEBUG_UI_PANEL = True
 
+# AC Matrix Settings
+AC_MATRIX_DATA_DIR = BASE_DIR / 'data' / 'ac_matrices'
+AC_MATRIX_JSON_STANDARDS_DIR = BASE_DIR / 'data' / 'json_standards'
+AC_MATRIX_MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+AC_MATRIX_ALLOWED_EXTENSIONS = {'.json'}
+
+# Ensure AC Matrix data directories exist
+AC_MATRIX_DATA_DIR.mkdir(parents=True, exist_ok=True)
+AC_MATRIX_JSON_STANDARDS_DIR.mkdir(parents=True, exist_ok=True)
+

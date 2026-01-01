@@ -122,3 +122,6 @@ If drag-and-drop still doesn't work in real browser:
 The code is correct - if issues persist, they're likely browser-specific or related to event propagation.
 
 
+
+
+

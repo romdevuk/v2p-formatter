@@ -1,0 +1,605 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Observation Report Module - Isolated Styling -->
+<div class="obs-report-page-wrapper" id="obsReportPage">
+<link rel="stylesheet" href="{{ url_for('v2p_formatter.serve_static', filename='css/observation-report.css') }}">
+<link rel="stylesheet" href="{{ url_for('v2p_formatter.serve_static', filename='css/observation-report/observation-report-media-browser.css') }}">
+<style>
+    /* CRITICAL: Scope all styles to observation report page wrapper */
+    .obs-report-page-wrapper {
+        /* Isolate from base.html */
+        background: #1e1e1e !important;
+        color: #e0e0e0 !important;
+        width: 100%;
+        min-height: 100vh;
+    }
+    
+    /* Override base.html container styles */
+    .obs-report-page-wrapper body,
+    .obs-report-page-wrapper .container {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+    
+    /* Ensure live preview has highest priority styles */
+    .obs-report-page-wrapper #livePreview,
+    .obs-report-page-wrapper .live-preview-container,
+    .obs-report-page-wrapper #livePreviewColumn #livePreview,
+    .obs-report-page-wrapper #livePreviewColumn .live-preview-container {
+        background: #1e1e1e !important;
+        background-color: #1e1e1e !important;
+        color: #e0e0e0 !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    }
+</style>
+<!-- Observation Report Module -->
+<!-- 
+⚠️ IMPORTANT: This is a NEW module - no legacy code from old modules.
+The old observation-media module did not work properly and must be completely avoided.
+
+Author: UX Designer (Agent-3)
+Created: Stage 3
+-->
+
+<div class="observation-report-container">
+    <!-- Navigation Tabs -->
+    <div class="observation-report-nav-tabs">
+        <a href="/v2p-formatter/" class="nav-tab">Video to Image</a>
+        <a href="/v2p-formatter/media-converter" class="nav-tab">Media Converter</a>
+        <a href="/v2p-formatter/ac-matrix" class="nav-tab">AC Matrix</a>
+        <a href="/v2p-formatter/observation-media" class="nav-tab">Observation Media</a>
+        <a href="/v2p-formatter/observation-report" class="nav-tab active">Observation Report</a>
+    </div>
+    
+    <!-- Top Controls -->
+    <div class="observation-report-top-controls">
+        <div class="top-controls-row">
+            <div class="control-group">
+                <label for="qualificationSelect">Qualification:</label>
+                <select id="qualificationSelect" class="control-select">
+                    <option value="">Select Qualification...</option>
+                    {% for qualification in qualifications %}
+                    <option value="{{ qualification }}" {% if qualification == selected_qualification %}selected{% endif %}>{{ qualification }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="learnerSelect">Learner:</label>
+                <select id="learnerSelect" class="control-select" {% if not selected_qualification %}disabled{% endif %}>
+                    <option value="">Select Learner...</option>
+                    {% for learner in learners %}
+                    <option value="{{ learner }}" {% if learner == selected_learner %}selected{% endif %}>{{ learner }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="standardsSelect">Standards:</label>
+                <select id="standardsSelect" class="control-select">
+                    <option value="">Select Standards...</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <button id="loadDraftBtn" class="btn-secondary">📂 Load Draft</button>
+                <button id="refreshBtn" class="btn-secondary">🔄 Refresh</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 3-Column Resizable Layout -->
+    <div class="observation-report-main-layout" id="mainLayout">
+        <!-- Left Column: Media Browser -->
+        <div class="observation-report-column" id="mediaBrowserColumn">
+            <div id="mediaBrowser"></div>
+        </div>
+        
+        <!-- Center Column: Live Preview -->
+        <div class="observation-report-column" id="livePreviewColumn">
+            <div id="livePreview" class="live-preview-container"></div>
+        </div>
+        
+        <!-- Right Column: Standards -->
+        <div class="observation-report-column" id="standardsColumn">
+            <div id="standards"></div>
+        </div>
+    </div>
+    
+    <!-- Collapsible Sections (at bottom) -->
+    
+    <!-- Header Section -->
+    <div class="observation-report-collapsible-section" data-section="header">
+        <div class="section-header">
+            <span class="section-toggle">▶</span>
+            <h3>Header</h3>
+        </div>
+        <div class="section-content" style="display: none;">
+            <div class="header-form">
+                <div class="form-row">
+                    <label>Learner:</label>
+                    <input type="text" id="headerLearner" class="form-input" placeholder="Learner name">
+                </div>
+                <div class="form-row">
+                    <label>Assessor:</label>
+                    <input type="text" id="headerAssessor" class="form-input" placeholder="Assessor name">
+                </div>
+                <div class="form-row">
+                    <label>Visit Date:</label>
+                    <input type="date" id="headerVisitDate" class="form-input">
+                </div>
+                <div class="form-row">
+                    <label>Location:</label>
+                    <input type="text" id="headerLocation" class="form-input" placeholder="Location">
+                </div>
+                <div class="form-row">
+                    <label>Address:</label>
+                    <input type="text" id="headerAddress" class="form-input" placeholder="Address">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Text Editor Section -->
+    <div class="observation-report-collapsible-section" data-section="textEditor">
+        <div class="section-header">
+            <span class="section-toggle">▶</span>
+            <h3>Text Editor</h3>
+            <span class="section-stats" id="textEditorStats">Placeholders: 0 | Words: 0 | Assigned: 0 | Unassigned: 0</span>
+        </div>
+        <div class="section-content" style="display: none;">
+            <textarea id="textEditor" class="text-editor" placeholder="Enter your observation report text here... Use {{Placeholder_Name}} for media placeholders."></textarea>
+        </div>
+    </div>
+    
+    <!-- Assessor Feedback Section -->
+    <div class="observation-report-collapsible-section" data-section="assessorFeedback">
+        <div class="section-header">
+            <span class="section-toggle">▶</span>
+            <h3>Assessor Feedback</h3>
+        </div>
+        <div class="section-content" style="display: none;">
+            <textarea id="assessorFeedback" class="text-editor" placeholder="Enter assessor feedback here..."></textarea>
+        </div>
+    </div>
+    
+    <!-- Actions -->
+    <div class="observation-report-actions">
+        <button id="saveDraftBtn" class="btn-primary">💾 Save Draft</button>
+        <button id="previewDraftBtn" class="btn-primary">👁️ Preview Draft</button>
+    </div>
+</div>
+
+<!-- Draft Load Dialog -->
+<div id="draftLoadDialog" class="modal-overlay" style="display: none;">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h3>Load Draft</h3>
+            <button class="modal-close">✕</button>
+        </div>
+        <div class="modal-content">
+            <div id="draftList"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-report/observation-report-media-browser.js') }}"></script>
+<script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-report/observation-report-live-preview.js') }}"></script>
+<script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-report/observation-report-standards.js') }}"></script>
+<script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-report/observation-report-preview-draft.js') }}"></script>
+<script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-report/observation-report-column-resizer.js') }}"></script>
+<script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-report.js') }}"></script>
+<script>
+// Initialize Observation Report module
+document.addEventListener('DOMContentLoaded', () => {
+    // Set up UI event handlers (don't wait for observationReport)
+    setupUIHandlers();
+    
+    // Initialize Observation Report module if available (created by observation-report.js)
+    if (typeof window.observationReport !== 'undefined' && window.observationReport) {
+        // If qualification and learner are already selected (from URL params), load media
+        const qualificationSelect = document.getElementById('qualificationSelect');
+        const learnerSelect = document.getElementById('learnerSelect');
+        if (qualificationSelect && learnerSelect && 
+            qualificationSelect.value && learnerSelect.value) {
+            window.observationReport.loadMedia(qualificationSelect.value, learnerSelect.value);
+        }
+    } else {
+        // Wait a bit for module to initialize
+        setTimeout(() => {
+            if (window.observationReport) {
+                const qualificationSelect = document.getElementById('qualificationSelect');
+                const learnerSelect = document.getElementById('learnerSelect');
+                if (qualificationSelect && learnerSelect && 
+                    qualificationSelect.value && learnerSelect.value) {
+                    window.observationReport.loadMedia(qualificationSelect.value, learnerSelect.value);
+                }
+            }
+        }, 100);
+    }
+});
+
+function setupUIHandlers() {
+    // Qualification/Learner selection
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    
+    // Initialize learner dropdown state based on current qualification selection
+    if (qualificationSelect && learnerSelect) {
+        if (qualificationSelect.value && qualificationSelect.value !== '') {
+            learnerSelect.disabled = false;
+        } else {
+            learnerSelect.disabled = true;
+        }
+    }
+    
+    qualificationSelect?.addEventListener('change', async (e) => {
+        const qualification = e.target.value;
+        if (qualification) {
+            // Load learners
+            try {
+                const response = await fetch(`/v2p-formatter/observation-report/learners?qualification=${encodeURIComponent(qualification)}`);
+                const data = await response.json();
+                if (data.success) {
+                    learnerSelect.innerHTML = '<option value="">Select Learner...</option>';
+                    data.learners.forEach(learner => {
+                        const option = document.createElement('option');
+                        option.value = learner;
+                        option.textContent = learner;
+                        learnerSelect.appendChild(option);
+                    });
+                    learnerSelect.disabled = false;
+                } else {
+                    console.error('Error loading learners:', data.error);
+                    learnerSelect.innerHTML = '<option value="">No learners found</option>';
+                    learnerSelect.disabled = true;
+                }
+            } catch (error) {
+                console.error('Error loading learners:', error);
+                learnerSelect.innerHTML = '<option value="">Error loading learners</option>';
+                learnerSelect.disabled = true;
+            }
+        } else {
+            // Clear learners if no qualification selected
+            learnerSelect.innerHTML = '<option value="">Select Learner...</option>';
+            learnerSelect.disabled = true;
+        }
+    });
+    
+    learnerSelect?.addEventListener('change', (e) => {
+        const learner = e.target.value;
+        const qualification = qualificationSelect.value;
+        if (qualification && learner && window.observationReport) {
+            window.observationReport.loadMedia(qualification, learner);
+        }
+    });
+    
+    // Standards selection
+    const standardsSelect = document.getElementById('standardsSelect');
+    standardsSelect?.addEventListener('change', async (e) => {
+        const fileId = e.target.value;
+        if (fileId && window.observationReport) {
+            await window.observationReport.loadStandards(fileId);
+        }
+    });
+    
+    // Load standards files
+    loadStandardsFiles();
+    
+    // Section toggles
+    document.querySelectorAll('.section-header').forEach(header => {
+        header.addEventListener('click', (e) => {
+            const section = e.currentTarget.closest('.observation-report-collapsible-section');
+            const content = section.querySelector('.section-content');
+            const toggle = section.querySelector('.section-toggle');
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                toggle.textContent = '▼';
+            } else {
+                content.style.display = 'none';
+                toggle.textContent = '▶';
+            }
+        });
+    });
+    
+    // Text editor updates
+    const textEditor = document.getElementById('textEditor');
+    textEditor?.addEventListener('input', (e) => {
+        if (window.observationReport) {
+            window.observationReport.updateTextContent(e.target.value);
+            updateTextStats(e.target.value);
+        }
+    });
+    
+    // Also trigger on initial load if there's content
+    if (textEditor && textEditor.value && window.observationReport) {
+        window.observationReport.updateTextContent(textEditor.value);
+        updateTextStats(textEditor.value);
+    }
+    
+    // Header data updates
+    ['headerLearner', 'headerAssessor', 'headerVisitDate', 'headerLocation', 'headerAddress'].forEach(id => {
+        const input = document.getElementById(id);
+        input?.addEventListener('change', () => {
+            if (window.observationReport) {
+                window.observationReport.updateHeaderData({
+                    learner: document.getElementById('headerLearner').value,
+                    assessor: document.getElementById('headerAssessor').value,
+                    visit_date: document.getElementById('headerVisitDate').value,
+                    location: document.getElementById('headerLocation').value,
+                    address: document.getElementById('headerAddress').value
+                });
+            }
+        });
+    });
+    
+    // Assessor feedback updates
+    const assessorFeedback = document.getElementById('assessorFeedback');
+    assessorFeedback?.addEventListener('input', (e) => {
+        if (window.observationReport) {
+            window.observationReport.updateAssessorFeedback(e.target.value);
+        }
+    });
+    
+    // Save Draft button
+    document.getElementById('saveDraftBtn')?.addEventListener('click', async () => {
+        const draftName = prompt('Enter draft name:');
+        if (draftName && window.observationReport) {
+            const success = await window.observationReport.saveDraft(draftName);
+            if (success) {
+                alert('Draft saved successfully!');
+            } else {
+                alert('Error saving draft');
+            }
+        }
+    });
+    
+    // Preview Draft button
+    document.getElementById('previewDraftBtn')?.addEventListener('click', () => {
+        if (window.observationReport) {
+            window.observationReport.openPreview();
+        }
+    });
+    
+    // Load Draft button
+    document.getElementById('loadDraftBtn')?.addEventListener('click', () => {
+        showDraftLoadDialog();
+    });
+}
+
+async function loadStandardsFiles() {
+    try {
+        const response = await fetch('/v2p-formatter/ac-matrix/json-files');
+        const data = await response.json();
+        if (data.success) {
+            const select = document.getElementById('standardsSelect');
+            data.files.forEach(file => {
+                const option = document.createElement('option');
+                option.value = file.id;
+                option.textContent = file.qualification_name || file.name;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading standards files:', error);
+    }
+}
+
+function updateTextStats(text) {
+    // Extract placeholders
+    const placeholderPattern = /\{\{([A-Za-z0-9_]+)\}\}/g;
+    const placeholders = new Set();
+    let match;
+    while ((match = placeholderPattern.exec(text)) !== null) {
+        placeholders.add(match[1].toLowerCase());
+    }
+    
+    // Count words
+    const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+    
+    // Count assigned/unassigned (would need assignments state)
+    const assigned = 0; // TODO: Get from observationReport state
+    const unassigned = placeholders.size - assigned;
+    
+    const stats = document.getElementById('textEditorStats');
+    if (stats) {
+        stats.textContent = `Placeholders: ${placeholders.size} | Words: ${words} | Assigned: ${assigned} | Unassigned: ${unassigned}`;
+    }
+}
+
+async function showDraftLoadDialog() {
+    try {
+        const response = await fetch('/v2p-formatter/observation-report/drafts');
+        const data = await response.json();
+        if (data.success) {
+            const dialog = document.getElementById('draftLoadDialog');
+            const list = document.getElementById('draftList');
+            
+            list.innerHTML = '';
+            if (data.drafts.length === 0) {
+                list.innerHTML = '<p>No drafts available</p>';
+            } else {
+                data.drafts.forEach(draft => {
+                    const item = document.createElement('div');
+                    item.className = 'draft-item';
+                    item.innerHTML = `
+                        <div class="draft-name">${draft.draft_name}</div>
+                        <div class="draft-meta">Updated: ${new Date(draft.updated_at).toLocaleString()}</div>
+                        <button class="btn-load-draft" data-draft="${draft.draft_name}">Load</button>
+                    `;
+                    list.appendChild(item);
+                });
+            }
+            
+            dialog.style.display = 'flex';
+            
+            // Set up load buttons
+            list.querySelectorAll('.btn-load-draft').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const draftName = btn.dataset.draft;
+                    if (window.observationReport) {
+                        const success = await window.observationReport.loadDraft(draftName);
+                        if (success) {
+                            dialog.style.display = 'none';
+                            // Update UI with loaded draft data
+                            updateUIFromDraft();
+                        }
+                    }
+                });
+            });
+            
+            // Close button
+            dialog.querySelector('.modal-close')?.addEventListener('click', () => {
+                dialog.style.display = 'none';
+            });
+        }
+    } catch (error) {
+        console.error('Error loading drafts:', error);
+    }
+}
+
+function updateUIFromDraft() {
+    if (!window.observationReport) {
+        // Wait for observationReport to initialize
+        setTimeout(updateUIFromDraft, 200);
+        return;
+    }
+    
+    const state = window.observationReport.state;
+    
+    // Update text editor
+    const textEditor = document.getElementById('textEditor');
+    if (textEditor) {
+        textEditor.value = state.textContent || '';
+        textEditor.dispatchEvent(new Event('input'));
+    }
+    
+    // Update header fields
+    if (state.headerData) {
+        const headerLearner = document.getElementById('headerLearner');
+        const headerAssessor = document.getElementById('headerAssessor');
+        const headerVisitDate = document.getElementById('headerVisitDate');
+        const headerLocation = document.getElementById('headerLocation');
+        const headerAddress = document.getElementById('headerAddress');
+        
+        if (headerLearner) headerLearner.value = state.headerData.learner || '';
+        if (headerAssessor) headerAssessor.value = state.headerData.assessor || '';
+        if (headerVisitDate) headerVisitDate.value = state.headerData.visit_date || '';
+        if (headerLocation) headerLocation.value = state.headerData.location || '';
+        if (headerAddress) headerAddress.value = state.headerData.address || '';
+    }
+    
+    // Update assessor feedback
+    const assessorFeedback = document.getElementById('assessorFeedback');
+    if (assessorFeedback) {
+        assessorFeedback.value = state.assessorFeedback || '';
+    }
+    
+    // Update qualification/learner selects
+    if (state.qualification) {
+        const qualificationSelect = document.getElementById('qualificationSelect');
+        if (qualificationSelect) {
+            qualificationSelect.value = state.qualification;
+            qualificationSelect.dispatchEvent(new Event('change'));
+            
+            // Wait for learners to load, then set learner
+            if (state.learner) {
+                setTimeout(() => {
+                    const learnerSelect = document.getElementById('learnerSelect');
+                    if (learnerSelect) {
+                        learnerSelect.value = state.learner;
+                        learnerSelect.dispatchEvent(new Event('change'));
+                    }
+                }, 800);
+            }
+        }
+    }
+    
+    // Load standards if available - check multiple possible field names
+    const draft = window.observationReport.currentDraft;
+    if (draft) {
+        let standardsId = null;
+        if (draft.json_file_id) {
+            standardsId = draft.json_file_id;
+        } else if (draft.standards_file_id) {
+            standardsId = draft.standards_file_id;
+        } else if (state.standardsFileId) {
+            standardsId = state.standardsFileId;
+        }
+        
+        if (standardsId && window.observationReport.standards) {
+            console.log('Loading standards from draft:', standardsId);
+            window.observationReport.loadStandards(standardsId).then(() => {
+                console.log('Standards loaded successfully');
+            }).catch(err => {
+                console.error('Error loading standards:', err);
+            });
+        }
+    }
+}
+
+// CRITICAL CSS INJECTION - Ensures styles apply even if CSS files fail
+(function() {
+    'use strict';
+    const criticalCSS = `
+        /* Live Preview Container - Critical Styles */
+        .obs-report-page-wrapper #livePreview,
+        .obs-report-page-wrapper .live-preview-container {
+            background: #1e1e1e !important;
+            background-color: #1e1e1e !important;
+            color: #e0e0e0 !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            width: 100% !important;
+            height: 100% !important;
+            padding: 15px !important;
+        }
+        
+        .obs-report-page-wrapper .preview-content {
+            background: transparent !important;
+            color: #e0e0e0 !important;
+            white-space: pre-wrap !important;
+        }
+        
+        .obs-report-page-wrapper .preview-section {
+            color: #e0e0e0 !important;
+        }
+        
+        .obs-report-page-wrapper .section-title {
+            color: #e0e0e0 !important;
+        }
+        
+        .obs-report-page-wrapper .placeholder-container {
+            background: #2a2a2a !important;
+            border: 1px solid #555 !important;
+        }
+        
+        .obs-report-page-wrapper .placeholder-table {
+            background: #1e1e1e !important;
+            border: 1px solid #555 !important;
+        }
+        
+        .obs-report-page-wrapper .placeholder-table td {
+            background: #1e1e1e !important;
+            color: #e0e0e0 !important;
+            border: 1px solid #555 !important;
+        }
+    `;
+    
+    // Inject critical CSS as inline style tag
+    const style = document.createElement('style');
+    style.id = 'obs-report-critical-css';
+    style.textContent = criticalCSS;
+    document.head.appendChild(style);
+    
+    console.log('✅ Critical CSS injected for Observation Report');
+})();
+</script>
+{% endblock %}
+</div><!-- End obs-report-page-wrapper -->
+
