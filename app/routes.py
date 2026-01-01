@@ -1882,7 +1882,27 @@ def generate_image_documents():
             # Fallback: use first image's directory
             output_dir = Path(validated_paths[0]).parent
         
-        output_base_name = 'images_document'
+        # Get filename from request (mandatory)
+        filename = data.get('filename', '').strip()
+        if not filename:
+            return jsonify({
+                'success': False,
+                'error': 'Filename is required'
+            }), 400
+        
+        # Sanitize filename: remove invalid characters
+        import re
+        filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', filename)
+        # Remove leading/trailing dots and spaces
+        filename = re.sub(r'^[.\s]+|[.\s]+$', '', filename)
+        
+        if not filename:
+            return jsonify({
+                'success': False,
+                'error': 'Filename contains only invalid characters'
+            }), 400
+        
+        output_base_name = filename
         
         results = {}
         

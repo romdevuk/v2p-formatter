@@ -57,6 +57,9 @@
                 <div id="selectionCountBadge" style="display: none; padding: 6px 12px; background: #667eea; color: white; border-radius: 20px; font-weight: bold; font-size: 14px;">
                     <span id="selectionCount">0</span> image(s) selected
                 </div>
+                
+                <!-- Reset Selection Button -->
+                <button id="resetSelectionBtn" class="btn btn-secondary" style="display: none; padding: 6px 12px; font-size: 13px; background: #4a2a2a; border-color: #6a3a3a; color: #ff9999;">Reset Selection</button>
 
                 <!-- Layout Options -->
                 <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
@@ -160,8 +163,23 @@
     </section>
 
     <!-- Processing Section -->
-    <section class="processing-section" id="processingSection" style="display: none;">
+    <section class="processing-section" id="processingSection">
         <h2>3. Generate Documents</h2>
+        
+        <!-- Filename Input -->
+        <div style="margin-bottom: 20px; padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+            <label for="outputFilename" style="display: block; color: #e0e0e0; font-size: 14px; font-weight: 500; margin-bottom: 8px;">
+                Output Filename <span style="color: #f44;">*</span>
+            </label>
+            <input type="text" 
+                   id="outputFilename" 
+                   placeholder="Enter filename (without extension)" 
+                   style="width: 100%; padding: 10px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px; box-sizing: border-box;">
+            <p style="color: #999; font-size: 12px; margin-top: 6px; margin-bottom: 0;">
+                Filename will be used for both PDF and DOCX files (extensions added automatically)
+            </p>
+        </div>
+        
         <div class="action-buttons">
             <button class="btn btn-primary" id="generateDocumentsBtn" type="button">Generate Documents</button>
         </div>
@@ -299,6 +317,11 @@ function loadImages() {
 // Render image list with folder structure
 function renderImageList(images) {
     const container = document.getElementById('fileTreeContent');
+    const scrollContainer = document.getElementById('fileTree');
+    
+    // Save scroll position before re-rendering
+    const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+    const scrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
     
     if (!images || images.length === 0) {
         container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No images found</p>';
@@ -370,6 +393,15 @@ function renderImageList(images) {
     html += '</div>'; // Close grid container
     
     container.innerHTML = html;
+    
+    // Restore scroll position after DOM update
+    if (scrollContainer) {
+        // Use requestAnimationFrame to ensure DOM has been rendered
+        requestAnimationFrame(() => {
+            scrollContainer.scrollTop = scrollTop;
+            scrollContainer.scrollLeft = scrollLeft;
+        });
+    }
 }
 
 // Render folder with images in 3-column grid
@@ -514,6 +546,12 @@ function updateSelectionUI() {
         }
     }
     
+    // Show/hide reset selection button
+    const resetSelectionBtn = document.getElementById('resetSelectionBtn');
+    if (resetSelectionBtn) {
+        resetSelectionBtn.style.display = count > 0 ? 'block' : 'none';
+    }
+    
     if (orderControls) {
         orderControls.style.display = count > 0 ? 'flex' : 'none';
     }
@@ -523,10 +561,7 @@ function updateSelectionUI() {
     }
     
     // Output settings always visible (no need to hide)
-    // Processing section only shown if images selected
-    if (processingSection) {
-        processingSection.style.display = count > 0 ? 'block' : 'none';
-    }
+    // Processing section always visible (no need to hide)
     
     // Update batch indicator
     const batchIndicator = document.getElementById('batchSettingsIndicator');
@@ -597,6 +632,21 @@ function resetOrder() {
     renderImageList(window.appData.availableImages);
 }
 
+// Reset selection - clear all selected images
+function resetSelection() {
+    // Clear all selected images and order
+    window.appData.selectedImages = [];
+    window.appData.imageOrder = [];
+    
+    // Re-render to remove selection indicators
+    if (window.appData.availableImages && window.appData.availableImages.length > 0) {
+        renderImageList(window.appData.availableImages);
+    }
+    
+    // Update UI (this will hide badges, buttons, etc.)
+    updateSelectionUI();
+}
+
 // Utility function
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -619,6 +669,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (resetOrderBtn) {
         resetOrderBtn.addEventListener('click', resetOrder);
+    }
+    
+    const resetSelectionBtn = document.getElementById('resetSelectionBtn');
+    if (resetSelectionBtn) {
+        resetSelectionBtn.addEventListener('click', resetSelection);
     }
     
     // Thumbnails per row selector
@@ -665,6 +720,36 @@ function generateImageDocuments() {
         return;
     }
     
+    // Get and validate filename (mandatory)
+    const filenameInput = document.getElementById('outputFilename');
+    if (!filenameInput) {
+        alert('Filename input not found');
+        return;
+    }
+    
+    let filename = filenameInput.value.trim();
+    if (!filename) {
+        alert('Please enter a filename');
+        filenameInput.focus();
+        return;
+    }
+    
+    // Sanitize filename: remove invalid characters
+    filename = filename.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+    // Remove leading/trailing dots and spaces
+    filename = filename.replace(/^[.\s]+|[.\s]+$/g, '');
+    
+    if (filename.length === 0) {
+        alert('Filename contains only invalid characters. Please enter a valid filename.');
+        filenameInput.focus();
+        return;
+    }
+    
+    // Update input with sanitized value
+    if (filename !== filenameInput.value.trim()) {
+        filenameInput.value = filename;
+    }
+    
     // Get settings
     const quality = parseInt(document.getElementById('qualitySlider').value) || 95;
     const maxSize = document.getElementById('resolutionSelect').value || '640x480';
@@ -672,14 +757,19 @@ function generateImageDocuments() {
     const layout = document.getElementById('layoutSelect').value || 'grid';
     const imagesPerPage = parseInt(document.getElementById('imagesPerPage').value) || 2;
     
-    // Use custom order if available, otherwise use selection order
-    const imageOrder = window.appData.imageOrder && window.appData.imageOrder.length > 0 
-        ? window.appData.imageOrder 
-        : selectedImages.map(img => img.path);
+    // Sort selected images by sequence number to ensure correct order (1, 2, 3...)
+    const sortedSelectedImages = [...selectedImages].sort((a, b) => {
+        const seqA = a.sequence || 999999; // Put items without sequence at the end
+        const seqB = b.sequence || 999999;
+        return seqA - seqB;
+    });
+    
+    // Use sequence-based order
+    const imageOrder = sortedSelectedImages.map(img => img.path);
     
     const imagePaths = imageOrder;
     const imageNames = imageOrder.map(path => {
-        const img = selectedImages.find(i => i.path === path);
+        const img = sortedSelectedImages.find(i => i.path === path) || selectedImages.find(i => i.path === path);
         if (img) {
             // Remove extension from filename
             const name = img.name;
@@ -688,15 +778,15 @@ function generateImageDocuments() {
         }
         // Fallback: extract from path
         const pathParts = path.split('/');
-        const filename = pathParts[pathParts.length - 1];
-        const lastDot = filename.lastIndexOf('.');
-        return lastDot > 0 ? filename.substring(0, lastDot) : filename;
+        const imgFilename = pathParts[pathParts.length - 1];
+        const lastDot = imgFilename.lastIndexOf('.');
+        return lastDot > 0 ? imgFilename.substring(0, lastDot) : imgFilename;
     });
     
     // Show progress
-    const progressContainer = document.getElementById('progressContainer');
-    const progressFill = document.getElementById('progressFill');
-    const progressText = document.getElementById('progressText');
+    const progressContainer = document.getElementById('batchProgressContainer');
+    const progressFill = document.getElementById('batchProgressFill');
+    const progressText = document.getElementById('batchProgressText');
     const resultsDiv = document.getElementById('results');
     
     progressContainer.style.display = 'block';
@@ -704,11 +794,14 @@ function generateImageDocuments() {
     progressText.textContent = 'Generating documents...';
     resultsDiv.innerHTML = '';
     
-    // Disable button
-    const generateBtn = document.getElementById('generateOutputBtn');
+    // Disable button and filename input
+    const generateBtn = document.getElementById('generateDocumentsBtn');
     if (generateBtn) {
         generateBtn.disabled = true;
         generateBtn.textContent = 'Generating...';
+    }
+    if (filenameInput) {
+        filenameInput.disabled = true;
     }
     
     // Get qualification and learner for output folder
@@ -728,7 +821,8 @@ function generateImageDocuments() {
             layout: layout,
             images_per_page: imagesPerPage,
             qualification: qualification,
-            learner: learner
+            learner: learner,
+            filename: filename
         })
     })
     .then(r => r.json())
@@ -764,10 +858,13 @@ function generateImageDocuments() {
             resultsDiv.innerHTML = `<div style="padding: 20px; background: #4a2a2a; border-radius: 6px; margin-top: 20px; color: #f44;">❌ Error: ${data.error || 'Unknown error'}</div>`;
         }
         
-        // Re-enable button
+        // Re-enable button and filename input
         if (generateBtn) {
             generateBtn.disabled = false;
             generateBtn.textContent = 'Generate Documents';
+        }
+        if (filenameInput) {
+            filenameInput.disabled = false;
         }
     })
     .catch(err => {
@@ -775,10 +872,13 @@ function generateImageDocuments() {
         if (progressText) progressText.textContent = 'Error occurred';
         resultsDiv.innerHTML = `<div style="padding: 20px; background: #4a2a2a; border-radius: 6px; margin-top: 20px; color: #f44;">❌ Error: ${err.message}</div>`;
         
-        // Re-enable button
+        // Re-enable button and filename input
         if (generateBtn) {
             generateBtn.disabled = false;
             generateBtn.textContent = 'Generate Documents';
+        }
+        if (filenameInput) {
+            filenameInput.disabled = false;
         }
     });
 }

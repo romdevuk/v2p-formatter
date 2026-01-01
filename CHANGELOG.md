@@ -2,6 +2,48 @@
 
 All notable changes to the Video to Image Formatter (v2p-formatter) project will be documented in this file.
 
+## [Unreleased] - Image to PDF Module Enhancements
+
+### Added
+- **Mandatory Filename Input**:
+  - Added filename input field in "3. Generate Documents" section
+  - Filename is required before generating documents
+  - Field starts empty (no default value)
+  - Frontend and backend validation ensures valid filename
+  - Filename sanitization removes invalid characters
+  - Input is disabled during document generation
+
+- **Reset Selection Button**:
+  - Added "Reset Selection" button in main image selection controls
+  - Button styled with darker red theme (matching media selector)
+  - Only visible when images are selected
+  - Clears all selected images and sequence numbers
+  - Re-renders image list and updates UI automatically
+
+### Changed
+- **Generate Documents Section**:
+  - Section is now always visible (no longer hidden when no images selected)
+  - Removed conditional display logic
+  - Users can see and access the section at any time
+
+- **Filename Default Value**:
+  - Removed default "images_document" value from filename input
+  - Input field now starts empty
+  - Users must enter a custom filename
+
+### Fixed
+- **Scroll Position Reset**:
+  - Fixed issue where selecting images at the bottom caused page to scroll to top
+  - Scroll position is now preserved when image list is re-rendered
+  - Uses `requestAnimationFrame` to restore scroll position after DOM update
+  - Works for both vertical and horizontal scrolling
+
+- **Image Sequence Order**:
+  - Fixed output PDF/DOCX to properly follow sequence numbers (1, 2, 3, 4...)
+  - Images are now sorted by sequence number before document generation
+  - Sequence numbers displayed on thumbnails now match the order in output files
+  - Ordering remains consistent even if images were selected in different order
+
 ## [Unreleased] - Media Selector Improvements
 
 ### Fixed
