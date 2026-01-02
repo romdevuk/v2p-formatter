@@ -40,7 +40,9 @@ def scan_mp4_files(root_path: str) -> List[Dict]:
                     'name': mp4_file.name,
                     'size': stat.st_size,
                     'size_mb': round(stat.st_size / (1024 * 1024), 2),
-                    'folder': str(relative_path.parent) if relative_path.parent != Path('.') else 'root'
+                    'folder': str(relative_path.parent) if relative_path.parent != Path('.') else 'root',
+                    'modified_time': stat.st_mtime,  # Modification time (Unix timestamp) for cache keys
+                    'created_time': stat.st_ctime  # Creation time as fallback
                 })
         except (OSError, PermissionError) as e:
             # Skip files we can't access

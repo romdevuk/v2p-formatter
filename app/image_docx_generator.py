@@ -189,3 +189,4 @@ def create_image_docx(images, image_names, output_path, images_per_page=2, quali
     
     return str(output_path)
 
+

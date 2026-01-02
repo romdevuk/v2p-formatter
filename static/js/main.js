@@ -156,3 +156,47 @@ function showResults(message, type = 'success', links = []) {
     resultsDiv.style.display = 'block';
 }
 
+// Open file in macOS Preview (for PDFs) or default app
+function openFileInPreview(filePath) {
+    fetch('/v2p-formatter/open_file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: filePath })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('File opened in Preview:', filePath);
+        } else {
+            console.error('Failed to open file:', data.error);
+            alert('Failed to open file: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error opening file:', error);
+        alert('Error opening file: ' + error.message);
+    });
+}
+
+// Open folder in macOS Finder
+function openFolderInFinder(folderPath) {
+    fetch('/v2p-formatter/open_folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: folderPath })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Folder opened in Finder:', folderPath);
+        } else {
+            console.error('Failed to open folder:', data.error);
+            alert('Failed to open folder: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error opening folder:', error);
+        alert('Error opening folder: ' + error.message);
+    });
+}
+

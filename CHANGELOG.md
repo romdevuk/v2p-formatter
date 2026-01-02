@@ -2,7 +2,51 @@
 
 All notable changes to the Video to Image Formatter (v2p-formatter) project will be documented in this file.
 
-## [Unreleased] - Image to PDF Module Enhancements
+## [2026-01-02] - Automatic PDF Generation
+
+### Added
+- **Automatic PDF Generation by Default**:
+  - PDFs are now automatically generated after frame extraction completes
+  - Works in both single video mode and bulk selection mode
+  - No manual "Generate PDF" step required - PDFs are created immediately after frames are extracted
+  - PDF generation uses current output settings (layout, images per page)
+
+- **Enhanced PDF Results Display**:
+  - Results display now matches the `image-to-pdf` page format
+  - Shows "Output Filename" for each generated PDF
+  - Displays "Output Folder" path with clickable "📁 Open Output Folder" link (opens in Finder)
+  - Shows "File Path" as clickable link that opens the file's directory in Finder
+  - Provides "📄 Open PDF" link that opens the PDF in Apple Preview
+  - Supports bulk results display with numbered sections (PDF 1 of N, PDF 2 of N, etc.)
+
+- **Bulk Mode PDF Generation**:
+  - Each video in bulk selection mode automatically gets a PDF generated after its frames are extracted
+  - PDF results are collected and displayed together after all videos are processed
+  - Status updates show "✅ PDF Generated" for each video during batch processing
+  - All PDF results are displayed in a unified results section with proper formatting
+
+### Changed
+- **Frame Extraction Workflow**:
+  - Frame extraction now automatically triggers PDF generation
+  - Removed need for separate "Generate PDF" button click after extraction
+  - Results are displayed immediately after PDF generation completes
+  - Progress indicators show both frame extraction and PDF generation status
+
+- **Results Display Format**:
+  - Updated results display to match `image-to-pdf` page styling and structure
+  - File paths are now clickable and open Finder to the file location
+  - PDF links use consistent "📄 Open PDF" text and open in Apple Preview
+  - Output folder information is prominently displayed with Finder link
+
+### Technical Details
+- Added `generatePDFAuto()` function to automatically generate PDFs after frame extraction
+- Added `showPDFResults()` function with support for single and bulk PDF results
+- Modified `extractFrames()` handler to call `generatePDFAuto()` after successful extraction
+- Updated `startBulkExtraction()` to generate PDFs for each video after frame extraction
+- PDF results are stored in `window.appData.batchResults[i].pdfResult` for bulk mode
+- Results display includes proper HTML escaping and error handling
+
+## [2026-01-01] - Image to PDF Module Enhancements
 
 ### Added
 - **Mandatory Filename Input**:
@@ -44,7 +88,16 @@ All notable changes to the Video to Image Formatter (v2p-formatter) project will
   - Sequence numbers displayed on thumbnails now match the order in output files
   - Ordering remains consistent even if images were selected in different order
 
-## [Unreleased] - Media Selector Improvements
+- **Thumbnail Caching Performance**:
+  - Fixed issue where all thumbnails were reloaded on every page render/interaction
+  - Replaced timestamp-based cache-buster with file modification time in thumbnail URLs
+  - Changed backend cache headers from `no-cache` to `public, max-age=31536000` (1 year)
+  - Added ETag support for conditional requests (304 Not Modified responses)
+  - Thumbnails now cached in browser and only reload when source files actually change
+  - Significantly faster page loads and smoother interactions when selecting images
+  - Reduced server load by eliminating unnecessary thumbnail regeneration
+
+## [2026-01-01] - Media Selector Improvements
 
 ### Fixed
 - **Folder Expansion in Media Selector**: 
@@ -74,7 +127,7 @@ All notable changes to the Video to Image Formatter (v2p-formatter) project will
   - More detailed console logging for debugging API issues
   - Handles HTTP errors and API error responses gracefully
 
-## [Unreleased] - Component Removal & Cleanup
+## [2026-01-01] - Component Removal & Cleanup
 
 ### Removed
 - **AC Matrix Component**: Completely removed all routes, functions, and navigation links
@@ -107,7 +160,7 @@ All notable changes to the Video to Image Formatter (v2p-formatter) project will
   - Cleaned up empty section markers
   - Removed unused function definitions without route decorators
 
-## [Unreleased] - Image to PDF Module Enhancements
+## [2026-01-01] - Image to PDF Module Enhancements
 
 ### Added
 - **Full-Screen Bulk Image Selector Modal**:

@@ -66,6 +66,20 @@
                 <div id="selectionCountBadge" style="display: none; padding: 6px 12px; background: #667eea; color: white; border-radius: 20px; font-weight: bold; font-size: 14px;">
                     <span id="selectionCount">0</span> video(s) selected
                 </div>
+                
+                <!-- Layout Options -->
+                <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
+                    <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Sort by:</label>
+                    <select id="sortBy" style="padding: 6px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px; cursor: pointer;">
+                        <option value="name" selected>Name</option>
+                        <option value="date">Date/Time</option>
+                    </select>
+                    <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Thumbnails per row:</label>
+                    <select id="thumbnailsPerRow" style="padding: 6px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px; cursor: pointer;">
+                        <option value="3" selected>3</option>
+                        <option value="4">4</option>
+                    </select>
+                </div>
             </div>
         </div>
         
@@ -234,7 +248,9 @@ window.appData = {
     selectedVideos: [],           // Array of {path, name, info} for bulk mode
     currentBatchIndex: 0,
     batchResults: [],             // Results for each video in batch
-    availableFiles: []            // Available files list (for re-rendering)
+    availableFiles: [],           // Available files list (for re-rendering)
+    thumbnailsPerRow: 3,          // Number of thumbnails per row (3 or 4)
+    sortBy: 'name'                // Sort order: 'name' (default) or 'date'
 };
 
 // Debug function
@@ -413,62 +429,129 @@ function renderVideoList(files) {
     const selectedVideos = window.appData.selectedVideos || [];
     const selectedPaths = selectedVideos.map(v => v.path);
     
-    let html = '';
-    files.forEach(file => {
+    // Check for single mode selection (current video path)
+    const currentVideoPath = window.appData.videoPath;
+    
+    // Get thumbnails per row setting - default to 3
+    let thumbnailsPerRow = 3;
+    if (window.appData && window.appData.thumbnailsPerRow) {
+        const parsed = parseInt(window.appData.thumbnailsPerRow);
+        if (!isNaN(parsed) && parsed > 0) {
+            thumbnailsPerRow = parsed;
+        }
+    }
+    if (thumbnailsPerRow < 3) {
+        thumbnailsPerRow = 3;
+    }
+    
+    // Get sort setting
+    const sortBy = (window.appData && window.appData.sortBy) ? window.appData.sortBy : 'name';
+    
+    // Sort files
+    const sortedFiles = [...files];
+    if (sortBy === 'date') {
+        sortedFiles.sort((a, b) => {
+            const dateA = a.modified_time || a.created_time || 0;
+            const dateB = b.modified_time || b.created_time || 0;
+            if (dateA !== dateB) {
+                return dateB - dateA; // Newest first
+            }
+            return a.name.localeCompare(b.name);
+        });
+    } else {
+        sortedFiles.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    
+    // Start with grid container
+    let html = `<div style="display: grid; grid-template-columns: repeat(${thumbnailsPerRow}, 1fr); gap: 16px; width: 100%;">`;
+    
+    sortedFiles.forEach(file => {
         const path = file.path.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
         const name = file.name.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
-        const cacheBuster = new Date().getTime();
-        const thumbnailUrl = `/v2p-formatter/thumbnail?path=${encodeURIComponent(file.path)}&size=120x90&t=${cacheBuster}`;
-        const isSelected = selectedPaths.includes(file.path);
+        const cacheKey = file.modified_time ? `m=${Math.floor(file.modified_time)}` : `t=${new Date().getTime()}`;
+        const thumbnailUrl = `/v2p-formatter/thumbnail?path=${encodeURIComponent(file.path)}&size=240x180&${cacheKey}`;
         
-        // Style based on selection state
-        const bgColor = isSelected ? '#2a3a4a' : '#2a2a2a';
+        // Check if selected: either in bulk mode selection OR is current video in single mode
+        const isSelected = bulkMode ? selectedPaths.includes(file.path) : (currentVideoPath === file.path);
+        
+        // Style based on selection state - make highlighting more prominent
+        const bgColor = isSelected ? '#2a3a4a' : '#1e1e1e';
         const borderColor = isSelected ? '#667eea' : '#555';
-        const borderWidth = isSelected ? '2px' : '1px';
+        const borderWidth = isSelected ? '3px' : '2px';
+        const boxShadow = isSelected ? '0 0 0 2px rgba(102, 126, 234, 0.3)' : 'none';
+        
+        // Escape path for use in JavaScript
+        const jsPath = path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         
         html += `
-            <div data-video-path="${path}" 
+            <div class="video-item ${isSelected ? 'selected' : ''}" 
+                 data-video-path="${path}" 
                  data-video-name="${name}"
                  onclick="handleVideoClick('${path}', '${name}')" 
-                 style="cursor: pointer; padding: 12px; margin: 8px 0; background: ${bgColor}; border-radius: 6px; border: ${borderWidth} solid ${borderColor}; transition: all 0.2s; color: #e0e0e0; display: flex; gap: 12px; align-items: flex-start; position: relative;"
-                 onmouseover="if (!window.appData.bulkMode) { this.style.background='#333'; this.style.borderColor='#667eea'; }"
-                 onmouseout="if (!window.appData.bulkMode) { const selected = (window.appData.selectedVideos || []).some(v => v.path === '${path}'); this.style.background=selected ? '#2a3a4a' : '#2a2a2a'; this.style.borderColor=selected ? '#667eea' : '#555'; }">
+                 style="cursor: pointer; padding: 12px; border-radius: 8px; background: ${bgColor}; border: ${borderWidth} solid ${borderColor}; box-shadow: ${boxShadow}; transition: all 0.2s; position: relative; width: 100%; box-sizing: border-box;"
+                 onmouseover="if (!this.classList.contains('selected')) { this.style.background='#2a2a2a'; this.style.borderColor='#667eea'; }"
+                 onmouseout="checkVideoSelectionState(this, '${jsPath}');">
+                ${isSelected ? `
+                    <div style="position: absolute; top: 8px; right: 8px; z-index: 10; background: #667eea; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.5);">✓</div>
+                ` : ''}
                 ${bulkMode ? `
                     <div style="position: absolute; top: 8px; left: 8px; z-index: 10;">
                         <input type="checkbox" 
                                ${isSelected ? 'checked' : ''}
                                onclick="event.stopPropagation(); toggleVideoSelection('${path}', '${name}');"
-                               style="width: 20px; height: 20px; cursor: pointer; accent-color: #667eea;">
+                               style="width: 24px; height: 24px; cursor: pointer; accent-color: #667eea;">
                     </div>
                 ` : ''}
-                ${isSelected ? `
-                    <div style="position: absolute; top: 8px; right: 8px; z-index: 10; background: #4ade80; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">✓</div>
-                ` : ''}
-                <div style="flex-shrink: 0; width: 120px; height: 90px; background: #1a1a1a; border: 1px solid #444; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
+                <div style="width: 100%; padding-top: 75%; background: #1a1a1a; border-radius: 4px; overflow: hidden; position: relative; margin-bottom: 8px;">
                     <img src="${thumbnailUrl}" 
                          alt="${file.name}" 
-                         style="max-width: 100%; max-height: 100%; object-fit: contain;"
+                         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;"
                          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                          onload="this.nextElementSibling.style.display='none';">
-                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; position: absolute; width: 100%; height: 100%; background: #1a1a1a;">
-                        <span style="font-size: 1.5em;">⏳</span>
-                        <span>Loading...</span>
+                    <div style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; background: #1a1a1a;">
+                        <span style="font-size: 2em;">🎬</span>
                     </div>
                     <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.7); color: #fff; padding: 2px 6px; border-radius: 3px; font-size: 10px;">▶️</div>
                 </div>
-                <div style="flex: 1; min-width: 0; ${bulkMode ? 'padding-left: 30px;' : ''}">
-                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                        <span style="font-size: 1.3em;">🎬</span>
-                        <strong style="margin-left: 10px; word-break: break-word;">${file.name}</strong>
-                        <span style="color: #999; margin-left: 10px; white-space: nowrap;">(${file.size_mb} MB)</span>
-                    </div>
+                <div style="padding: 0 4px;">
+                    <div style="color: #e0e0e0; font-weight: 500; font-size: 13px; word-break: break-word; text-align: center; margin-bottom: 4px;">${file.name}</div>
+                    <div style="color: #666; font-size: 11px; text-align: center;">(${file.size_mb} MB)</div>
                 </div>
             </div>
         `;
     });
+    html += '</div>'; // Close grid container
     document.getElementById('fileTreeContent').innerHTML = html;
     updateSelectionUI();
 }
+
+// Helper function to check and update video selection state on mouseout
+window.checkVideoSelectionState = function(element, filePath) {
+    const bulkMode = window.appData.bulkMode || false;
+    const currentVideoPath = window.appData.videoPath;
+    
+    let isSelected = false;
+    if (bulkMode) {
+        const selectedVideos = window.appData.selectedVideos || [];
+        isSelected = selectedVideos.some(v => v.path === filePath);
+    } else {
+        isSelected = (currentVideoPath === filePath);
+    }
+    
+    if (isSelected) {
+        element.style.background = '#2a3a4a';
+        element.style.borderColor = '#667eea';
+        element.style.borderWidth = '3px';
+        element.style.boxShadow = '0 0 0 2px rgba(102, 126, 234, 0.3)';
+        element.classList.add('selected');
+    } else {
+        element.style.background = '#1e1e1e';
+        element.style.borderColor = '#555';
+        element.style.borderWidth = '2px';
+        element.style.boxShadow = 'none';
+        element.classList.remove('selected');
+    }
+};
 
 // Handle video click (single or bulk mode)
 window.handleVideoClick = function(filePath, fileName) {
@@ -535,6 +618,11 @@ window.selectSingleVideo = function(filePath, fileName) {
             
             window.appData.videoPath = data.filepath;
             window.appData.videoInfo = data;
+            
+            // Re-render video list to update highlighting
+            if (window.appData.availableFiles && window.appData.availableFiles.length > 0) {
+                renderVideoList(window.appData.availableFiles);
+            }
             
             const video = document.getElementById('videoPlayer');
             if (video) {
@@ -1009,6 +1097,60 @@ async function startBulkExtraction(selectedVideos, timePoints) {
                 `;
                 
                 debug(`Extracted frames for ${video.name}: ${data.count} frames`, 'success');
+                
+                // Automatically generate PDF after frame extraction
+                try {
+                    const layout = document.getElementById('layoutSelect')?.value || 'grid';
+                    const imagesPerPage = parseInt(document.getElementById('imagesPerPage')?.value || 4);
+                    
+                    statusItem.innerHTML = `
+                        <div>
+                            <strong style="color: #e0e0e0;">${video.name}</strong>
+                            <div style="color: #667eea; font-size: 12px; margin-top: 2px;">⏳ Generating PDF...</div>
+                        </div>
+                    `;
+                    
+                    const pdfResponse = await fetch('/v2p-formatter/generate_pdf', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            video_path: video.path,
+                            image_paths: data.images || [],
+                            layout: layout,
+                            images_per_page: imagesPerPage
+                        })
+                    });
+                    
+                    const pdfData = await pdfResponse.json();
+                    if (pdfData.success) {
+                        window.appData.batchResults[i].pdfResult = pdfData;
+                        statusItem.innerHTML = `
+                            <div>
+                                <strong style="color: #e0e0e0;">${video.name}</strong>
+                                <div style="color: #4ade80; font-size: 12px; margin-top: 2px;">✅ PDF Generated - ${data.count} frames</div>
+                            </div>
+                        `;
+                        debug(`PDF generated for ${video.name}: ${pdfData.filename}`, 'success');
+                    } else {
+                        window.appData.batchResults[i].pdfError = pdfData.error || 'Unknown error';
+                        statusItem.innerHTML = `
+                            <div>
+                                <strong style="color: #e0e0e0;">${video.name}</strong>
+                                <div style="color: #ff6b6b; font-size: 12px; margin-top: 2px;">⚠️ Frames extracted, PDF failed</div>
+                            </div>
+                        `;
+                        debug(`PDF generation failed for ${video.name}: ${pdfData.error}`, 'error');
+                    }
+                } catch (pdfErr) {
+                    window.appData.batchResults[i].pdfError = pdfErr.message;
+                    statusItem.innerHTML = `
+                        <div>
+                            <strong style="color: #e0e0e0;">${video.name}</strong>
+                            <div style="color: #ff6b6b; font-size: 12px; margin-top: 2px;">⚠️ Frames extracted, PDF error</div>
+                        </div>
+                    `;
+                    debug(`PDF generation error for ${video.name}: ${pdfErr.message}`, 'error');
+                }
             } else {
                 // Error
                 window.appData.batchResults[i].status = 'error';
@@ -1047,17 +1189,30 @@ async function startBulkExtraction(selectedVideos, timePoints) {
     }
     
     // All done
-    batchText.textContent = `Batch extraction complete! ${completed} of ${selectedVideos.length} videos processed.`;
+    batchText.textContent = `Batch extraction and PDF generation complete! ${completed} of ${selectedVideos.length} videos processed.`;
     
-    // Show generate button if any videos succeeded
+    // Show generate button if any videos succeeded (for DOCX generation if needed)
     const successfulVideos = window.appData.batchResults.filter(r => r.status === 'completed');
     if (successfulVideos.length > 0) {
         document.getElementById('generateOutputBtn').style.display = 'inline-block';
         updateGenerateButtonLabel();
     }
     
-    // Show summary
+    // Show summary first
     showBulkExtractionResults();
+    
+    // Then show PDF results (this will append or replace the results div)
+    const pdfResults = window.appData.batchResults
+        .filter(r => r.status === 'completed' && r.pdfResult)
+        .map(r => r.pdfResult);
+    
+    // Show PDF results if any were generated (after bulk summary)
+    if (pdfResults.length > 0) {
+        // Small delay to ensure bulk summary is shown first
+        setTimeout(() => {
+            showPDFResults({ results: pdfResults });
+        }, 100);
+    }
 }
 
 // Show bulk extraction results summary
@@ -1580,16 +1735,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('progressFill').style.width = '100%';
                     document.getElementById('progressText').textContent = `Extracted ${data.count} frames!`;
                     
+                    // Automatically generate PDF after frame extraction
                     setTimeout(() => {
                         document.getElementById('progressContainer').style.display = 'none';
-                        document.getElementById('generateOutputBtn').style.display = 'inline-block';
-                        document.getElementById('results').innerHTML = `
-                            <div style="padding: 15px; background: #1e3a1e; border: 1px solid #2d5a2d; border-radius: 6px; margin-top: 15px; color: #e0e0e0;">
-                                <strong>✅ Success!</strong> Extracted ${data.count} frames.<br>
-                                Images saved to: ${data.output_dir}
-                            </div>
-                        `;
-                        debug(`Extracted ${data.count} frames successfully`, 'success');
+                        generatePDFAuto();
                     }, 1000);
                 } else {
                     document.getElementById('progressContainer').style.display = 'none';
@@ -2061,6 +2210,37 @@ document.addEventListener('DOMContentLoaded', function() {
         learnerSelect.addEventListener('change', handleLearnerChange);
     }
     
+    // Sort by control
+    const sortBySelect = document.getElementById('sortBy');
+    if (sortBySelect) {
+        sortBySelect.value = window.appData.sortBy || 'name';
+        sortBySelect.addEventListener('change', function() {
+            window.appData.sortBy = this.value;
+            // Re-render video list if files are loaded
+            if (window.appData.availableFiles && window.appData.availableFiles.length > 0) {
+                renderVideoList(window.appData.availableFiles);
+            }
+        });
+    }
+    
+    // Thumbnails per row control
+    const thumbnailsPerRowSelect = document.getElementById('thumbnailsPerRow');
+    if (thumbnailsPerRowSelect) {
+        // Force default to 3 if not set
+        if (!window.appData.thumbnailsPerRow || window.appData.thumbnailsPerRow < 3) {
+            window.appData.thumbnailsPerRow = 3;
+        }
+        thumbnailsPerRowSelect.value = window.appData.thumbnailsPerRow;
+        thumbnailsPerRowSelect.addEventListener('change', function() {
+            const value = parseInt(this.value) || 3;
+            window.appData.thumbnailsPerRow = Math.max(value, 3); // Ensure minimum 3
+            // Re-render video list if files are loaded
+            if (window.appData.availableFiles && window.appData.availableFiles.length > 0) {
+                renderVideoList(window.appData.availableFiles);
+            }
+        });
+    }
+    
     // Auto-load if both are selected (from URL parameters)
     const urlParams = new URLSearchParams(window.location.search);
     const selectedQualification = urlParams.get('qualification');
@@ -2090,5 +2270,120 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
+// Auto-generate PDF after frame extraction
+function generatePDFAuto() {
+    if (!window.appData.extractedImages || window.appData.extractedImages.length === 0) {
+        return;
+    }
+    
+    const layout = document.getElementById('layoutSelect')?.value || 'grid';
+    const imagesPerPage = parseInt(document.getElementById('imagesPerPage')?.value || 4);
+    
+    document.getElementById('progressContainer').style.display = 'block';
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressText').textContent = 'Generating PDF...';
+    
+    fetch('/v2p-formatter/generate_pdf', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            video_path: window.appData.videoPath,
+            image_paths: window.appData.extractedImages,
+            layout: layout,
+            images_per_page: imagesPerPage
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('progressFill').style.width = '100%';
+            document.getElementById('progressText').textContent = 'PDF generated successfully!';
+            
+            setTimeout(() => {
+                document.getElementById('progressContainer').style.display = 'none';
+                showPDFResults(data);
+            }, 1000);
+        } else {
+            document.getElementById('progressContainer').style.display = 'none';
+            alert('Error: ' + (data.error || 'Failed to generate PDF'));
+            debug('PDF generation error: ' + (data.error || 'Unknown'), 'error');
+        }
+    })
+    .catch(error => {
+        document.getElementById('progressContainer').style.display = 'none';
+        console.error('PDF generation error:', error);
+        alert('Failed to generate PDF: ' + error.message);
+        debug('PDF generation error: ' + error.message, 'error');
+    });
+}
+
+// Show PDF results with proper formatting (matching image-to-pdf)
+function showPDFResults(data) {
+    const resultsDiv = document.getElementById('results');
+    if (!resultsDiv) return;
+    
+    // Check if this is bulk results (array of results)
+    const isBulk = Array.isArray(data) || (data.results && Array.isArray(data.results));
+    const results = isBulk ? (data.results || data) : [data];
+    
+    let html = '<div style="padding: 20px; background: #2a2a2a; border-radius: 6px; margin-top: 20px;">';
+    
+    if (isBulk && results.length > 1) {
+        html += `<h3 style="color: #e0e0e0; margin-top: 0;">✅ ${results.length} PDFs Generated Successfully!</h3>`;
+    } else {
+        html += '<h3 style="color: #e0e0e0; margin-top: 0;">✅ PDF Generated Successfully!</h3>';
+    }
+    
+    // Process each result
+    results.forEach((result, index) => {
+        if (isBulk && results.length > 1) {
+            html += `<h4 style="color: #e0e0e0; margin-top: ${index > 0 ? '20px' : '0'}; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #555;">PDF ${index + 1} of ${results.length}</h4>`;
+        }
+        
+        // Output Filename
+        if (result.filename) {
+            html += '<p style="color: #e0e0e0; margin-bottom: 15px;"><strong>Output Filename:</strong> <span style="color: #999; font-family: monospace;">' + escapeHtml(result.filename) + '</span></p>';
+        }
+        
+        // Add output folder path
+        if (result.output_folder_path) {
+            html += '<p style="margin-bottom: 15px;"><strong style="color: #e0e0e0;">Output Folder:</strong></p>';
+            html += `<p style="margin-bottom: 15px; padding: 10px; background: #1e1e1e; border-radius: 4px; word-break: break-all; font-family: monospace; color: #999; font-size: 12px;">${escapeHtml(result.output_folder_path)}</p>`;
+            html += `<p style="margin-bottom: 20px;"><a href="#" onclick="openFolderInFinder('${result.output_folder_path.replace(/'/g, "\\'")}'); return false;" style="color: #667eea; text-decoration: underline; font-weight: 500; cursor: pointer;">📁 Open Output Folder</a></p>`;
+            html += '<hr style="border: none; border-top: 1px solid #555; margin: 15px 0;">';
+        }
+        
+        // Add PDF file path (clickable to open in Finder) - matching image-to-pdf format
+        if (result.file_path) {
+            // Extract directory from file path for Finder link
+            const fileDir = result.file_path.substring(0, result.file_path.lastIndexOf('/'));
+            html += '<p style="color: #e0e0e0; margin-bottom: 10px;"><strong>File Path:</strong> <a href="#" onclick="openFolderInFinder(\'' + fileDir.replace(/'/g, "\\'") + '\'); return false;" style="color: #667eea; text-decoration: underline; cursor: pointer;">' + escapeHtml(result.file_path) + '</a></p>';
+        }
+        
+        // Add PDF links - matching image-to-pdf format exactly
+        const pdfRelativePath = result.pdf_relative_path || result.file_path;
+        if (pdfRelativePath) {
+            html += '<p style="color: #e0e0e0; margin-bottom: 10px;"><strong>PDF:</strong> <a href="#" onclick="openFileInPreview(\'' + pdfRelativePath.replace(/'/g, "\\'") + '\'); return false;" style="color: #667eea; text-decoration: underline; cursor: pointer;">📄 Open PDF</a></p>';
+        }
+        
+        if (index < results.length - 1) {
+            html += '<hr style="border: none; border-top: 1px solid #555; margin: 20px 0;">';
+        }
+    });
+    
+    html += '</div>';
+    resultsDiv.innerHTML = html;
+    resultsDiv.style.display = 'block';
+}
+
+// Utility function to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 </script>
 {% endblock %}

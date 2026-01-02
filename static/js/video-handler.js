@@ -313,15 +313,10 @@ function extractFrames() {
             appState.extractedImages = data.images;
             showProgress(100, 'Frames extracted successfully!');
             
+            // Automatically generate PDF after frame extraction
             setTimeout(() => {
-                hideProgress();
-                showResults(
-                    `Successfully extracted ${data.count} frames`,
-                    'success',
-                    [{ url: data.output_dir, text: 'View output folder' }]
-                );
-                document.getElementById('generatePdfBtn').style.display = 'block';
-            }, 1000);
+                generatePDFAuto();
+            }, 500);
         } else {
             hideProgress();
             showResults(data.error || 'Failed to extract frames', 'error');
@@ -338,6 +333,51 @@ function extractFrames() {
 const generatePdfBtn = document.getElementById('generatePdfBtn');
 if (generatePdfBtn) {
     generatePdfBtn.addEventListener('click', generatePDF);
+}
+
+// Auto-generate PDF after frame extraction
+function generatePDFAuto() {
+    if (!appState.extractedImages || appState.extractedImages.length === 0) {
+        return;
+    }
+    
+    const layout = document.getElementById('layoutSelect')?.value || 'grid';
+    const imagesPerPage = parseInt(document.getElementById('imagesPerPage')?.value || 4);
+    
+    showProgress(0, 'Generating PDF...');
+    
+    fetch('/v2p-formatter/generate_pdf', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            video_path: appState.videoPath,
+            image_paths: appState.extractedImages,
+            layout: layout,
+            images_per_page: imagesPerPage
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            appState.pdfPath = data.pdf_path;
+            showProgress(100, 'PDF generated successfully!');
+            
+            setTimeout(() => {
+                hideProgress();
+                showPDFResults(data);
+            }, 1000);
+        } else {
+            hideProgress();
+            showResults(data.error || 'Failed to generate PDF', 'error');
+        }
+    })
+    .catch(error => {
+        hideProgress();
+        console.error('PDF generation error:', error);
+        showResults('Failed to generate PDF: ' + error.message, 'error');
+    });
 }
 
 function generatePDF() {
@@ -371,11 +411,7 @@ function generatePDF() {
             
             setTimeout(() => {
                 hideProgress();
-                showResults(
-                    'PDF generated successfully!',
-                    'success',
-                    [{ url: `/v2p-formatter/download?path=${encodeURIComponent(data.pdf_path)}`, text: `Download ${data.filename}` }]
-                );
+                showPDFResults(data);
             }, 1000);
         } else {
             hideProgress();
@@ -387,5 +423,73 @@ function generatePDF() {
         console.error('PDF generation error:', error);
         showResults('Failed to generate PDF: ' + error.message, 'error');
     });
+}
+
+// Show PDF results with file path and Preview link
+function showPDFResults(data) {
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.className = 'results success';
+    
+    // Check if this is bulk results (array of results)
+    const isBulk = Array.isArray(data) || (data.results && Array.isArray(data.results));
+    const results = isBulk ? (data.results || data) : [data];
+    
+    let html = '<div style="padding: 20px; background: #2a2a2a; border-radius: 6px; margin-top: 20px;">';
+    
+    if (isBulk && results.length > 1) {
+        html += `<h3 style="color: #e0e0e0; margin-top: 0;">✅ ${results.length} PDFs Generated Successfully!</h3>`;
+    } else {
+        html += '<h3 style="color: #e0e0e0; margin-top: 0;">✅ PDF Generated Successfully!</h3>';
+    }
+    
+    // Process each result
+    results.forEach((result, index) => {
+        if (isBulk && results.length > 1) {
+            html += `<h4 style="color: #e0e0e0; margin-top: ${index > 0 ? '20px' : '0'}; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #555;">PDF ${index + 1} of ${results.length}</h4>`;
+        }
+        
+        // Output Filename
+        if (result.filename) {
+            html += '<p style="color: #e0e0e0; margin-bottom: 15px;"><strong>Output Filename:</strong> <span style="color: #999; font-family: monospace;">' + escapeHtml(result.filename) + '</span></p>';
+        }
+        
+        // Add output folder path
+        if (result.output_folder_path) {
+            html += '<p style="margin-bottom: 15px;"><strong style="color: #e0e0e0;">Output Folder:</strong></p>';
+            html += `<p style="margin-bottom: 15px; padding: 10px; background: #1e1e1e; border-radius: 4px; word-break: break-all; font-family: monospace; color: #999; font-size: 12px;">${escapeHtml(result.output_folder_path)}</p>`;
+            html += `<p style="margin-bottom: 20px;"><a href="#" onclick="openFolderInFinder('${result.output_folder_path.replace(/'/g, "\\'")}'); return false;" style="color: #667eea; text-decoration: underline; font-weight: 500; cursor: pointer;">📁 Open Output Folder</a></p>`;
+            html += '<hr style="border: none; border-top: 1px solid #555; margin: 15px 0;">';
+        }
+        
+        // Add PDF file path (clickable to open in Finder) - matching image-to-pdf format
+        // Note: image-to-pdf doesn't show file path separately, but we'll keep it for video formatter
+        // The file path should be clickable to open Finder to that file's location
+        if (result.file_path) {
+            // Extract directory from file path for Finder link
+            const fileDir = result.file_path.substring(0, result.file_path.lastIndexOf('/'));
+            html += '<p style="color: #e0e0e0; margin-bottom: 10px;"><strong>File Path:</strong> <a href="#" onclick="openFolderInFinder(\'' + fileDir.replace(/'/g, "\\'") + '\'); return false;" style="color: #667eea; text-decoration: underline; cursor: pointer;">' + escapeHtml(result.file_path) + '</a></p>';
+        }
+        
+        // Add PDF links - matching image-to-pdf format exactly
+        const pdfRelativePath = result.pdf_relative_path || result.file_path;
+        if (pdfRelativePath) {
+            html += '<p style="color: #e0e0e0; margin-bottom: 10px;"><strong>PDF:</strong> <a href="#" onclick="openFileInPreview(\'' + pdfRelativePath.replace(/'/g, "\\'") + '\'); return false;" style="color: #667eea; text-decoration: underline; cursor: pointer;">📄 Open PDF</a></p>';
+        }
+        
+        if (index < results.length - 1) {
+            html += '<hr style="border: none; border-top: 1px solid #555; margin: 20px 0;">';
+        }
+    });
+    
+    html += '</div>';
+    resultsDiv.innerHTML = html;
+    resultsDiv.style.display = 'block';
+}
+
+// Utility function to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 

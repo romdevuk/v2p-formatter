@@ -249,3 +249,4 @@ Develop the full-screen modal component for bulk image selection with zoom contr
 - Zoom controls must be at bottom of window (as per spec)
 - No "Done" button - selections auto-save
 
+

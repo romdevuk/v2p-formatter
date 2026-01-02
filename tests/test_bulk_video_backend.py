@@ -235,3 +235,4 @@ class TestSequentialExtraction:
         assert 'images' in data2
 
 
+

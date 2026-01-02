@@ -74,6 +74,10 @@ function loadFileTree() {
                 if (data.output_folder) {
                     console.log(`📁 Output folder: ${data.output_folder}`);
                 }
+                // Store files for re-rendering
+                if (typeof window.appData !== 'undefined') {
+                    window.appData.availableFiles = data.files;
+                }
                 renderFileTree(data.files, fileTreeContent);
                 fileTree.style.display = 'block';
             } else {
@@ -109,6 +113,20 @@ function renderFileTree(files, container) {
         return div.innerHTML;
     }
     
+    // Get sort and thumbnail settings - default to 3 per row
+    const sortBy = (typeof window.appData !== 'undefined' && window.appData.sortBy) ? window.appData.sortBy : 'name';
+    let thumbnailsPerRow = 3; // Default to 3
+    if (typeof window.appData !== 'undefined' && window.appData.thumbnailsPerRow) {
+        const parsed = parseInt(window.appData.thumbnailsPerRow);
+        if (!isNaN(parsed) && parsed > 0) {
+            thumbnailsPerRow = parsed;
+        }
+    }
+    // Ensure minimum of 3 per row (force default)
+    if (thumbnailsPerRow < 3 || isNaN(thumbnailsPerRow)) {
+        thumbnailsPerRow = 3;
+    }
+    
     // Group files by folder
     const folders = {};
     files.forEach(file => {
@@ -119,7 +137,7 @@ function renderFileTree(files, container) {
         folders[folder].push(file);
     });
     
-    let html = '<div class="file-tree-list">';
+    let html = '<div class="file-tree-list" style="width: 100%;">';
     
     // Sort folders
     const sortedFolders = Object.keys(folders).sort();
@@ -132,26 +150,72 @@ function renderFileTree(files, container) {
         const folderIcon = shouldExpand ? '📂' : '📁';
         
         html += `<div class="file-tree-folder">`;
-        html += `<div class="file-tree-folder-header" onclick="toggleFolder(this)">
+        html += `<div class="file-tree-folder-header" onclick="toggleFolder(this)" style="cursor: pointer; padding: 10px; margin: 5px 0; background: #2a2a2a; border-radius: 4px; display: flex; align-items: center; gap: 10px;">
             <span class="folder-icon">${folderIcon}</span>
-            <strong>${escapedFolder}</strong>
+            <strong style="color: #e0e0e0;">${escapedFolder}</strong>
             <span style="color: #666; margin-left: 10px;">(${folders[folder].length} files)</span>
         </div>`;
-        html += `<div class="file-tree-folder-content" style="display: ${displayStyle}; margin-left: 20px; margin-top: 5px;">`;
+        html += `<div class="file-tree-folder-content" style="display: ${displayStyle}; margin-top: 5px; width: 100%;">`;
         
-        // Sort files by name
-        folders[folder].sort((a, b) => a.name.localeCompare(b.name));
+        // Sort files based on sortBy setting
+        if (sortBy === 'date') {
+            // Sort by date (if available) or name as fallback
+            folders[folder].sort((a, b) => {
+                const dateA = a.modified_time || a.created_time || 0;
+                const dateB = b.modified_time || b.created_time || 0;
+                if (dateA !== dateB) {
+                    return dateB - dateA; // Newest first
+                }
+                return a.name.localeCompare(b.name);
+            });
+        } else {
+            // Sort by name (default)
+            folders[folder].sort((a, b) => a.name.localeCompare(b.name));
+        }
+        
+        // Render files in thumbnail grid layout - always use grid, never list
+        // Use CSS Grid for more reliable layout - FORCE 3 columns by default
+        // If thumbnailsPerRow is not explicitly set to 4, use 3
+        const gridColumns = (thumbnailsPerRow === 4) ? 4 : 3;
+        html += `<div class="video-grid-container" style="display: grid !important; grid-template-columns: repeat(${gridColumns}, 1fr) !important; gap: 16px !important; margin: 0 !important; width: 100% !important; box-sizing: border-box !important;">`;
         
         folders[folder].forEach(file => {
-            const escapedPath = escapeHtml(file.path).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+            const escapedPath = escapeHtml(file.path).replace(/'/g, "\\'").replace(/"/g, '&quot;');
             const escapedName = escapeHtml(file.name);
-            html += `<div class="file-tree-item" onclick="selectFile('${escapedPath}', '${escapedName}')" title="${escapedPath}" style="cursor: pointer; padding: 8px; margin: 3px 0; border-radius: 4px; transition: background 0.2s; background: #f9f9f9;" onmouseover="this.style.background='#e8f0fe'" onmouseout="this.style.background='#f9f9f9'">
-                <span class="file-icon">🎬</span>
-                <span class="file-name" style="font-weight: 500;">${escapedName}</span>
-                <span class="file-size" style="color: #666; margin-left: 8px;">(${file.size_mb} MB)</span>
-            </div>`;
+            const cacheKey = file.modified_time ? `m=${Math.floor(file.modified_time)}` : `t=${new Date().getTime()}`;
+            const thumbnailUrl = `/v2p-formatter/thumbnail?path=${encodeURIComponent(file.path)}&size=240x180&${cacheKey}`;
+            
+            html += `<div class="video-item" 
+                         data-path="${escapedPath}" 
+                         data-name="${escapedName}"
+                         onclick="selectFile('${escapedPath}', '${escapedName}')"
+                         style="padding: 12px; border-radius: 8px; cursor: pointer; 
+                                background: #1e1e1e; 
+                                border: 2px solid #555;
+                                width: 100%;
+                                box-sizing: border-box;
+                                position: relative; transition: all 0.2s;"
+                         onmouseover="this.style.background='#2a2a2a'; this.style.borderColor='#667eea';"
+                         onmouseout="this.style.background='#1e1e1e'; this.style.borderColor='#555';"
+                         title="${escapedPath}">
+                    <div style="width: 100%; padding-top: 75%; background: #1a1a1a; border-radius: 4px; overflow: hidden; position: relative; margin-bottom: 8px;">
+                        <img src="${thumbnailUrl}" 
+                             alt="${escapedName}"
+                             style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                             onload="this.nextElementSibling.style.display='none';">
+                        <div style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; background: #1a1a1a;">
+                            <span style="font-size: 2em;">🎬</span>
+                        </div>
+                    </div>
+                    <div style="padding: 0 4px;">
+                        <div style="color: #e0e0e0; font-weight: 500; font-size: 13px; word-break: break-word; text-align: center; margin-bottom: 4px;">${escapedName}</div>
+                        <div style="color: #666; font-size: 11px; text-align: center;">(${(file.size_mb || 0).toFixed(2)} MB)</div>
+                    </div>
+                </div>`;
         });
         
+        html += '</div>'; // Close grid container
         html += `</div></div>`;
     });
     

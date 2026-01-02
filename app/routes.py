@@ -338,11 +338,16 @@ def generate_pdf():
     try:
         create_pdf(image_paths, pdf_path, layout, images_per_page)
         
+        # Calculate relative path for download/Preview links
+        pdf_relative_path = pdf_path.relative_to(OUTPUT_FOLDER)
+        
         return jsonify({
             'success': True,
             'file_path': str(pdf_path),
             'pdf_path': str(pdf_path),  # Keep for backward compatibility
-            'filename': pdf_path.name
+            'pdf_relative_path': str(pdf_relative_path),  # For Preview link
+            'filename': pdf_path.name,
+            'output_folder_path': str(pdf_path.parent)  # Output folder path
         })
     except Exception as e:
         return jsonify({'error': f'Failed to generate PDF: {str(e)}'}), 500
@@ -841,14 +846,29 @@ def get_video_thumbnail():
         # Generate thumbnail (will use cache if valid, or create new)
         thumbnail_data = get_thumbnail(file_path_obj, file_type, size)
         
+        # Get file modification time for ETag
+        try:
+            file_mtime = file_path_obj.stat().st_mtime
+            etag = f'"{hash(str(file_mtime) + str(size))}"'
+        except:
+            etag = None
+        
+        # Check if client has cached version
+        if etag and request.headers.get('If-None-Match') == etag:
+            from flask import Response
+            return Response(status=304)  # Not Modified
+        
+        # Set cache headers for long-term browser caching (1 year)
+        # Cache will be invalidated when file modification time changes (via URL parameter)
+        headers = {
+            'Cache-Control': 'public, max-age=31536000',  # 1 year
+            'ETag': etag
+        }
+        
         return Response(
             thumbnail_data,
             mimetype='image/jpeg',
-            headers={
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
-            }
+            headers=headers
         )
     except Exception as e:
         import logging
@@ -1652,14 +1672,29 @@ def get_thumbnail():
         # Generate thumbnail (will use cache if valid, or create new)
         thumbnail_data = get_thumbnail(file_path_obj, file_type, size)
         
+        # Get file modification time for ETag
+        try:
+            file_mtime = file_path_obj.stat().st_mtime
+            etag = f'"{hash(str(file_mtime) + str(size))}"'
+        except:
+            etag = None
+        
+        # Check if client has cached version
+        if etag and request.headers.get('If-None-Match') == etag:
+            from flask import Response
+            return Response(status=304)  # Not Modified
+        
+        # Set cache headers for long-term browser caching (1 year)
+        # Cache will be invalidated when file modification time changes (via URL parameter)
+        headers = {
+            'Cache-Control': 'public, max-age=31536000',  # 1 year
+            'ETag': etag
+        }
+        
         return Response(
             thumbnail_data,
             mimetype='image/jpeg',
-            headers={
-                'Cache-Control': 'no-cache, no-store, must-revalidate',  # Don't cache in browser
-                'Pragma': 'no-cache',
-                'Expires': '0'
-            }
+            headers=headers
         )
     except Exception as e:
         import logging
