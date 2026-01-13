@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('v2p_formatter.serve_static', filename='css/ac-matrix.css') }}">
+<link rel="stylesheet" href="/v2p-formatter/static/css/ac-matrix.css">
 <div class="ac-matrix-container">
     <!-- Navigation Tabs -->
     <div style="margin-bottom: 30px; border-bottom: 2px solid #555;">
@@ -266,7 +266,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('v2p_formatter.serve_static', filename='js/preview-renderer.js') }}"></script>
-<script src="{{ url_for('v2p_formatter.serve_static', filename='js/ac-matrix.js') }}"></script>
+<script src="/v2p-formatter/static/js/preview-renderer.js"></script>
+<script src="/v2p-formatter/static/js/ac-matrix.js"></script>
 {% endblock %}
 

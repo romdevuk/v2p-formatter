@@ -176,9 +176,7 @@ function openFileInPreview(filePath) {
         console.error('Error opening file:', error);
         alert('Error opening file: ' + error.message);
     });
-}
-
-// Open folder in macOS Finder
+}// Open folder in macOS Finder
 function openFolderInFinder(folderPath) {
     fetch('/v2p-formatter/open_folder', {
         method: 'POST',
@@ -199,4 +197,3 @@ function openFolderInFinder(folderPath) {
         alert('Error opening folder: ' + error.message);
     });
 }
-

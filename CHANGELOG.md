@@ -2,6 +2,174 @@
 
 All notable changes to the Video to Image Formatter (v2p-formatter) project will be documented in this file.
 
+## [2026-01-11] - Deface Module Enhancements
+
+### Added
+
+#### Export MP4 Videos Feature
+- **Export MP4 Videos checkbox**: Added option to export defaced MP4 videos alongside PDF/DOCX documents
+  - Checkbox option in "3. Output Settings" section
+  - When enabled, defaced MP4 videos are copied to the output folder
+  - Videos are exported with the same `deface_` prefix as other output files
+  - Export links displayed in results section after document generation
+  - Supports exporting multiple videos when processing multiple media items
+
+#### Progress Simulation During Deface Processing
+- **Progress bar animation**: Added progress simulation during deface processing
+  - Progress bar gradually increases from 0% to 90% while waiting for API response
+  - Updates every 500ms for smooth visual feedback
+  - Reaches 100% when processing completes
+  - Provides better user experience during longer processing operations
+
+#### Manual Deface Modal Auto-Close
+- **Automatic modal closure**: Manual deface modal now closes automatically after successful deface application
+  - Modal closes immediately after manual deface is successfully applied
+  - Review grid automatically updates with the new defaced image
+  - User is returned to the review interface without manual close action
+  - Improves workflow efficiency
+
+### Changed
+
+#### Separate Image and Video File Lists
+- **File organization**: Separated images and videos into distinct sections with separate file lists
+  - Images displayed in dedicated "Images" section with file count
+  - Videos displayed in dedicated "Videos" section with file count
+  - Each section has its own "Select All" checkbox functionality
+  - File counts displayed per section (e.g., "(5 files)")
+  - Improved organization and clarity for users
+
+#### File Loading Function Refactoring
+- **Renamed and enhanced file loading**: Refactored `loadImages()` to `loadDefaceFiles()`
+  - Function now accepts qualification and learner parameters
+  - Separates files by type (image/video) using backend `type` field
+  - Updated rendering functions: `renderImageListDeface()` and `renderVideoListDeface()`
+  - Better error handling with separate error messages per section
+  - Added `updateFileCounts()` function to update file count displays
+
+#### Session Persistence Fix
+- **Flask auto-reloader disabled**: Fixed session expiration by disabling Flask's auto-reloader in debug mode
+  - Added `use_reloader=False` to `app.run()` in `run.py`
+  - Prevents server restarts on file changes that clear in-memory sessions
+  - Sessions now persist correctly between requests during workflow
+  - Debug mode remains active (only auto-reloader disabled)
+
+### Technical Details
+
+#### Backend Changes
+- **`app/routes.py`**:
+  - Added `export_mp4_videos` parameter to `generate_deface_documents` endpoint
+  - Implemented MP4 video export logic that copies defaced videos to output folder
+  - Added `exported_videos` array to response with video metadata and download URLs
+  - Videos exported to same output folder as PDF/DOCX documents
+
+- **`run.py`**:
+  - Added `use_reloader=False` parameter to `app.run()` call
+  - Prevents Flask auto-reloader from restarting server on file changes
+  - Sessions persist correctly between requests
+
+#### Frontend Changes
+- **`templates/deface.html`**:
+  - Added "Export MP4 Videos" checkbox in output settings section
+  - Separated file display into `imageFilesList` and `videoFilesList` containers
+  - Added `renderImageListDeface()` and `renderVideoListDeface()` functions
+  - Added `updateFileCounts()` function for dynamic file count updates
+  - Added `toggleSelectAllDeface()` function for separate image/video selection
+  - Added progress simulation interval in `applyDeface()` function
+  - Added `closeManualDefaceModal()` call after successful manual deface
+  - Updated `loadDefaceFiles()` function to handle separate image/video lists
+  - Added `toggleSection()` function for collapsible sections
+  - Updated results display to show exported MP4 videos with download links
+
+### 🎯 Benefits
+- **Better Organization**: Separate image and video sections improve clarity and usability
+- **Enhanced Workflow**: Auto-closing modal streamlines manual deface editing process
+- **Visual Feedback**: Progress simulation provides better user experience during processing
+- **Video Export**: Option to export defaced MP4 videos provides complete output package
+- **Session Persistence**: Fixed session management ensures reliable workflow completion
+
+## [2026-01-11] - Static File Serving Fix, Template Updates, and Server Configuration
+
+### 🐛 Fixed
+
+#### Static File MIME Type Errors and 502 Bad Gateway
+- **Fixed CSS and JavaScript files being served with wrong MIME types**: Static files (CSS/JS) were being served with `application/json` or `text/html` MIME types instead of `text/css` and `application/javascript`
+  - **Root Cause**: Flask route handler for static files (`/static/<path:filename>`) was interfering and returning JSON error responses, and nginx location block order was causing static files to be proxied to Flask instead of served directly
+  - **Solution**: 
+    - Removed Flask static file route handler (`/v2p-formatter/static/<path:filename>`) from `app/routes.py`
+    - Updated nginx configuration to serve static files directly (static location block must come before app location block)
+    - Static files are now served directly by nginx with correct MIME types
+  - **Impact**: Static files now load correctly with proper MIME types, eliminating browser console errors and fixing 502 Bad Gateway errors
+  - **Error Messages Fixed**:
+    - `GET http://localhost/v2p-formatter/ 502 (Bad Gateway)`
+    - `Refused to apply style from 'http://localhost/v2p-formatter/static/css/...' because its MIME type ('application/json') is not a supported stylesheet MIME type`
+    - `werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'v2p_formatter.serve_static'`
+
+#### Template Static File References
+- **Fixed template errors after removing Flask static route**: Templates were still using `url_for('v2p_formatter.serve_static', ...)` which caused `BuildError` exceptions
+  - **Solution**: Replaced all `url_for('v2p_formatter.serve_static', filename='...')` references with direct static paths `/v2p-formatter/static/...`
+  - **Files Updated**:
+    - `templates/base.html` - Updated CSS and JS references
+    - `templates/observation_report.html` - Updated CSS and JS references
+    - `templates/observation_media.html` - Updated JS references
+    - `templates/ac_matrix.html` - Updated CSS and JS references
+    - `templates/image_to_pdf.html` - Updated CSS and JS references
+  - **Impact**: All templates now use direct static paths that nginx serves, eliminating Flask routing errors
+
+### 📝 Technical Details
+
+#### Files Modified
+- `app/routes.py`:
+  - Removed `/static/<path:filename>` route handler
+  - Static files are now served directly by nginx, not Flask
+  - Kept `/static/cache/<path:filename>` route for dynamically generated thumbnails
+
+- `nginx-config.conf`:
+  - Reordered location blocks to place `/v2p-formatter/static` before `/v2p-formatter`
+  - Ensures nginx serves static files directly instead of proxying to Flask
+
+- `templates/base.html`:
+  - Changed `{{ url_for('v2p_formatter.serve_static', filename='css/style.css') }}` → `/v2p-formatter/static/css/style.css`
+  - Changed all JS script references to direct paths
+
+- `templates/observation_report.html`:
+  - Updated CSS links: `observation-report.css`, `observation-report-media-browser.css`
+  - Updated JS script references: `observation-report-media-browser.js`, `observation-report-live-preview.js`, `observation-report-standards.js`, `observation-report-preview-draft.js`, `observation-report-column-resizer.js`, `observation-report.js`
+
+- `templates/observation_media.html`:
+  - Updated JS script references: `live-preview.js`, `media-browser.js`, `standards.js`, `reshuffle.js`, `observation-media.js`
+
+- `templates/ac_matrix.html`:
+  - Updated CSS link: `ac-matrix.css`
+  - Updated JS script references: `preview-renderer.js`, `ac-matrix.js`
+
+- `templates/image_to_pdf.html`:
+  - Updated CSS link: `media-bulk-image-selector.css`
+  - Updated JS script reference: `media-bulk-image-selector.js`
+
+#### Nginx Configuration
+- Static file location block must come **before** the app location block
+- Nginx serves static files directly from `/Users/rom/Documents/nvq/apps/v2p-formatter/static`
+- Flask no longer handles static file requests (except cache files)
+
+#### Server Management
+- Server can be started directly: `source venv/bin/activate && python run.py`
+- PM2 configuration may require full path to Python interpreter or use of `start.sh` script
+- Server runs on port 5001, proxied by nginx on port 80
+
+### 🎯 Benefits
+- **Correct MIME Types**: Static files served with proper MIME types (CSS as `text/css`, JS as `application/javascript`)
+- **Better Performance**: Static files served directly by nginx (no Flask overhead)
+- **Reliable Access**: Fixes 502 Bad Gateway errors when accessing the app
+- **No Routing Errors**: Templates no longer cause Flask BuildError exceptions
+- **Consistent Behavior**: Matches the fix applied in observation-report-cursor app
+
+### ⚠️ Action Required
+After applying these changes:
+1. Reload nginx configuration: `sudo nginx -s reload` or restart nginx
+2. Restart the Flask server to apply route changes
+3. Clear browser cache if issues persist
+4. Verify static files load correctly in browser developer tools
+
 ## [2026-01-02] - Automatic PDF Generation
 
 ### Added

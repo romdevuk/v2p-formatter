@@ -484,12 +484,9 @@ function showPDFResults(data) {
     html += '</div>';
     resultsDiv.innerHTML = html;
     resultsDiv.style.display = 'block';
-}
-
-// Utility function to escape HTML
+}// Utility function to escape HTML
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
-

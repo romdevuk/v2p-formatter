@@ -1,0 +1,2298 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="app-container">
+    <!-- Navigation Tabs -->
+    <div style="margin-bottom: 30px; border-bottom: 2px solid #555;">
+        <div style="display: flex; gap: 10px;">
+            <a href="/v2p-formatter/" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Video to Image
+            </a>
+            <a href="/v2p-formatter/media-converter" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Media Converter
+            </a>
+            <a href="/v2p-formatter/image-to-pdf" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Image to PDF
+            </a>
+            <a href="/v2p-formatter/deface" style="padding: 12px 24px; background: #1e1e1e; color: #667eea; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #667eea; border-bottom: none; font-weight: bold;">
+                Deface
+            </a>
+        </div>
+    </div>
+
+    <!-- Qualification/Learner Selection Section -->
+    <section class="upload-section" style="margin-bottom: 20px;">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+            <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Select Qualification:</label>
+            <select id="qualificationSelect" style="flex: 1; min-width: 200px; padding: 8px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px;">
+                <option value="">Select Qualification...</option>
+                {% for qualification in qualifications %}
+                <option value="{{ qualification }}" {% if qualification == selected_qualification %}selected{% endif %}>{{ qualification }}</option>
+                {% endfor %}
+            </select>
+            <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Select Learner:</label>
+            <select id="learnerSelect" style="flex: 1; min-width: 200px; padding: 8px 12px; background: #1e1e1e; color: #999; border: 1px solid #555; border-radius: 4px; font-size: 14px;" {% if not selected_qualification %}disabled{% endif %}>
+                <option value="">Select Learner...</option>
+                {% for learner in learners %}
+                <option value="{{ learner }}" {% if learner == selected_learner %}selected{% endif %}>{{ learner }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-secondary" onclick="loadImages()" style="padding: 8px 16px;">🔄 Refresh</button>
+        </div>
+    </section>
+    
+    <!-- Image/Video Selection Section -->
+    <section class="upload-section">
+        <h2>1. Select Images and Videos</h2>
+        
+        <!-- Bulk Selection Controls -->
+        <div id="bulkSelectionControls" style="margin-bottom: 15px; padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+            <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                <!-- Select All -->
+                <div id="selectAllContainer" style="display: flex; align-items: center; gap: 10px;">
+                    <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="selectAllCheckbox" style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                        <span style="color: #e0e0e0; font-weight: 500;">Select All</span>
+                    </label>
+                </div>
+                
+                <!-- Selection Count Badge -->
+                <div id="selectionCountBadge" style="display: none; padding: 6px 12px; background: #667eea; color: white; border-radius: 20px; font-weight: bold; font-size: 14px;">
+                    <span id="selectionCount">0</span> file(s) selected
+                    <span id="selectionBreakdown" style="font-size: 12px; opacity: 0.9;"></span>
+                </div>
+                
+                <!-- Reset Selection Button -->
+                <button id="resetSelectionBtn" class="btn btn-secondary" style="display: none; padding: 6px 12px; font-size: 13px; background: #4a2a2a; border-color: #6a3a3a; color: #ff9999;">Reset Selection</button>
+
+                <!-- Layout Options -->
+                <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
+                    <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Sort by:</label>
+                    <select id="sortBy" style="padding: 6px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px; cursor: pointer;">
+                        <option value="name" selected>Name</option>
+                        <option value="date">Date/Time</option>
+                    </select>
+                    <label style="color: #e0e0e0; font-size: 14px; white-space: nowrap;">Thumbnails per row:</label>
+                    <select id="thumbnailsPerRow" style="padding: 6px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px; cursor: pointer;">
+                        <option value="3" selected>3</option>
+                        <option value="4">4</option>
+                    </select>
+                    <button id="openFullScreenSelectorBtn" class="btn btn-primary" style="padding: 8px 10px; font-size: 20px; margin-left: 10px; min-width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 6px;" title="Open Full Screen Selector">
+                        ⛶
+                    </button>
+                </div>
+
+                <!-- Order Controls (visible only in bulk mode with selections) -->
+                <div id="orderControls" style="display: none; display: flex; align-items: center; gap: 10px;">
+                    <button id="resetOrderBtn" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;">Reset to Default Order</button>
+                    <span style="color: #999; font-size: 13px;">Sequences are assigned by selection order (1, 2, 3...)</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="file-selector-container">
+            <div id="fileSelectionContainer" style="margin-top: 20px;">
+                <!-- Video Files Section -->
+                <div style="margin-bottom: 30px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 12px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555; cursor: pointer;"
+                         onclick="toggleSection('videoSection')">
+                        <h3 style="margin: 0; color: #e0e0e0;">🎬 Video Files (MP4) <span id="videoCount">(0 files)</span></h3>
+                        <span id="videoToggle" style="color: #999;">▼</span>
+                    </div>
+                    <div id="videoSection" style="display: block;">
+                        <div style="padding: 10px; background: #1e1e1e; border-radius: 4px; margin-bottom: 10px; border: 1px solid #444;">
+                            <label style="color: #e0e0e0; cursor: pointer;">
+                                <input type="checkbox" id="selectAllVideos" onchange="toggleSelectAllDeface('video')">
+                                <strong>Select All Videos</strong>
+                                <span id="videoTotalInfo" style="color: #999; margin-left: 10px;">(0 files, 0 MB)</span>
+                            </label>
+                        </div>
+                        <div id="videoFilesList" style="max-height: 600px; overflow-y: auto; padding: 10px; background: #1e1e1e; border-radius: 6px; border: 1px solid #444;">
+                            <p style="text-align: center; color: #999; padding: 20px;">Please select both qualification and learner to view videos</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Image Files Section -->
+                <div style="margin-bottom: 30px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 12px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555; cursor: pointer;"
+                         onclick="toggleSection('imageSection')">
+                        <h3 style="margin: 0; color: #e0e0e0;">🖼️ Image Files (JPG/PNG) <span id="imageCount">(0 files)</span></h3>
+                        <span id="imageToggle" style="color: #999;">▼</span>
+                    </div>
+                    <div id="imageSection" style="display: block;">
+                        <div style="padding: 10px; background: #1e1e1e; border-radius: 4px; margin-bottom: 10px; border: 1px solid #444;">
+                            <label style="color: #e0e0e0; cursor: pointer;">
+                                <input type="checkbox" id="selectAllImages" onchange="toggleSelectAllDeface('image')">
+                                <strong>Select All Images</strong>
+                                <span id="imageTotalInfo" style="color: #999; margin-left: 10px;">(0 files, 0 MB)</span>
+                            </label>
+                        </div>
+                        <div id="imageFilesList" style="max-height: 600px; overflow-y: auto; padding: 10px; background: #1e1e1e; border-radius: 6px; border: 1px solid #444;">
+                            <p style="text-align: center; color: #999; padding: 20px;">Please select both qualification and learner to view images</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="fileTreeLoading" style="display: none; margin-top: 20px; text-align: center; color: #999;">
+                <p>Scanning directory for images and videos...</p>
+            </div>
+        </div>
+        <div id="uploadStatus" class="status-message"></div>
+    </section>
+
+    <!-- Output Settings Section -->
+    <section class="output-settings-section" id="outputSettingsSection">
+        <h2 id="outputSettingsTitle">2. Output Settings</h2>
+        <div id="batchSettingsIndicator" style="display: none; margin-bottom: 15px; padding: 12px; background: #2a3a4a; border-left: 4px solid #667eea; border-radius: 4px;">
+            <strong style="color: #667eea;">📦 Batch Mode:</strong>
+            <span id="batchSettingsInfo" style="color: #e0e0e0; margin-left: 8px;">These settings will apply to all selected images.</span>
+        </div>
+        <div class="settings-container">
+            <div class="settings-group">
+                <h3>Image Settings</h3>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="qualitySlider">Quality: <span id="qualityValue">95</span></label>
+                        <input type="range" id="qualitySlider" min="1" max="100" value="95">
+                    </div>
+                    <div class="config-item">
+                        <label for="resolutionSelect">Max Size:</label>
+                        <select id="resolutionSelect">
+                            <option value="original">Original</option>
+                            <option value="1920x1080">1920x1080</option>
+                            <option value="1280x720">1280x720</option>
+                            <option value="640x480" selected>640x480</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-group">
+                <h3>Deface Settings</h3>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="replacewithSelect">Anonymization Method:</label>
+                        <select id="replacewithSelect">
+                            <option value="blur" selected>Blur</option>
+                            <option value="solid">Solid (Black Box)</option>
+                            <option value="mosaic">Mosaic</option>
+                        </select>
+                    </div>
+                    <div class="config-item">
+                        <label for="boxesCheckbox" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="boxesCheckbox" style="width: 18px; height: 18px; cursor: pointer;">
+                            <span>Use Rectangular Boxes</span>
+                        </label>
+                        <p style="color: #999; font-size: 12px; margin-top: 4px; margin-bottom: 0;">Use rectangular boxes instead of ellipses (for solid/mosaic)</p>
+                    </div>
+                    <div class="config-item">
+                        <label for="threshSlider">Detection Threshold: <span id="threshValue">0.2</span></label>
+                        <input type="range" id="threshSlider" min="0" max="1" step="0.01" value="0.2">
+                        <p style="color: #999; font-size: 12px; margin-top: 4px; margin-bottom: 0;">Lower = more sensitive (default: 0.2)</p>
+                    </div>
+                    <div class="config-item">
+                        <label for="scaleSelect">Detection Scale (Optional):</label>
+                        <select id="scaleSelect">
+                            <option value="original" selected>Original Resolution</option>
+                            <option value="640x360">640x360</option>
+                            <option value="1280x720">1280x720</option>
+                        </select>
+                        <p style="color: #999; font-size: 12px; margin-top: 4px; margin-bottom: 0;">Downscale for faster processing (keeps output quality)</p>
+                    </div>
+                    <div class="config-item" id="mosaicsizeContainer">
+                        <label for="mosaicsizeSlider">Mosaic Size: <span id="mosaicsizeValue">20</span></label>
+                        <input type="range" id="mosaicsizeSlider" min="5" max="50" step="1" value="20">
+                        <p style="color: #999; font-size: 12px; margin-top: 4px; margin-bottom: 0;">Tile size in pixels (only for mosaic)</p>
+                    </div>
+                    <div class="config-item">
+                        <label for="drawScoresCheckbox" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="drawScoresCheckbox" style="width: 18px; height: 18px; cursor: pointer;">
+                            <span>Show Detection Scores</span>
+                        </label>
+                        <p style="color: #999; font-size: 12px; margin-top: 4px; margin-bottom: 0;">Display face detection confidence scores</p>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-group">
+                <h3>Video Processing</h3>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="approveVideoProcessingCheckbox" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="approveVideoProcessingCheckbox" style="width: 18px; height: 18px; cursor: pointer;">
+                            <span>Approve Video Processing</span>
+                        </label>
+                        <p style="color: #999; font-size: 12px; margin-top: 4px; margin-bottom: 0;">Must be checked before processing videos. Videos will be saved as MP4 format.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-group">
+                <h3>Output Format</h3>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="outputFormat">Format:</label>
+                        <select id="outputFormat">
+                            <option value="pdf" selected>PDF Only</option>
+                            <option value="both">Both (PDF + DOCX)</option>
+                            <option value="docx">DOCX Only</option>
+                            <option value="mp4">MP4 Only</option>
+                            <option value="mp4+pdf">MP4 + PDF</option>
+                        </select>
+                    </div>
+                    <div class="config-item" id="pdfSettingsContainer">
+                        <label for="layoutSelect">Layout:</label>
+                        <select id="layoutSelect">
+                            <option value="grid" selected>Grid</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div class="config-item" id="imagesPerPageContainer">
+                        <label for="imagesPerPage">Images per Page:</label>
+                        <select id="imagesPerPage">
+                            <option value="1">1</option>
+                            <option value="2" selected>2</option>
+                            <option value="4">4</option>
+                            <option value="6">6</option>
+                            <option value="9">9</option>
+                            <option value="12">12</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <p class="output-info" style="margin-top: 20px; padding: 15px; background-color: #2a2a2a; border: 1px solid #555; border-radius: 8px; color: #e0e0e0;">
+            Images and videos will be anonymized using face detection before generating PDF and DOCX documents. Videos will be processed directly and saved as MP4 format. Generated files will include anonymized images/videos with filenames displayed below each image.
+        </p>
+    </section>
+
+    <!-- Apply Deface & Review Section -->
+    <section class="apply-deface-section" id="applyDefaceSection">
+        <h2>3. Apply Deface & Review</h2>
+        
+        <div class="action-buttons" style="margin-bottom: 20px;">
+            <button class="btn btn-primary" id="applyDefaceBtn" type="button">Apply Deface</button>
+        </div>
+        
+        <!-- Processing Progress -->
+        <div id="defaceProgressContainer" style="display: none; margin-top: 20px; padding: 20px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+            <h3 style="margin-top: 0; color: #e0e0e0;">Processing Deface...</h3>
+            <div id="defaceProgressBar" style="width: 100%; height: 30px; background: #1e1e1e; border-radius: 4px; overflow: hidden; margin-bottom: 15px; border: 1px solid #555;">
+                <div id="defaceProgressFill" style="height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); width: 0%; transition: width 0.3s ease;"></div>
+            </div>
+            <div id="defaceProgressText" style="color: #e0e0e0; margin-bottom: 15px; font-weight: 500;">Preparing...</div>
+        </div>
+        
+        <!-- Review Interface -->
+        <div id="reviewInterface" style="display: none; margin-top: 20px;">
+            <div style="padding: 20px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555; margin-bottom: 20px;">
+                <h3 style="margin-top: 0; color: #51cf66;">✅ Deface Applied Successfully</h3>
+                <p style="color: #e0e0e0; margin-bottom: 15px;">Review anonymized media files below:</p>
+            </div>
+            
+            <!-- Preview Grid -->
+            <div id="reviewGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-bottom: 20px;">
+                <!-- Defaced items will be inserted here -->
+            </div>
+            
+            <!-- Review Actions -->
+            <div style="padding: 20px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <button class="btn btn-secondary" id="adjustSettingsBtn" type="button">Adjust Settings & Re-apply</button>
+                    <button class="btn btn-primary" id="acceptAndProceedBtn" type="button">Accept & Proceed to Document Generation</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Document Generation Section -->
+    <section class="processing-section" id="processingSection" style="display: none;">
+        <h2>4. Generate Documents</h2>
+        
+        <!-- Filename Input -->
+        <div style="margin-bottom: 20px; padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+            <label for="outputFilename" style="display: block; color: #e0e0e0; font-size: 14px; font-weight: 500; margin-bottom: 8px;">
+                Output Filename <span style="color: #f44;">*</span>
+            </label>
+            <input type="text" 
+                   id="outputFilename" 
+                   placeholder="Enter filename (without extension)" 
+                   style="width: 100%; padding: 10px 12px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-size: 14px; box-sizing: border-box;">
+            <p style="color: #999; font-size: 12px; margin-top: 6px; margin-bottom: 0;">
+                Filename will be used for PDF/DOCX files (extensions added automatically). For MP4 format, videos will be exported with 'deface_' prefix.
+            </p>
+        </div>
+        
+        <div class="action-buttons">
+            <button class="btn btn-primary" id="generateDocumentsBtn" type="button">Generate Documents</button>
+        </div>
+        
+        <!-- Batch Progress Section -->
+        <div id="batchProgressContainer" style="display: none; margin-top: 20px; padding: 20px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+            <h3 style="margin-top: 0; color: #e0e0e0;">Batch Processing Progress</h3>
+            <div id="batchProgressBar" style="width: 100%; height: 30px; background: #1e1e1e; border-radius: 4px; overflow: hidden; margin-bottom: 15px; border: 1px solid #555;">
+                <div id="batchProgressFill" style="height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); width: 0%; transition: width 0.3s ease;"></div>
+            </div>
+            <div id="batchProgressText" style="color: #e0e0e0; margin-bottom: 15px; font-weight: 500;">Preparing...</div>
+        </div>
+        
+        <div id="progressContainer" class="progress-container" style="display: none;">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p id="progressText"></p>
+        </div>
+        <div id="results" class="results"></div>
+    </section>
+</div>
+
+<script>
+// GLOBAL STATE
+window.appData = {
+    selectedImages: [],  // Array of {path, name, folder} objects in order
+    imageOrder: [],      // Ordered array of image paths (for selection-based ordering)
+    bulkMode: true,      // Bulk mode enabled by default
+    availableImages: [],  // Available image files
+    availableVideos: [],  // Available video files
+    batchResults: {},
+    thumbnailsPerRow: 3,  // Number of thumbnails per row (3 or 4)
+    sortBy: 'name',  // Sort order: 'name' (default) or 'date'
+    defaceSessionId: null,  // Session ID from apply_deface
+    defacedItems: [],  // Array of processed items from apply_deface
+    currentManualDefaceMediaId: null,  // Media ID for manual deface editor
+    currentManualDefaceMediaType: null,  // 'image' or 'video'
+    currentManualDefaceVideoTime: null,  // Current time point for video frame extraction
+    manualDefaceAreas: []  // Current deface areas being edited
+};
+
+// Initialize qualification/learner dropdowns
+(function() {
+    const qualificationSelect = document.getElementById('qualificationSelect');
+    const learnerSelect = document.getElementById('learnerSelect');
+    
+    function handleLearnerChange() {
+        const qualification = qualificationSelect.value;
+        const learner = learnerSelect.value;
+        
+        if (qualification && learner) {
+            loadDefaceFiles(qualification, learner);
+        } else {
+            const imageFilesList = document.getElementById('imageFilesList');
+            const videoFilesList = document.getElementById('videoFilesList');
+            if (imageFilesList) imageFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Please select both qualification and learner to view images</p>';
+            if (videoFilesList) videoFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Please select both qualification and learner to view videos</p>';
+            updateFileCounts(0, 0);
+        }
+    }
+    
+    if (qualificationSelect) {
+        qualificationSelect.addEventListener('change', function() {
+            const qualification = this.value;
+            learnerSelect.disabled = !qualification;
+            learnerSelect.innerHTML = '<option value="">Select Learner...</option>';
+            
+            if (qualification) {
+                fetch(`/v2p-formatter/learners?qualification=${encodeURIComponent(qualification)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.learners) {
+                            data.learners.forEach(learner => {
+                                const option = document.createElement('option');
+                                option.value = learner;
+                                option.textContent = learner;
+                                learnerSelect.appendChild(option);
+                            });
+                            // Don't auto-call handleLearnerChange here - wait for user to select learner
+                        }
+                    })
+                    .catch(err => console.error('Error loading learners:', err));
+            } else {
+                const imageFilesList = document.getElementById('imageFilesList');
+                const videoFilesList = document.getElementById('videoFilesList');
+                if (imageFilesList) imageFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Please select both qualification and learner to view images</p>';
+                if (videoFilesList) videoFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Please select both qualification and learner to view videos</p>';
+                updateFileCounts(0, 0);
+            }
+        });
+    }
+    
+    if (learnerSelect) {
+        learnerSelect.addEventListener('change', handleLearnerChange);
+    }
+    
+    // Auto-load if URL parameters are present
+    const urlParams = new URLSearchParams(window.location.search);
+    const selectedQualification = urlParams.get('qualification');
+    const selectedLearner = urlParams.get('learner');
+    
+    if (selectedQualification && qualificationSelect) {
+        qualificationSelect.value = selectedQualification;
+        qualificationSelect.dispatchEvent(new Event('change'));
+        
+        setTimeout(() => {
+            if (selectedLearner && learnerSelect) {
+                learnerSelect.value = selectedLearner;
+                handleLearnerChange();
+            }
+        }, 500);
+    }
+})();
+
+// Load deface files function (renamed from loadImages to loadDefaceFiles)
+function loadDefaceFiles(qualification, learner) {
+    if (!qualification || !learner) {
+        return;
+    }
+    
+    const imageFilesList = document.getElementById('imageFilesList');
+    const videoFilesList = document.getElementById('videoFilesList');
+    const fileTreeLoading = document.getElementById('fileTreeLoading');
+    
+    if (imageFilesList) imageFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Loading images...</p>';
+    if (videoFilesList) videoFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Loading videos...</p>';
+    if (fileTreeLoading) fileTreeLoading.style.display = 'block';
+    
+    fetch(`/v2p-formatter/list_images?qualification=${encodeURIComponent(qualification)}&learner=${encodeURIComponent(learner)}`)
+        .then(r => {
+            if (!r.ok) {
+                return r.json().then(data => {
+                    throw new Error(data.error || `HTTP ${r.status}: ${r.statusText}`);
+                }).catch(() => {
+                    throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+                });
+            }
+            return r.json();
+        })
+        .then(data => {
+            if (fileTreeLoading) fileTreeLoading.style.display = 'none';
+            
+            if (data.success && data.files) {
+                // Separate images and videos using 'type' field from backend
+                const images = data.files.filter(f => f.type === 'image');
+                const videos = data.files.filter(f => f.type === 'video');
+                
+                window.appData.availableImages = images;
+                window.appData.availableVideos = videos;
+                
+                // Render separately
+                renderImageListDeface(images);
+                renderVideoListDeface(videos);
+                
+                // Update counts
+                updateFileCounts(images.length, videos.length);
+            } else {
+                if (imageFilesList) imageFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No images found</p>';
+                if (videoFilesList) videoFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No videos found</p>';
+                updateFileCounts(0, 0);
+            }
+        })
+        .catch(err => {
+            if (fileTreeLoading) fileTreeLoading.style.display = 'none';
+            const errorMsg = err.message || 'Unknown error';
+            if (imageFilesList) imageFilesList.innerHTML = `<p style="text-align: center; color: #f44; padding: 20px;">Error loading images: ${errorMsg}</p>`;
+            if (videoFilesList) videoFilesList.innerHTML = `<p style="text-align: center; color: #f44; padding: 20px;">Error loading videos: ${errorMsg}</p>`;
+            console.error('Error loading files:', err);
+            updateFileCounts(0, 0);
+        });
+}
+
+function toggleSection(sectionId) {
+    const section = document.getElementById(sectionId);
+    const toggle = document.getElementById(sectionId.replace('Section', 'Toggle'));
+    if (section && toggle) {
+        const isVisible = section.style.display !== 'none';
+        section.style.display = isVisible ? 'none' : 'block';
+        toggle.textContent = isVisible ? '▶' : '▼';
+    }
+}
+
+// Toggle select all for deface
+function toggleSelectAllDeface(type) {
+    const checkbox = document.getElementById(`selectAll${type === 'image' ? 'Images' : 'Videos'}`);
+    const files = type === 'image' ? (window.appData.availableImages || []) : (window.appData.availableVideos || []);
+    const isChecked = checkbox ? checkbox.checked : false;
+    
+    files.forEach(file => {
+        const path = file.path;
+        const name = file.name;
+        const index = window.appData.selectedImages.findIndex(img => img.path === path);
+        
+        if (isChecked) {
+            // Select - add if not already selected
+            if (index < 0) {
+                const folder = file.folder || 'root';
+                const fileType = file.type || type;
+                window.appData.selectedImages.push({path, name, folder, type: fileType});
+                window.appData.imageOrder.push(path);
+            }
+        } else {
+            // Deselect - remove if selected
+            if (index >= 0) {
+                window.appData.selectedImages.splice(index, 1);
+                window.appData.imageOrder = window.appData.imageOrder.filter(p => p !== path);
+            }
+        }
+    });
+    
+    updateSequenceNumbers();
+    updateSelectionUI();
+    // Re-render both sections
+    if (window.appData.availableImages && window.appData.availableImages.length > 0) {
+        renderImageListDeface(window.appData.availableImages);
+    }
+    if (window.appData.availableVideos && window.appData.availableVideos.length > 0) {
+        renderVideoListDeface(window.appData.availableVideos);
+    }
+}
+
+function updateFileCounts(imageCount, videoCount) {
+    const imageCountEl = document.getElementById('imageCount');
+    const videoCountEl = document.getElementById('videoCount');
+    if (imageCountEl) imageCountEl.textContent = `(${imageCount} files)`;
+    if (videoCountEl) videoCountEl.textContent = `(${videoCount} files)`;
+    
+    // Update total info if elements exist
+    const imageTotalInfo = document.getElementById('imageTotalInfo');
+    const videoTotalInfo = document.getElementById('videoTotalInfo');
+    if (imageTotalInfo) {
+        const imageTotalSize = window.appData.availableImages ? window.appData.availableImages.reduce((sum, f) => sum + (f.size_mb || 0), 0) : 0;
+        imageTotalInfo.textContent = `(${imageCount} files, ${imageTotalSize.toFixed(2)} MB)`;
+    }
+    if (videoTotalInfo) {
+        const videoTotalSize = window.appData.availableVideos ? window.appData.availableVideos.reduce((sum, f) => sum + (f.size_mb || 0), 0) : 0;
+        videoTotalInfo.textContent = `(${videoCount} files, ${videoTotalSize.toFixed(2)} MB)`;
+    }
+}
+
+// Render image list for deface (separate section)
+function renderImageListDeface(images) {
+    const container = document.getElementById('imageFilesList');
+    
+    if (!images || images.length === 0) {
+        if (container) {
+            container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No images found</p>';
+        }
+        return;
+    }
+    
+    // Organize by folder
+    const folders = {};
+    images.forEach(img => {
+        const folder = img.folder || 'root';
+        if (!folders[folder]) {
+            folders[folder] = [];
+        }
+        folders[folder].push(img);
+    });
+    
+    let html = '';
+    
+    // Render subfolders first (sorted)
+    const subfolders = Object.keys(folders).filter(f => f !== 'root').sort();
+    subfolders.forEach(folder => {
+        html += renderFolder(folder, folders[folder], true); // true = is subfolder
+    });
+    
+    // Render root images last
+    if (folders['root'] && folders['root'].length > 0) {
+        if (subfolders.length > 0) {
+            html += '<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #555;"><strong style="color: #e0e0e0;">Direct images:</strong></div>';
+        }
+        html += '<div style="display: flex; flex-wrap: wrap; margin: -8px;">'; // Grid container
+        // Render root images directly (not in a folder wrapper)
+        folders['root'].sort((a, b) => a.name.localeCompare(b.name));
+        folders['root'].forEach((img, index) => {
+            const selectedImage = window.appData.selectedImages.find(s => s.path === img.path);
+            const isSelected = !!selectedImage;
+            const sequenceNumber = selectedImage ? selectedImage.sequence : null;
+            // Use file modification time for cache key (only changes when file changes)
+            // This allows browser to cache thumbnails properly
+            const cacheKey = img.modified_time ? `m=${Math.floor(img.modified_time)}` : `t=${new Date().getTime()}`;
+            // Increased thumbnail size for better quality: 240x180 (2x larger than before)
+            const thumbnailUrl = `/v2p-formatter/thumbnail?path=${encodeURIComponent(img.path)}&size=240x180&${cacheKey}`;
+            
+            html += `<div class="image-item ${isSelected ? 'selected' : ''}" 
+                         data-path="${escapeHtml(img.path)}" 
+                         data-name="${escapeHtml(img.name)}"
+                         style="padding: 12px; margin: 8px; border-radius: 8px; cursor: pointer; 
+                                background: ${isSelected ? '#2a3a4a' : '#1e1e1e'}; 
+                                border: 2px solid ${isSelected ? '#667eea' : '#555'};
+                                display: inline-block; width: calc(${100 / (window.appData.thumbnailsPerRow || 3)}% - 16px); min-width: 200px; vertical-align: top;
+                                position: relative;"
+                         onclick="handleImageClick('${escapeHtml(img.path)}', '${escapeHtml(img.name)}')">
+                    <div style="width: 100%; padding-top: 75%; background: #1a1a1a; border-radius: 4px; overflow: hidden; position: relative; margin-bottom: 8px;">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleImageSelection('${escapeHtml(img.path)}', '${escapeHtml(img.name)}')" style="position: absolute; top: 8px; left: 8px; z-index: 10; width: 24px; height: 24px; cursor: pointer; accent-color: #667eea; border-radius: 4px;">
+                        ${isSelected && sequenceNumber ? `<div style="position: absolute; top: 8px; right: 8px; z-index: 10; background: #667eea; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.5);">${sequenceNumber}</div>` : ''}
+                        <img src="${thumbnailUrl}" 
+                             alt="${escapeHtml(img.name)}"
+                             style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                             onload="this.nextElementSibling.style.display='none';">
+                        <div style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; background: #1a1a1a;">
+                            <span style="font-size: 2em;">🖼️</span>
+                        </div>
+                    </div>
+                    <div style="padding: 0 4px;">
+                        <div style="color: #e0e0e0; font-weight: 500; font-size: 13px; word-break: break-word; text-align: center; margin-bottom: 4px;">${escapeHtml(img.name)}</div>
+                        <div style="color: #666; font-size: 11px; text-align: center;">(${(img.size_mb || 0).toFixed(2)} MB)</div>
+                    </div>
+                    </div>`;
+        });
+    }
+    
+    html += '</div>'; // Close grid container
+    
+    if (container) {
+    container.innerHTML = html;
+    }
+}
+
+// Render video list for deface (separate section)
+function renderVideoListDeface(videos) {
+    const container = document.getElementById('videoFilesList');
+    
+    if (!videos || videos.length === 0) {
+        if (container) {
+            container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No videos found</p>';
+        }
+        return;
+    }
+    
+    // Organize by folder
+    const folders = {};
+    videos.forEach(video => {
+        const folder = video.folder || 'root';
+        if (!folders[folder]) {
+            folders[folder] = [];
+        }
+        folders[folder].push(video);
+    });
+    
+    let html = '';
+    
+    // Render subfolders first (sorted)
+    const subfolders = Object.keys(folders).filter(f => f !== 'root').sort();
+    subfolders.forEach(folder => {
+        html += renderVideoFolderDeface(folder, folders[folder], true);
+    });
+    
+    // Render root videos last
+    if (folders['root'] && folders['root'].length > 0) {
+        if (subfolders.length > 0) {
+            html += '<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #555;"><strong style="color: #e0e0e0;">Direct videos:</strong></div>';
+        }
+        html += '<div style="display: flex; flex-wrap: wrap; margin: -8px;">';
+        folders['root'].sort((a, b) => a.name.localeCompare(b.name));
+        folders['root'].forEach((video, index) => {
+            const selectedVideo = window.appData.selectedImages.find(s => s.path === video.path);
+            const isSelected = !!selectedVideo;
+            const sequenceNumber = selectedVideo ? selectedVideo.sequence : null;
+            const cacheKey = video.modified_time ? `m=${Math.floor(video.modified_time)}` : `t=${new Date().getTime()}`;
+            const thumbnailUrl = `/v2p-formatter/thumbnail?path=${encodeURIComponent(video.path)}&size=240x180&${cacheKey}`;
+            
+            html += `<div class="image-item ${isSelected ? 'selected' : ''}" 
+                         data-path="${escapeHtml(video.path)}" 
+                         data-name="${escapeHtml(video.name)}"
+                         data-type="video"
+                         style="padding: 12px; margin: 8px; border-radius: 8px; cursor: pointer; 
+                                background: ${isSelected ? '#2a3a4a' : '#1e1e1e'}; 
+                                border: 2px solid ${isSelected ? '#667eea' : '#555'};
+                                display: inline-block; width: calc(${100 / (window.appData.thumbnailsPerRow || 3)}% - 16px); min-width: 200px; vertical-align: top;
+                                position: relative;"
+                         onclick="handleImageClick('${escapeHtml(video.path)}', '${escapeHtml(video.name)}')">
+                    <div style="width: 100%; padding-top: 75%; background: #1a1a1a; border-radius: 4px; overflow: hidden; position: relative; margin-bottom: 8px;">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleImageSelection('${escapeHtml(video.path)}', '${escapeHtml(video.name)}')" style="position: absolute; top: 8px; left: 8px; z-index: 10; width: 24px; height: 24px; cursor: pointer; accent-color: #667eea; border-radius: 4px;">
+                        ${isSelected && sequenceNumber ? `<div style="position: absolute; top: 8px; right: 8px; z-index: 10; background: #667eea; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.5);">${sequenceNumber}</div>` : ''}
+                        <img src="${thumbnailUrl}" 
+                             alt="${escapeHtml(video.name)}"
+                             style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                             onload="this.nextElementSibling.style.display='none';">
+                        <div style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; background: #1a1a1a;">
+                            <span style="font-size: 2em;">🎬</span>
+                        </div>
+                    </div>
+                    <div style="padding: 0 4px;">
+                        <div style="color: #e0e0e0; font-weight: 500; font-size: 13px; word-break: break-word; text-align: center; margin-bottom: 4px;">${escapeHtml(video.name)}</div>
+                        <div style="color: #666; font-size: 11px; text-align: center;">(${(video.size_mb || 0).toFixed(2)} MB)</div>
+                    </div>
+                    </div>`;
+        });
+        html += '</div>';
+    }
+    
+    if (container) {
+        container.innerHTML = html;
+    }
+}
+
+function renderVideoFolderDeface(folderName, videos, isSubfolder) {
+    const folderId = 'folder-' + folderName.replace(/[^a-zA-Z0-9]/g, '-');
+    const isCollapsed = true;
+    
+    let html = '';
+    
+    if (isSubfolder) {
+        html += `<div class="image-folder" data-folder="${folderId}" style="width: 100%; margin-bottom: 20px;">`;
+        html += `<div class="folder-header" onclick="toggleImageFolder('${folderId}')" style="cursor: pointer; padding: 10px; margin: 5px 0; background: #2a2a2a; border-radius: 4px; display: flex; align-items: center; gap: 10px;">`;
+        html += `<span class="folder-icon">${isCollapsed ? '▶' : '▼'}</span>`;
+        html += `<strong style="color: #e0e0e0;">${escapeHtml(folderName)}</strong>`;
+        html += `<span style="color: #666; margin-left: 10px;">(${videos.length} videos)</span>`;
+        html += `</div>`;
+        html += `<div class="folder-content" id="${folderId}" style="display: ${isCollapsed ? 'none' : 'block'}; margin-top: 5px;">`;
+        html += '<div style="display: flex; flex-wrap: wrap; margin: -8px;">';
+    }
+    
+    videos.sort((a, b) => a.name.localeCompare(b.name));
+    
+    videos.forEach((video, index) => {
+        const selectedVideo = window.appData.selectedImages.find(s => s.path === video.path);
+        const isSelected = !!selectedVideo;
+        const sequenceNumber = selectedVideo ? selectedVideo.sequence : null;
+        const cacheKey = video.modified_time ? `m=${Math.floor(video.modified_time)}` : `t=${new Date().getTime()}`;
+        const thumbnailUrl = `/v2p-formatter/thumbnail?path=${encodeURIComponent(video.path)}&size=240x180&${cacheKey}`;
+        
+        html += `<div class="image-item ${isSelected ? 'selected' : ''}" 
+                     data-path="${escapeHtml(video.path)}" 
+                     data-name="${escapeHtml(video.name)}"
+                     data-type="video"
+                     style="padding: 12px; margin: 8px; border-radius: 8px; cursor: pointer; 
+                            background: ${isSelected ? '#2a3a4a' : '#1e1e1e'}; 
+                            border: 2px solid ${isSelected ? '#667eea' : '#555'};
+                            display: inline-block; width: calc(${100 / (window.appData.thumbnailsPerRow || 3)}% - 16px); min-width: 200px; vertical-align: top;
+                            position: relative;"
+                     onclick="handleImageClick('${escapeHtml(video.path)}', '${escapeHtml(video.name)}')">
+                <div style="width: 100%; padding-top: 75%; background: #1a1a1a; border-radius: 4px; overflow: hidden; position: relative; margin-bottom: 8px;">
+                    <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleImageSelection('${escapeHtml(video.path)}', '${escapeHtml(video.name)}')" style="position: absolute; top: 8px; left: 8px; z-index: 10; width: 24px; height: 24px; cursor: pointer; accent-color: #667eea; border-radius: 4px;">
+                    ${isSelected && sequenceNumber ? `<div style="position: absolute; top: 8px; right: 8px; z-index: 10; background: #667eea; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.5);">${sequenceNumber}</div>` : ''}
+                    <img src="${thumbnailUrl}" 
+                         alt="${escapeHtml(video.name)}"
+                         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                         onload="this.nextElementSibling.style.display='none';">
+                    <div style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; background: #1a1a1a;">
+                        <span style="font-size: 2em;">🎬</span>
+                    </div>
+                </div>
+                <div style="padding: 0 4px;">
+                    <div style="color: #e0e0e0; font-weight: 500; font-size: 13px; word-break: break-word; text-align: center; margin-bottom: 4px;">${escapeHtml(video.name)}</div>
+                    <div style="color: #666; font-size: 11px; text-align: center;">(${(video.size_mb || 0).toFixed(2)} MB)</div>
+                </div>
+                </div>`;
+    });
+    
+    if (isSubfolder) {
+        html += '</div></div></div>'; // Close grid, folder content, folder
+    }
+    
+    return html;
+}
+
+// Render folder with images in 3-column grid
+function renderFolder(folderName, images, isSubfolder) {
+    const folderId = folderName === 'root' ? 'root' : 'folder-' + folderName.replace(/[^a-zA-Z0-9]/g, '-');
+    const isCollapsed = true; // All folders collapsed by default
+    
+    let html = '';
+    
+    if (isSubfolder) {
+        html += `<div class="image-folder" data-folder="${folderId}" style="width: 100%; margin-bottom: 20px;">`;
+        html += `<div class="folder-header" onclick="toggleImageFolder('${folderId}')" style="cursor: pointer; padding: 10px; margin: 5px 0; background: #2a2a2a; border-radius: 4px; display: flex; align-items: center; gap: 10px;">`;
+        html += `<span class="folder-icon">${isCollapsed ? '▶' : '▼'}</span>`;
+        html += `<strong style="color: #e0e0e0;">${escapeHtml(folderName)}</strong>`;
+        html += `<span style="color: #666; margin-left: 10px;">(${images.length} images)</span>`;
+        html += `</div>`;
+        html += `<div class="folder-content" id="${folderId}" style="display: ${isCollapsed ? 'none' : 'block'}; margin-top: 5px;">`;
+        html += '<div style="display: flex; flex-wrap: wrap; margin: -8px;">'; // Grid container
+    }
+    
+    // Sort images by name
+    images.sort((a, b) => a.name.localeCompare(b.name));
+    
+    images.forEach((img, index) => {
+        const selectedImage = window.appData.selectedImages.find(s => s.path === img.path);
+        const isSelected = !!selectedImage;
+        const sequenceNumber = selectedImage ? selectedImage.sequence : null;
+        // Use file modification time for cache key (only changes when file changes)
+        // This allows browser to cache thumbnails properly
+        const cacheKey = img.modified_time ? `m=${Math.floor(img.modified_time)}` : `t=${new Date().getTime()}`;
+        // Increased thumbnail size for better quality: 240x180 (2x larger than before)
+        const thumbnailUrl = `/v2p-formatter/thumbnail?path=${encodeURIComponent(img.path)}&size=240x180&${cacheKey}`;
+        
+        html += `<div class="image-item ${isSelected ? 'selected' : ''}" 
+                     data-path="${escapeHtml(img.path)}" 
+                     data-name="${escapeHtml(img.name)}"
+                     style="padding: 12px; margin: 8px; border-radius: 8px; cursor: pointer; 
+                            background: ${isSelected ? '#2a3a4a' : '#1e1e1e'}; 
+                            border: 2px solid ${isSelected ? '#667eea' : '#555'};
+                            display: inline-block; width: calc(${100 / (window.appData.thumbnailsPerRow || 3)}% - 16px); min-width: 200px; vertical-align: top;
+                            position: relative;"
+                     onclick="handleImageClick('${escapeHtml(img.path)}', '${escapeHtml(img.name)}')">
+                    <div style="width: 100%; padding-top: 75%; background: #1a1a1a; border-radius: 4px; overflow: hidden; position: relative; margin-bottom: 8px;">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleImageSelection('${escapeHtml(img.path)}', '${escapeHtml(img.name)}')" style="position: absolute; top: 8px; left: 8px; z-index: 10; width: 24px; height: 24px; cursor: pointer; accent-color: #667eea; border-radius: 4px;">
+                        ${isSelected && sequenceNumber ? `<div style="position: absolute; top: 8px; right: 8px; z-index: 10; background: #667eea; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.5);">${sequenceNumber}</div>` : ''}
+                    <img src="${thumbnailUrl}" 
+                         alt="${escapeHtml(img.name)}"
+                         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                         onload="this.nextElementSibling.style.display='none';">
+                    <div style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; background: #1a1a1a;">
+                        <span style="font-size: 2em;">🖼️</span>
+                    </div>
+                </div>
+                <div style="padding: 0 4px;">
+                    <div style="color: #e0e0e0; font-weight: 500; font-size: 13px; word-break: break-word; text-align: center; margin-bottom: 4px;">${escapeHtml(img.name)}</div>
+                    <div style="color: #666; font-size: 11px; text-align: center;">(${(img.size_mb || 0).toFixed(2)} MB)</div>
+                </div>
+                </div>`;
+    });
+    
+    if (isSubfolder) {
+        html += `</div></div></div>`; // Close grid container, folder content, and folder
+    }
+    
+    return html;
+}
+
+// Toggle folder expand/collapse (Image to PDF specific)
+function toggleImageFolder(folderId) {
+    const content = document.getElementById(folderId);
+    if (content) {
+        const isVisible = content.style.display !== 'none';
+        content.style.display = isVisible ? 'none' : 'block';
+        
+        // Update icon - find the header that contains this folder's ID
+        const folderDiv = content.parentElement;
+        if (folderDiv && folderDiv.classList.contains('image-folder')) {
+            const header = folderDiv.querySelector('.folder-header');
+            if (header) {
+                const icon = header.querySelector('.folder-icon');
+                if (icon) {
+                    icon.textContent = isVisible ? '▶' : '▼';
+                }
+            }
+        }
+    }
+}
+
+// Handle image click (bulk mode always enabled)
+function handleImageClick(path, name) {
+    toggleImageSelection(path, name);
+}
+
+// Toggle image selection - assigns sequence numbers based on selection order
+function toggleImageSelection(path, name) {
+    const index = window.appData.selectedImages.findIndex(img => img.path === path);
+    
+    if (index >= 0) {
+        // Deselect - remove from selection
+        window.appData.selectedImages.splice(index, 1);
+        window.appData.imageOrder = window.appData.imageOrder.filter(p => p !== path);
+        // Renumber remaining images
+        updateSequenceNumbers();
+    } else {
+        // Select - add to end of selection (gets next sequence number)
+        // Look in both availableImages and availableVideos
+        let fileInfo = window.appData.availableImages?.find(img => img.path === path);
+        if (!fileInfo && window.appData.availableVideos) {
+            fileInfo = window.appData.availableVideos.find(vid => vid.path === path);
+        }
+        const folder = fileInfo?.folder || 'root';
+        const type = fileInfo?.type || 'image'; // Preserve type field (image or video)
+        window.appData.selectedImages.push({path, name, folder, type});
+        window.appData.imageOrder.push(path);
+        // Update sequence numbers
+        updateSequenceNumbers();
+    }
+    
+    updateSelectionUI();
+    // Re-render both sections to show sequence numbers
+    if (window.appData.availableImages && window.appData.availableImages.length > 0) {
+        renderImageListDeface(window.appData.availableImages);
+    }
+    if (window.appData.availableVideos && window.appData.availableVideos.length > 0) {
+        renderVideoListDeface(window.appData.availableVideos);
+    }
+}
+
+// Update sequence numbers for all selected images
+function updateSequenceNumbers() {
+    window.appData.selectedImages.forEach((img, index) => {
+        img.sequence = index + 1; // 1-based sequence number
+    });
+}
+
+// Update selection UI
+function updateSelectionUI() {
+    const selectedFiles = window.appData.selectedImages || [];
+    const count = selectedFiles.length;
+    
+    // Count images and videos separately
+    const imageCount = selectedFiles.filter(f => !f.type || f.type === 'image').length;
+    const videoCount = selectedFiles.filter(f => f.type === 'video').length;
+    
+    const countBadge = document.getElementById('selectionCountBadge');
+    const selectionCount = document.getElementById('selectionCount');
+    const selectionBreakdown = document.getElementById('selectionBreakdown');
+    const selectAllContainer = document.getElementById('selectAllContainer');
+    const orderControls = document.getElementById('orderControls');
+    const outputSection = document.getElementById('outputSettingsSection');
+    const processingSection = document.getElementById('processingSection');
+    
+    // Ensure sequence numbers are up to date
+    updateSequenceNumbers();
+    
+    if (countBadge && selectionCount) {
+        if (count > 0) {
+            countBadge.style.display = 'block';
+            selectionCount.textContent = count;
+        
+        // Show breakdown if there are both images and videos
+        if (selectionBreakdown) {
+            if (imageCount > 0 && videoCount > 0) {
+                selectionBreakdown.textContent = ` (${imageCount} images, ${videoCount} videos)`;
+            } else if (imageCount > 0) {
+                selectionBreakdown.textContent = ` (${imageCount} images)`;
+            } else if (videoCount > 0) {
+                selectionBreakdown.textContent = ` (${videoCount} videos)`;
+            } else {
+                selectionBreakdown.textContent = '';
+            }
+        }
+        } else {
+            countBadge.style.display = 'none';
+        }
+    }
+    
+    // Show/hide reset selection button
+    const resetSelectionBtn = document.getElementById('resetSelectionBtn');
+    if (resetSelectionBtn) {
+        resetSelectionBtn.style.display = count > 0 ? 'block' : 'none';
+    }
+    
+    if (orderControls) {
+        orderControls.style.display = count > 0 ? 'flex' : 'none';
+    }
+    
+    if (selectAllContainer) {
+        selectAllContainer.style.display = 'flex'; // Always visible
+    }
+    
+    // Output settings always visible (no need to hide)
+    // Processing section always visible (no need to hide)
+    
+    // Update batch indicator
+    const batchIndicator = document.getElementById('batchSettingsIndicator');
+    const batchInfo = document.getElementById('batchSettingsInfo');
+    if (batchIndicator && batchInfo) {
+        if (count > 0) {
+            batchIndicator.style.display = 'block';
+            if (imageCount > 0 && videoCount > 0) {
+                batchInfo.textContent = `These settings will apply to all ${count} selected files (${imageCount} images, ${videoCount} videos).`;
+            } else if (imageCount > 0) {
+                batchInfo.textContent = `These settings will apply to all ${imageCount} selected images.`;
+            } else if (videoCount > 0) {
+                batchInfo.textContent = `These settings will apply to all ${videoCount} selected videos.`;
+            } else {
+                batchInfo.textContent = `These settings will apply to all ${count} selected files.`;
+            }
+        } else {
+            batchIndicator.style.display = 'none';
+        }
+    }
+}
+
+// Bulk mode is always enabled - no toggle needed
+// This function kept for backward compatibility but does nothing
+function toggleBulkMode() {
+    // Bulk mode is always enabled, no action needed
+}
+
+// Select all images
+function toggleSelectAll() {
+    const checkbox = document.getElementById('selectAllCheckbox');
+    if (!checkbox) return;
+    
+    if (checkbox.checked) {
+        // Select all - maintain current order if images already selected, then add new ones
+        const existingPaths = new Set(window.appData.selectedImages.map(img => img.path));
+        const newImages = window.appData.availableImages
+            .filter(img => !existingPaths.has(img.path))
+            .map(img => ({
+                path: img.path,
+                name: img.name,
+                folder: img.folder,
+                type: img.type || 'image' // Preserve type field (image or video)
+            }));
+        window.appData.selectedImages = [...window.appData.selectedImages, ...newImages];
+        window.appData.imageOrder = window.appData.selectedImages.map(img => img.path);
+    } else {
+        // Deselect all
+        window.appData.selectedImages = [];
+        window.appData.imageOrder = [];
+    }
+    
+    updateSequenceNumbers();
+    updateSelectionUI();
+    // Re-render both sections to show sequence numbers
+    if (window.appData.availableImages && window.appData.availableImages.length > 0) {
+        renderImageListDeface(window.appData.availableImages);
+    }
+    if (window.appData.availableVideos && window.appData.availableVideos.length > 0) {
+        renderVideoListDeface(window.appData.availableVideos);
+    }
+}
+
+// Reset order to default
+function resetOrder() {
+    if (!window.appData.selectedImages || window.appData.selectedImages.length === 0) return;
+    
+    // Reset to folder structure order (subfolders first, then root, then alphabetical)
+    const sorted = [...window.appData.selectedImages].sort((a, b) => {
+        if (a.folder !== b.folder) {
+            if (a.folder === 'root') return 1;
+            if (b.folder === 'root') return -1;
+            return a.folder.localeCompare(b.folder);
+        }
+        return a.name.localeCompare(b.name);
+    });
+    
+    window.appData.selectedImages = sorted;
+    window.appData.imageOrder = sorted.map(img => img.path);
+    
+    updateSequenceNumbers();
+    updateSelectionUI();
+    // Re-render both sections to show sequence numbers
+    if (window.appData.availableImages && window.appData.availableImages.length > 0) {
+        renderImageListDeface(window.appData.availableImages);
+    }
+    if (window.appData.availableVideos && window.appData.availableVideos.length > 0) {
+        renderVideoListDeface(window.appData.availableVideos);
+    }
+}
+
+// Reset selection - clear all selected images
+function resetSelection() {
+    // Clear all selected images and order
+    window.appData.selectedImages = [];
+    window.appData.imageOrder = [];
+    
+    // Re-render to remove selection indicators
+    if (window.appData.availableImages && window.appData.availableImages.length > 0) {
+        renderImageListDeface(window.appData.availableImages);
+    }
+    if (window.appData.availableVideos && window.appData.availableVideos.length > 0) {
+        renderVideoListDeface(window.appData.availableVideos);
+    }
+    
+    // Update UI (this will hide badges, buttons, etc.)
+    updateSelectionUI();
+}
+
+// Utility function
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Initialize bulk mode toggle
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const resetOrderBtn = document.getElementById('resetOrderBtn');
+    
+    // Bulk mode is always enabled - no toggle needed
+    window.appData.bulkMode = true; // Always true
+    updateSelectionUI(); // Update UI to show bulk mode controls
+    
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', toggleSelectAll);
+    }
+    
+    if (resetOrderBtn) {
+        resetOrderBtn.addEventListener('click', resetOrder);
+    }
+    
+    const resetSelectionBtn = document.getElementById('resetSelectionBtn');
+    if (resetSelectionBtn) {
+        resetSelectionBtn.addEventListener('click', resetSelection);
+    }
+    
+    // Thumbnails per row selector
+    const thumbnailsPerRowSelect = document.getElementById('thumbnailsPerRow');
+    if (thumbnailsPerRowSelect) {
+        thumbnailsPerRowSelect.value = window.appData.thumbnailsPerRow || 3;
+        thumbnailsPerRowSelect.addEventListener('change', function() {
+            window.appData.thumbnailsPerRow = parseInt(this.value) || 3;
+            // Re-render both sections with new layout
+            if (window.appData.availableImages && window.appData.availableImages.length > 0) {
+                renderImageListDeface(window.appData.availableImages);
+            }
+            if (window.appData.availableVideos && window.appData.availableVideos.length > 0) {
+                renderVideoListDeface(window.appData.availableVideos);
+            }
+        });
+    }
+    
+    // Quality slider
+    const qualitySlider = document.getElementById('qualitySlider');
+    const qualityValue = document.getElementById('qualityValue');
+    if (qualitySlider && qualityValue) {
+        qualitySlider.addEventListener('input', function() {
+            qualityValue.textContent = this.value;
+        });
+    }
+    
+    // Deface settings handlers
+    const threshSlider = document.getElementById('threshSlider');
+    const threshValue = document.getElementById('threshValue');
+    if (threshSlider && threshValue) {
+        threshSlider.addEventListener('input', function() {
+            threshValue.textContent = parseFloat(this.value).toFixed(2);
+        });
+    }
+    
+    const mosaicsizeSlider = document.getElementById('mosaicsizeSlider');
+    const mosaicsizeValue = document.getElementById('mosaicsizeValue');
+    if (mosaicsizeSlider && mosaicsizeValue) {
+        mosaicsizeSlider.addEventListener('input', function() {
+            mosaicsizeValue.textContent = this.value;
+        });
+    }
+    
+    
+    // Show/hide mosaic size based on replacewith selection
+    const replacewithSelect = document.getElementById('replacewithSelect');
+    const mosaicsizeContainer = document.getElementById('mosaicsizeContainer');
+    if (replacewithSelect && mosaicsizeContainer) {
+        function updateMosaicsizeVisibility() {
+            mosaicsizeContainer.style.display = replacewithSelect.value === 'mosaic' ? 'block' : 'none';
+        }
+        replacewithSelect.addEventListener('change', updateMosaicsizeVisibility);
+        updateMosaicsizeVisibility(); // Initial state
+    }
+    
+    // Apply deface button
+    const applyDefaceBtn = document.getElementById('applyDefaceBtn');
+    if (applyDefaceBtn) {
+        applyDefaceBtn.addEventListener('click', function() {
+            if (window.appData.selectedImages.length === 0) {
+                alert('Please select at least one image or video');
+                return;
+            }
+            
+            applyDeface();
+        });
+    }
+    
+    // Adjust settings & re-apply button
+    const adjustSettingsBtn = document.getElementById('adjustSettingsBtn');
+    if (adjustSettingsBtn) {
+        adjustSettingsBtn.addEventListener('click', function() {
+            applyDeface();
+        });
+    }
+    
+    // Accept & proceed button
+    const acceptAndProceedBtn = document.getElementById('acceptAndProceedBtn');
+    if (acceptAndProceedBtn) {
+        acceptAndProceedBtn.addEventListener('click', function() {
+            const processingSection = document.getElementById('processingSection');
+            if (processingSection) {
+                processingSection.style.display = 'block';
+                processingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    }
+    
+    // Generate documents button
+    const generateBtn = document.getElementById('generateDocumentsBtn');
+    if (generateBtn) {
+        generateBtn.addEventListener('click', function() {
+            if (!window.appData.defaceSessionId) {
+                alert('Please apply deface first');
+                return;
+            }
+            
+            generateImageDocuments();
+        });
+    }
+    
+    // Manual deface editor modal handlers
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const cancelModalBtn = document.getElementById('cancelModalBtn');
+    const modal = document.getElementById('manualDefaceModal');
+    
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', closeManualDefaceModal);
+    }
+    if (cancelModalBtn) {
+        cancelModalBtn.addEventListener('click', closeManualDefaceModal);
+    }
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeManualDefaceModal();
+            }
+        });
+    }
+    
+    // Deface size selector change handler
+    const defaceSizeSelect = document.getElementById('defaceSizeSelect');
+    const customSizeContainer = document.getElementById('customSizeContainer');
+    if (defaceSizeSelect && customSizeContainer) {
+        defaceSizeSelect.addEventListener('change', function() {
+            customSizeContainer.style.display = this.value === 'custom' ? 'block' : 'none';
+        });
+    }
+    
+    // Modal mosaic size slider handler
+    const modalMosaicsizeSlider = document.getElementById('modalMosaicsizeSlider');
+    const modalMosaicsizeValue = document.getElementById('modalMosaicsizeValue');
+    if (modalMosaicsizeSlider && modalMosaicsizeValue) {
+        modalMosaicsizeSlider.addEventListener('input', function() {
+            modalMosaicsizeValue.textContent = this.value;
+        });
+    }
+    
+    // Show/hide modal mosaic size based on deface method selection
+    const defaceMethodSelect = document.getElementById('defaceMethodSelect');
+    const modalMosaicsizeContainer = document.getElementById('modalMosaicsizeContainer');
+    if (defaceMethodSelect && modalMosaicsizeContainer) {
+        function updateModalMosaicsizeVisibility() {
+            modalMosaicsizeContainer.style.display = defaceMethodSelect.value === 'mosaic' ? 'block' : 'none';
+        }
+        defaceMethodSelect.addEventListener('change', updateModalMosaicsizeVisibility);
+        updateModalMosaicsizeVisibility(); // Initial state
+    }
+    
+    // Clear all deface areas button
+    const clearAllDefaceBtn = document.getElementById('clearAllDefaceBtn');
+    if (clearAllDefaceBtn) {
+        clearAllDefaceBtn.addEventListener('click', function() {
+            window.appData.manualDefaceAreas = [];
+            updateActiveAreasList();
+            redrawDefaceAreas();
+        });
+    }
+    
+    // Apply manual deface button
+    const applyManualDefaceBtn = document.getElementById('applyManualDefaceBtn');
+    if (applyManualDefaceBtn) {
+        applyManualDefaceBtn.addEventListener('click', applyManualDefaceToMedia);
+    }
+    
+    // Extract frame button (for videos)
+    const extractFrameBtn = document.getElementById('extractFrameBtn');
+    if (extractFrameBtn) {
+        extractFrameBtn.addEventListener('click', extractVideoFrame);
+    }
+    
+    // Video time slider
+    const videoTimeSlider = document.getElementById('videoTimeSlider');
+    const videoPlayer = document.getElementById('manualDefaceVideoPlayer');
+    if (videoTimeSlider && videoPlayer) {
+        videoTimeSlider.addEventListener('input', function() {
+            if (videoPlayer) {
+                videoPlayer.currentTime = parseFloat(this.value);
+                updateVideoTimeDisplay();
+            }
+        });
+    }
+});
+
+// Apply deface function
+function applyDeface() {
+    const selectedImages = window.appData.selectedImages || [];
+    if (selectedImages.length === 0) {
+        alert('Please select at least one image or video');
+        return;
+    }
+    
+    // Get deface settings
+    const replacewith = document.getElementById('replacewithSelect').value || 'blur';
+    const boxes = document.getElementById('boxesCheckbox').checked || false;
+    const thresh = parseFloat(document.getElementById('threshSlider').value) || 0.2;
+    const scale = document.getElementById('scaleSelect').value || 'original';
+    const mosaicsize = parseInt(document.getElementById('mosaicsizeSlider').value) || 20;
+    const drawScores = document.getElementById('drawScoresCheckbox').checked || false;
+    const approveVideoProcessing = document.getElementById('approveVideoProcessingCheckbox')?.checked || false;
+    const quality = parseInt(document.getElementById('qualitySlider').value) || 95;
+    const maxSize = document.getElementById('resolutionSelect').value || '640x480';
+    
+    // Get image paths
+    const imagePaths = selectedImages.map(img => img.path);
+    
+    // Show progress
+    const progressContainer = document.getElementById('defaceProgressContainer');
+    const progressFill = document.getElementById('defaceProgressFill');
+    const progressText = document.getElementById('defaceProgressText');
+    const reviewInterface = document.getElementById('reviewInterface');
+    
+    progressContainer.style.display = 'block';
+    progressFill.style.width = '0%';
+    progressText.textContent = 'Processing images/videos with deface...';
+    reviewInterface.style.display = 'none';
+    
+    // Disable button
+    const applyBtn = document.getElementById('applyDefaceBtn');
+    if (applyBtn) {
+        applyBtn.disabled = true;
+        applyBtn.textContent = 'Processing...';
+    }
+    
+    // Start progress simulation (updates gradually while waiting)
+    let progressPercent = 0;
+    const progressInterval = setInterval(function() {
+        // Gradually increase progress up to 90% while waiting
+        if (progressPercent < 90) {
+            progressPercent += 2;
+            if (progressFill) progressFill.style.width = progressPercent + '%';
+            if (progressText) progressText.textContent = `Processing... ${progressPercent}%`;
+        }
+    }, 500); // Update every 500ms
+    
+    // Call API
+    const fetchPromise = fetch('/v2p-formatter/apply_deface', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            image_paths: imagePaths,
+            quality: quality,
+            max_size: maxSize,
+            replacewith: replacewith,
+            boxes: boxes,
+            thresh: thresh,
+            scale: scale,
+            mosaicsize: mosaicsize,
+            draw_scores: drawScores,
+            approve_video_processing: approveVideoProcessing
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        // Clear progress simulation interval
+        clearInterval(progressInterval);
+        
+        // Set to 100%
+        if (progressFill) progressFill.style.width = '100%';
+        if (progressText) progressText.textContent = 'Complete!';
+        
+        if (data.success) {
+            // Store session ID and processed items
+            window.appData.defaceSessionId = data.session_id;
+            window.appData.defacedItems = data.processed || [];
+            
+            // Show review interface
+            if (reviewInterface) {
+                reviewInterface.style.display = 'block';
+                renderReviewGrid(data.processed);
+            }
+        } else {
+            alert('Error: ' + (data.error || 'Failed to apply deface'));
+            if (progressContainer) progressContainer.style.display = 'none';
+        }
+        
+        // Re-enable button
+        if (applyBtn) {
+            applyBtn.disabled = false;
+            applyBtn.textContent = 'Apply Deface';
+        }
+    })
+    .catch(err => {
+        // Clear progress simulation interval
+        clearInterval(progressInterval);
+        
+        if (progressFill) progressFill.style.width = '0%';
+        if (progressText) progressText.textContent = 'Error occurred';
+        alert('Error: ' + err.message);
+        if (progressContainer) progressContainer.style.display = 'none';
+        
+        // Re-enable button
+        if (applyBtn) {
+            applyBtn.disabled = false;
+            applyBtn.textContent = 'Apply Deface';
+        }
+    });
+}
+
+// Render review grid
+function renderReviewGrid(processedItems) {
+    const grid = document.getElementById('reviewGrid');
+    if (!grid) return;
+    
+    let html = '';
+    
+    processedItems.forEach((item, index) => {
+        const mediaId = item.sequence || index;
+        const isImage = item.type === 'image';
+        const isVideo = item.type === 'video';
+        const defacedUrl = item.defaced_url || (item.defaced_urls && item.defaced_urls[0]);
+        const originalName = item.original_name || 'Unknown';
+        
+        html += `
+            <div style="padding: 15px; background: #1e1e1e; border-radius: 6px; border: 1px solid #555;">
+                <div style="position: relative; width: 100%; padding-top: 75%; background: #000; border-radius: 4px; overflow: hidden; margin-bottom: 10px;">
+                    ${isVideo ? 
+                        `<video src="${defacedUrl}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;" controls></video>` :
+                        `<img src="${defacedUrl}" alt="${originalName}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;">`
+                    }
+                </div>
+                <div style="text-align: center;">
+                    <div style="color: #e0e0e0; font-weight: 500; margin-bottom: 5px;">${escapeHtml(originalName)}</div>
+                    <div style="color: #51cf66; font-size: 12px; margin-bottom: 10px;">✓ Defaced</div>
+                    <button class="btn btn-secondary" onclick="openManualDefaceEditor(${mediaId})" style="padding: 6px 12px; font-size: 13px;">Edit</button>
+                </div>
+            </div>
+        `;
+    });
+    
+    grid.innerHTML = html;
+}
+
+// Open manual deface editor
+function openManualDefaceEditor(mediaId) {
+    const item = window.appData.defacedItems.find(i => (i.sequence || 0) === mediaId);
+    if (!item) {
+        alert('Media item not found');
+        return;
+    }
+    
+    window.appData.currentManualDefaceMediaId = mediaId;
+    window.appData.currentManualDefaceMediaType = item.type || 'image';
+    window.appData.manualDefaceAreas = [];
+    window.appData.currentManualDefaceVideoTime = null;
+    
+    const modal = document.getElementById('manualDefaceModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalImagePreview = document.getElementById('modalImagePreview');
+    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+    const videoFrameSelection = document.getElementById('videoFrameSelection');
+    const videoPlayer = document.getElementById('manualDefaceVideoPlayer');
+    const instructionsText = document.getElementById('instructionsText');
+    
+    if (modalTitle) modalTitle.textContent = `Manual Deface Editor - ${item.original_name || 'Unknown'}`;
+    
+    if (item.type === 'video') {
+        console.log('Setting up video manual deface');
+        // Show video player section, hide image preview initially
+        if (videoFrameSelection) {
+            videoFrameSelection.style.display = 'block';
+            console.log('Video frame selection displayed');
+        } else {
+            console.error('Video frame selection element not found!');
+        }
+        if (imagePreviewContainer) {
+            imagePreviewContainer.style.display = 'none';
+            console.log('Image preview container hidden');
+        }
+        
+        // Setup video player
+        const defacedVideoUrl = item.defaced_url;
+        console.log('Defaced video URL:', defacedVideoUrl);
+        if (videoPlayer && defacedVideoUrl) {
+            videoPlayer.src = defacedVideoUrl;
+            videoPlayer.currentTime = 0;
+            window.appData.currentManualDefaceVideoTime = 0;
+            
+            // Remove existing listeners by replacing with fresh handlers
+            const handleTimeUpdate = function() {
+                updateVideoTimeDisplay();
+            };
+            const handleLoadedMetadata = function() {
+                updateVideoTimeDisplay();
+            };
+            
+            // Remove old listeners (if any) and add new ones
+            videoPlayer.removeEventListener('timeupdate', handleTimeUpdate);
+            videoPlayer.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            videoPlayer.addEventListener('timeupdate', handleTimeUpdate);
+            videoPlayer.addEventListener('loadedmetadata', handleLoadedMetadata);
+            
+            console.log('Video player setup complete');
+        } else {
+            console.error('Video player or URL not available', { videoPlayer: !!videoPlayer, defacedVideoUrl });
+        }
+        
+        // Update instructions for video
+        if (instructionsText) {
+            instructionsText.innerHTML = '<strong>Instructions:</strong><br>' +
+                '1. Use video player to select frame time point<br>' +
+                '2. Click "Extract Frame at Current Time" to load frame<br>' +
+                '3. Click on frame to place deface area<br>' +
+                '4. Adjust size using the dropdown or custom inputs<br>' +
+                '5. Select deface method (Blur, Solid, or Mosaic)<br>' +
+                '6. Click "Apply Deface" to save defaced frame';
+        }
+        
+        console.log('Video frame selection displayed:', videoFrameSelection ? videoFrameSelection.style.display : 'element not found');
+        console.log('Image preview container displayed:', imagePreviewContainer ? imagePreviewContainer.style.display : 'element not found');
+    } else {
+        console.log('Setting up image manual deface');
+        // Hide video player section, show image preview
+        if (videoFrameSelection) videoFrameSelection.style.display = 'none';
+        if (imagePreviewContainer) imagePreviewContainer.style.display = 'flex';
+        
+        const defacedUrl = item.defaced_url;
+    if (modalImagePreview && defacedUrl) {
+        modalImagePreview.src = defacedUrl;
+        modalImagePreview.onload = function() {
+            setupDefaceCanvas(modalImagePreview);
+        };
+        }
+        
+        // Update instructions for image
+        if (instructionsText) {
+            instructionsText.innerHTML = '<strong>Instructions:</strong><br>' +
+                '1. Click on the image to place a deface area<br>' +
+                '2. Adjust size using the dropdown or custom inputs<br>' +
+                '3. Select deface method (Blur, Solid, or Mosaic)<br>' +
+                '4. Click "Apply Deface" to add to the image<br>' +
+                '5. Repeat to add multiple deface areas';
+        }
+    }
+    
+    if (modal) modal.style.display = 'block';
+    updateActiveAreasList();
+}
+
+// Update video time display
+function updateVideoTimeDisplay() {
+    const videoPlayer = document.getElementById('manualDefaceVideoPlayer');
+    const timeDisplay = document.getElementById('videoTimeDisplay');
+    const durationDisplay = document.getElementById('videoDurationDisplay');
+    const timeSlider = document.getElementById('videoTimeSlider');
+    
+    if (videoPlayer) {
+        const currentTime = videoPlayer.currentTime || 0;
+        const duration = videoPlayer.duration || 0;
+        window.appData.currentManualDefaceVideoTime = currentTime;
+        
+        if (timeDisplay) {
+            timeDisplay.textContent = formatTime(currentTime);
+        }
+        if (durationDisplay) {
+            durationDisplay.textContent = formatTime(duration);
+        }
+        if (timeSlider) {
+            timeSlider.max = duration || 100;
+            timeSlider.value = currentTime;
+        }
+    }
+}
+
+// Format time in MM:SS.S format
+function formatTime(seconds) {
+    if (!seconds || isNaN(seconds)) return '0:00.0';
+    const mins = Math.floor(seconds / 60);
+    const secs = (seconds % 60).toFixed(1);
+    return `${mins}:${secs.padStart(4, '0')}`;
+}
+
+// Close manual deface editor
+function closeManualDefaceModal() {
+    const modal = document.getElementById('manualDefaceModal');
+    if (modal) modal.style.display = 'none';
+    window.appData.currentManualDefaceMediaId = null;
+    window.appData.currentManualDefaceMediaType = null;
+    window.appData.manualDefaceAreas = [];
+    window.appData.currentManualDefaceVideoTime = null;
+    
+    // Stop video if playing
+    const videoPlayer = document.getElementById('manualDefaceVideoPlayer');
+    if (videoPlayer) {
+        videoPlayer.pause();
+        videoPlayer.src = '';
+    }
+}
+
+// Extract frame from video at current time point
+function extractVideoFrame() {
+    const item = window.appData.defacedItems.find(i => (i.sequence || 0) === window.appData.currentManualDefaceMediaId);
+    if (!item || item.type !== 'video') {
+        alert('Invalid video item');
+        return;
+    }
+    
+    const videoPlayer = document.getElementById('manualDefaceVideoPlayer');
+    const timePoint = videoPlayer ? videoPlayer.currentTime : window.appData.currentManualDefaceVideoTime || 0;
+    
+    if (!timePoint && timePoint !== 0) {
+        alert('Please select a time point in the video');
+        return;
+    }
+    
+    // Store the time point for later use when applying deface
+    window.appData.currentManualDefaceVideoTime = timePoint;
+    
+    // Extract frame using preview_frame endpoint (returns image directly)
+    const defacedVideoUrl = item.defaced_url;
+    if (!defacedVideoUrl) {
+        alert('Video URL not found');
+        return;
+    }
+    
+    // Extract video path from URL (remove /v2p-formatter/deface_temp/{session_id}/)
+    const urlParts = defacedVideoUrl.split('/');
+    const sessionId = window.appData.defaceSessionId;
+    const videoFilename = urlParts[urlParts.length - 1];
+    
+    // Get video path from session
+    // For now, we'll use the original_path to get video info, then extract frame
+    // Actually, we should extract frame from the defaced video file
+    // Let's use a simpler approach: request frame extraction from the defaced video
+    
+    // Show loading state
+    const extractBtn = document.getElementById('extractFrameBtn');
+    if (extractBtn) {
+        extractBtn.disabled = true;
+        extractBtn.textContent = 'Extracting...';
+    }
+    
+    // Call backend to extract frame - we need to pass the defaced video path
+    // Since we have the defaced_url, we need to get the actual file path
+    // For now, let's use the original_path and extract from defaced video
+    // Actually, the backend needs the defaced video path, not the original
+    // We'll need to extract the frame client-side or use a new endpoint
+    
+    // Simple approach: Use the video's current frame via canvas
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = videoPlayer.videoWidth;
+    canvas.height = videoPlayer.videoHeight;
+    ctx.drawImage(videoPlayer, 0, 0);
+    
+    // Convert canvas to image
+    canvas.toBlob(function(blob) {
+        const imageUrl = URL.createObjectURL(blob);
+        const modalImagePreview = document.getElementById('modalImagePreview');
+        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+        
+        if (modalImagePreview && imagePreviewContainer) {
+            imagePreviewContainer.style.display = 'flex';
+            modalImagePreview.src = imageUrl;
+            modalImagePreview.onload = function() {
+                setupDefaceCanvas(modalImagePreview);
+                if (extractBtn) {
+                    extractBtn.disabled = false;
+                    extractBtn.textContent = 'Extract Frame at Current Time';
+                }
+            };
+        }
+    }, 'image/jpeg', 0.95);
+}
+
+// Setup deface canvas
+function setupDefaceCanvas(img) {
+    const canvas = document.getElementById('defaceCanvas');
+    const container = document.getElementById('imagePreviewContainer');
+    if (!canvas || !container || !img) return;
+    
+    const rect = img.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+    canvas.style.width = img.style.width || img.offsetWidth + 'px';
+    canvas.style.height = img.style.height || img.offsetHeight + 'px';
+    canvas.style.left = (img.offsetLeft || 0) + 'px';
+    canvas.style.top = (img.offsetTop || 0) + 'px';
+    
+    let isDrawing = false;
+    let startX = 0, startY = 0;
+    
+    canvas.addEventListener('click', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+        
+        const shape = document.getElementById('defaceShapeSelect').value;
+        const size = document.getElementById('defaceSizeSelect').value;
+        const method = document.getElementById('defaceMethodSelect').value;
+        
+        let width = 100, height = 100;
+        if (size === 'small') {
+            width = height = 50;
+        } else if (size === 'medium') {
+            width = height = 100;
+        } else if (size === 'large') {
+            width = height = 150;
+        } else if (size === 'custom') {
+            width = parseInt(document.getElementById('customWidth').value) || 100;
+            height = parseInt(document.getElementById('customHeight').value) || 100;
+        }
+        
+        if (shape === 'square') {
+            height = width;
+        }
+        
+        const area = {
+            x: Math.max(0, x - width / 2),
+            y: Math.max(0, y - height / 2),
+            width: Math.min(width, canvas.width - (x - width / 2)),
+            height: Math.min(height, canvas.height - (y - height / 2)),
+            shape: shape,
+            method: method
+        };
+        
+        window.appData.manualDefaceAreas.push(area);
+        updateActiveAreasList();
+        redrawDefaceAreas();
+    });
+    
+    redrawDefaceAreas();
+}
+
+// Redraw deface areas on canvas
+function redrawDefaceAreas() {
+    const canvas = document.getElementById('defaceCanvas');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    window.appData.manualDefaceAreas.forEach((area, index) => {
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(area.x, area.y, area.width, area.height);
+        
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+        ctx.fillRect(area.x, area.y, area.width, area.height);
+        
+        ctx.fillStyle = '#ff0000';
+        ctx.font = '12px Arial';
+        ctx.fillText(`Area ${index + 1}`, area.x + 5, area.y + 15);
+    });
+}
+
+// Update active areas list
+function updateActiveAreasList() {
+    const list = document.getElementById('activeAreasList');
+    const count = document.getElementById('activeAreasCount');
+    
+    if (count) count.textContent = window.appData.manualDefaceAreas.length;
+    
+    if (!list) return;
+    
+    if (window.appData.manualDefaceAreas.length === 0) {
+        list.innerHTML = '<p style="color: #999; margin: 0;">No deface areas added yet. Click on the image to add one.</p>';
+        return;
+    }
+    
+    let html = '';
+    window.appData.manualDefaceAreas.forEach((area, index) => {
+        html += `
+            <div style="padding: 10px; background: #1e1e1e; border-radius: 4px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="color: #e0e0e0;">
+                    <strong>Area ${index + 1}:</strong> ${area.shape}, ${area.method} (${Math.round(area.width)}x${Math.round(area.height)}px)
+                </div>
+                <button class="btn btn-secondary" onclick="removeDefaceArea(${index})" style="padding: 4px 8px; font-size: 12px;">Remove</button>
+            </div>
+        `;
+    });
+    
+    list.innerHTML = html;
+}
+
+// Remove deface area
+function removeDefaceArea(index) {
+    window.appData.manualDefaceAreas.splice(index, 1);
+    updateActiveAreasList();
+    redrawDefaceAreas();
+}
+
+// Apply manual deface to media
+function applyManualDefaceToMedia() {
+    const mediaId = window.appData.currentManualDefaceMediaId;
+    const sessionId = window.appData.defaceSessionId;
+    
+    if (!mediaId || !sessionId) {
+        alert('Invalid session or media ID');
+        return;
+    }
+    
+    if (window.appData.manualDefaceAreas.length === 0) {
+        alert('Please add at least one deface area');
+        return;
+    }
+    
+    // Get mosaicsize from modal slider (preferred) or main slider (fallback)
+    const modalMosaicsizeSlider = document.getElementById('modalMosaicsizeSlider');
+    const mosaicsize = modalMosaicsizeSlider ? parseInt(modalMosaicsizeSlider.value) || 20 : (parseInt(document.getElementById('mosaicsizeSlider')?.value) || 20);
+    
+    // Disable button
+    const applyBtn = document.getElementById('applyManualDefaceBtn');
+    if (applyBtn) {
+        applyBtn.disabled = true;
+        applyBtn.textContent = 'Applying...';
+    }
+    
+    const item = window.appData.defacedItems.find(i => (i.sequence || 0) === mediaId);
+    const mediaType = item ? (item.type || 'image') : 'image';
+    
+    const requestData = {
+            session_id: sessionId,
+            media_id: mediaId,
+            deface_areas: window.appData.manualDefaceAreas,
+            mosaicsize: mosaicsize
+    };
+    
+    // Add time_point for videos
+    if (mediaType === 'video') {
+        const timePoint = window.appData.currentManualDefaceVideoTime;
+        if (timePoint !== null && timePoint !== undefined) {
+            requestData.time_point = timePoint;
+        } else {
+            alert('Please extract a frame from the video first');
+            if (applyBtn) {
+                applyBtn.disabled = false;
+                applyBtn.textContent = 'Apply Deface';
+            }
+            return;
+        }
+    }
+    
+    fetch('/v2p-formatter/apply_manual_deface', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Update the item in defacedItems
+            const item = window.appData.defacedItems.find(i => (i.sequence || 0) === mediaId);
+            if (item) {
+                if (item.type === 'image') {
+                    item.defaced_url = data.defaced_url;
+                } else if (item.type === 'video') {
+                    // For videos, update manual_frames array
+                    if (!item.manual_frames) {
+                        item.manual_frames = [];
+                    }
+                    
+                    // Add or update manual frame entry
+                    const timePoint = data.time_point || window.appData.currentManualDefaceVideoTime;
+                    const existingFrame = item.manual_frames.findIndex(f => Math.abs(f.time_point - timePoint) < 0.5);
+                    
+                    const frameEntry = {
+                        time_point: timePoint,
+                        frame_path: data.defaced_path,
+                        frame_url: data.defaced_url
+                    };
+                    
+                    if (existingFrame >= 0) {
+                        item.manual_frames[existingFrame] = frameEntry;
+                    } else {
+                        item.manual_frames.push(frameEntry);
+                    }
+                }
+            }
+            
+            // Update preview image in modal
+            const modalImagePreview = document.getElementById('modalImagePreview');
+            if (modalImagePreview && data.defaced_url) {
+                modalImagePreview.src = data.defaced_url + '?t=' + new Date().getTime();
+            }
+            
+            // Re-render review grid
+            renderReviewGrid(window.appData.defacedItems);
+            
+            // Clear manual deface areas
+            window.appData.manualDefaceAreas = [];
+            updateActiveAreasList();
+            redrawDefaceAreas();
+            
+            // Re-enable button
+            if (applyBtn) {
+                applyBtn.disabled = false;
+                applyBtn.textContent = 'Apply Deface';
+            }
+            
+            // Close modal automatically after successful manual deface
+            closeManualDefaceModal();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to apply manual deface'));
+        
+        // Re-enable button
+        if (applyBtn) {
+            applyBtn.disabled = false;
+            applyBtn.textContent = 'Apply Deface';
+            }
+        }
+    })
+    .catch(err => {
+        alert('Error: ' + err.message);
+        
+        // Re-enable button
+        if (applyBtn) {
+            applyBtn.disabled = false;
+            applyBtn.textContent = 'Apply Deface';
+        }
+    });
+}
+
+// Generate documents function
+function generateImageDocuments() {
+    const selectedImages = window.appData.selectedImages || [];
+    if (selectedImages.length === 0) {
+        alert('Please select at least one image');
+        return;
+    }
+    
+    // Get and validate filename (mandatory)
+    const filenameInput = document.getElementById('outputFilename');
+    if (!filenameInput) {
+        alert('Filename input not found');
+        return;
+    }
+    
+    let filename = filenameInput.value.trim();
+    if (!filename) {
+        alert('Please enter a filename');
+        filenameInput.focus();
+        return;
+    }
+    
+    // Sanitize filename: remove invalid characters
+    filename = filename.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+    // Remove leading/trailing dots and spaces
+    filename = filename.replace(/^[.\s]+|[.\s]+$/g, '');
+    
+    if (filename.length === 0) {
+        alert('Filename contains only invalid characters. Please enter a valid filename.');
+        filenameInput.focus();
+        return;
+    }
+    
+    // Update input with sanitized value
+    if (filename !== filenameInput.value.trim()) {
+        filenameInput.value = filename;
+    }
+    
+    // Validate session ID
+    if (!window.appData.defaceSessionId) {
+        alert('Please apply deface first');
+        return;
+    }
+    
+    // Get settings
+    const quality = parseInt(document.getElementById('qualitySlider').value) || 95;
+    const maxSize = document.getElementById('resolutionSelect').value || '640x480';
+    const outputFormat = document.getElementById('outputFormat').value || 'pdf';
+    const layout = document.getElementById('layoutSelect').value || 'grid';
+    const imagesPerPage = parseInt(document.getElementById('imagesPerPage').value) || 2;
+    
+    // Get image order from defaced items (if available) or use selected images sequence
+    let imageOrder = [];
+    if (window.appData.defacedItems && window.appData.defacedItems.length > 0) {
+        // Use sequence order from defaced items
+        const sortedItems = [...window.appData.defacedItems].sort((a, b) => {
+            const seqA = a.sequence || 999999;
+            const seqB = b.sequence || 999999;
+            return seqA - seqB;
+        });
+        imageOrder = sortedItems.map(item => item.sequence || 0);
+    } else {
+        // Fallback: use selected images sequence
+    const sortedSelectedImages = [...selectedImages].sort((a, b) => {
+            const seqA = a.sequence || 999999;
+        const seqB = b.sequence || 999999;
+        return seqA - seqB;
+    });
+        imageOrder = sortedSelectedImages.map(img => img.sequence || 0);
+    }
+    
+    // Show progress
+    const progressContainer = document.getElementById('batchProgressContainer');
+    const progressFill = document.getElementById('batchProgressFill');
+    const progressText = document.getElementById('batchProgressText');
+    const resultsDiv = document.getElementById('results');
+    
+    progressContainer.style.display = 'block';
+    progressFill.style.width = '0%';
+    progressText.textContent = 'Generating documents...';
+    resultsDiv.innerHTML = '';
+    
+    // Disable button and filename input
+    const generateBtn = document.getElementById('generateDocumentsBtn');
+    if (generateBtn) {
+        generateBtn.disabled = true;
+        generateBtn.textContent = 'Generating...';
+    }
+    if (filenameInput) {
+        filenameInput.disabled = true;
+    }
+    
+    // Get qualification and learner for output folder
+    const qualification = document.getElementById('qualificationSelect')?.value;
+    const learner = document.getElementById('learnerSelect')?.value;
+    
+    // Call API with session_id
+    fetch('/v2p-formatter/generate_deface_documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            session_id: window.appData.defaceSessionId,
+            image_order: imageOrder,
+            quality: quality,
+            max_size: maxSize,
+            output_format: outputFormat,
+            layout: layout,
+            images_per_page: imagesPerPage,
+            qualification: qualification,
+            learner: learner,
+            filename: filename
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (progressFill) progressFill.style.width = '100%';
+        if (progressText) progressText.textContent = 'Complete!';
+        
+        if (data.success) {
+            let html = '<div style="padding: 20px; background: #2a2a2a; border-radius: 6px; margin-top: 20px;">';
+            html += '<h3 style="color: #e0e0e0; margin-top: 0;">✅ Documents Generated Successfully!</h3>';
+            
+            // Add link to output folder
+            if (data.output_folder_path) {
+                html += `<p style="margin-bottom: 15px;"><strong style="color: #e0e0e0;">Output Folder:</strong></p>`;
+                html += `<p style="margin-bottom: 15px; padding: 10px; background: #1e1e1e; border-radius: 4px; word-break: break-all; font-family: monospace; color: #999; font-size: 12px;">${data.output_folder_path}</p>`;
+                html += `<p style="margin-bottom: 20px;"><a href="#" onclick="openFolderInFinder('${data.output_folder_path.replace(/'/g, "\\'")}'); return false;" style="color: #667eea; text-decoration: underline; font-weight: 500; cursor: pointer;">📁 Open Output Folder</a></p>`;
+                html += '<hr style="border: none; border-top: 1px solid #555; margin: 15px 0;">';
+            }
+            
+            if (data.pdf_path) {
+                const pdfPath = data.pdf_relative_path || data.pdf_path;
+                html += `<p style="color: #e0e0e0; margin-bottom: 10px;"><strong>PDF:</strong> <a href="#" onclick="openFileInPreview('${pdfPath.replace(/'/g, "\\'")}'); return false;" style="color: #667eea; text-decoration: underline; cursor: pointer;">📄 Open PDF</a></p>`;
+            }
+            if (data.docx_path) {
+                const relativePath = data.docx_relative_path || data.docx_path;
+                const docxUrl = `/v2p-formatter/download?path=${encodeURIComponent(relativePath)}`;
+                html += `<p style="color: #e0e0e0; margin-bottom: 10px;"><strong>DOCX:</strong> <a href="${docxUrl}" download style="color: #667eea; text-decoration: underline;">📝 Download DOCX</a></p>`;
+            }
+            
+            // Add exported MP4 videos if any
+            if (data.exported_videos && data.exported_videos.length > 0) {
+                html += '<hr style="border: none; border-top: 1px solid #555; margin: 15px 0;">';
+                html += `<p style="color: #e0e0e0; margin-bottom: 10px;"><strong>Exported MP4 Videos (${data.exported_videos.length}):</strong></p>`;
+                data.exported_videos.forEach((video, index) => {
+                    const videoUrl = video.url || `/v2p-formatter/download?path=${encodeURIComponent(video.relative_path || video.path)}`;
+                    html += `<p style="color: #e0e0e0; margin-bottom: 8px; margin-left: 20px;">
+                        <span style="color: #999;">${index + 1}.</span> 
+                        <a href="${videoUrl}" download style="color: #667eea; text-decoration: underline;">🎬 ${video.name || video.path.split('/').pop()}</a>
+                    </p>`;
+                });
+            }
+            
+            html += '</div>';
+            resultsDiv.innerHTML = html;
+        } else {
+            resultsDiv.innerHTML = `<div style="padding: 20px; background: #4a2a2a; border-radius: 6px; margin-top: 20px; color: #f44;">❌ Error: ${data.error || 'Unknown error'}</div>`;
+        }
+        
+        // Re-enable button and filename input
+        if (generateBtn) {
+            generateBtn.disabled = false;
+            generateBtn.textContent = 'Generate Documents';
+        }
+        if (filenameInput) {
+            filenameInput.disabled = false;
+        }
+    })
+    .catch(err => {
+        if (progressFill) progressFill.style.width = '0%';
+        if (progressText) progressText.textContent = 'Error occurred';
+        resultsDiv.innerHTML = `<div style="padding: 20px; background: #4a2a2a; border-radius: 6px; margin-top: 20px; color: #f44;">❌ Error: ${err.message}</div>`;
+        
+        // Re-enable button and filename input
+        if (generateBtn) {
+            generateBtn.disabled = false;
+            generateBtn.textContent = 'Generate Documents';
+        }
+        if (filenameInput) {
+            filenameInput.disabled = false;
+        }
+    });
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Make functions globally available
+window.openManualDefaceEditor = openManualDefaceEditor;
+window.removeDefaceArea = removeDefaceArea;
+window.toggleSection = toggleSection;
+window.toggleSelectAllDeface = toggleSelectAllDeface;
+
+// Open folder in macOS Finder
+function openFolderInFinder(folderPath) {
+    fetch('/v2p-formatter/open_folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: folderPath })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Folder opened in Finder:', folderPath);
+        } else {
+            console.error('Failed to open folder:', data.error);
+            alert('Failed to open folder: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error opening folder:', error);
+        alert('Error opening folder: ' + error.message);
+    });
+}
+
+// Open file in macOS Preview (for PDFs) or default app
+function openFileInPreview(filePath) {
+    fetch('/v2p-formatter/open_file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: filePath })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('File opened in Preview:', filePath);
+        } else {
+            console.error('Failed to open file:', data.error);
+            alert('Failed to open file: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error opening file:', error);
+        alert('Error opening file: ' + error.message);
+    });
+}
+
+// Initialize Full Screen Selector button
+document.addEventListener('DOMContentLoaded', function() {
+    const openFullScreenBtn = document.getElementById('openFullScreenSelectorBtn');
+    if (openFullScreenBtn) {
+        openFullScreenBtn.addEventListener('click', function() {
+            if (window.MediaBulkImageSelector) {
+                window.MediaBulkImageSelector.open();
+            } else {
+                console.error('MediaBulkImageSelector not loaded');
+            }
+        });
+    }
+});
+</script>
+
+<!-- Media Bulk Image Selector Modal -->
+<link rel="stylesheet" href="/v2p-formatter/static/css/media-bulk-image-selector.css">
+<script src="/v2p-formatter/static/js/media-bulk-image-selector.js"></script>
+
+<!-- Manual Deface Editor Modal -->
+<div id="manualDefaceModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10000; overflow-y: auto; padding: 20px; box-sizing: border-box;">
+    <div style="max-width: 1200px; margin: 0 auto; background: #1e1e1e; border-radius: 8px; border: 1px solid #555; padding: 20px;">
+        <!-- Modal Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 15px;">
+            <h2 style="margin: 0; color: #e0e0e0;" id="modalTitle">Manual Deface Editor</h2>
+            <button id="closeModalBtn" style="background: transparent; border: 1px solid #555; color: #e0e0e0; border-radius: 4px; width: 32px; height: 32px; cursor: pointer; font-size: 18px;">✕</button>
+        </div>
+        
+        <!-- Video Frame Selection (for videos only) -->
+        <div id="videoFrameSelection" style="display: none; margin-bottom: 20px; padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+            <h3 style="margin-top: 0; color: #e0e0e0; margin-bottom: 15px;">Frame Selection</h3>
+            <div style="margin-bottom: 15px;">
+                <video id="manualDefaceVideoPlayer" controls style="width: 100%; max-height: 400px; background: #000; border-radius: 4px;">
+                    Your browser does not support video playback.
+                </video>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 200px;">
+                    <label style="display: block; color: #e0e0e0; margin-bottom: 5px; font-weight: 500;">Time: <span id="videoTimeDisplay">0:00.0</span> / <span id="videoDurationDisplay">0:00.0</span></label>
+                    <input type="range" id="videoTimeSlider" min="0" max="100" value="0" step="0.1" style="width: 100%;">
+                </div>
+                <button class="btn btn-primary" id="extractFrameBtn" type="button" style="padding: 10px 20px;">Extract Frame at Current Time</button>
+            </div>
+        </div>
+        
+        <!-- Image Preview Container -->
+        <div style="margin-bottom: 20px; background: #000; border-radius: 4px; overflow: hidden; position: relative;">
+            <div id="imagePreviewContainer" style="position: relative; display: flex; justify-content: center; align-items: center; min-height: 400px; max-height: 70vh; overflow: auto;">
+                <img id="modalImagePreview" src="" alt="Preview" style="max-width: 100%; max-height: 70vh; object-fit: contain;">
+                <canvas id="defaceCanvas" style="position: absolute; top: 0; left: 0; cursor: crosshair;"></canvas>
+            </div>
+        </div>
+        
+        <!-- Controls -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; padding: 15px; background: #2a2a2a; border-radius: 6px;">
+            <div>
+                <label style="display: block; color: #e0e0e0; margin-bottom: 5px; font-weight: 500;">Deface Shape:</label>
+                <select id="defaceShapeSelect" style="width: 100%; padding: 8px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px;">
+                    <option value="square" selected>Square</option>
+                    <option value="rectangular">Rectangular</option>
+                </select>
+            </div>
+            <div>
+                <label style="display: block; color: #e0e0e0; margin-bottom: 5px; font-weight: 500;">Size:</label>
+                <select id="defaceSizeSelect" style="width: 100%; padding: 8px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px;">
+                    <option value="small">Small (50x50)</option>
+                    <option value="medium" selected>Medium (100x100)</option>
+                    <option value="large">Large (150x150)</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            <div id="customSizeContainer" style="display: none;">
+                <label style="display: block; color: #e0e0e0; margin-bottom: 5px; font-weight: 500;">Width:</label>
+                <input type="number" id="customWidth" value="100" min="20" max="500" style="width: 100%; padding: 8px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; margin-bottom: 5px;">
+                <label style="display: block; color: #e0e0e0; margin-bottom: 5px; font-weight: 500;">Height:</label>
+                <input type="number" id="customHeight" value="100" min="20" max="500" style="width: 100%; padding: 8px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px;">
+            </div>
+            <div>
+                <label style="display: block; color: #e0e0e0; margin-bottom: 5px; font-weight: 500;">Deface Method:</label>
+                <select id="defaceMethodSelect" style="width: 100%; padding: 8px; background: #1e1e1e; color: #e0e0e0; border: 1px solid #555; border-radius: 4px;">
+                    <option value="blur" selected>Blur</option>
+                    <option value="solid">Solid (Black Box)</option>
+                    <option value="mosaic">Mosaic</option>
+                </select>
+            </div>
+            <div id="modalMosaicsizeContainer" style="display: none;">
+                <label style="display: block; color: #e0e0e0; margin-bottom: 5px; font-weight: 500;">Mosaic Size: <span id="modalMosaicsizeValue">20</span></label>
+                <input type="range" id="modalMosaicsizeSlider" min="5" max="50" step="1" value="20" style="width: 100%;">
+                <p style="color: #999; font-size: 12px; margin-top: 4px; margin-bottom: 0;">Tile size in pixels (only for mosaic)</p>
+            </div>
+        </div>
+        
+        <!-- Instructions -->
+        <div id="instructionsContainer" style="padding: 15px; background: #2a3a4a; border-left: 4px solid #667eea; border-radius: 4px; margin-bottom: 20px;">
+            <p id="instructionsText" style="color: #e0e0e0; margin: 0; line-height: 1.6;">
+                <strong>Instructions:</strong><br>
+                1. Click on the image to place a deface area<br>
+                2. Adjust size using the dropdown or custom inputs<br>
+                3. Select deface method (Blur, Solid, or Mosaic)<br>
+                4. Click "Apply Deface" to add to the image<br>
+                5. Repeat to add multiple deface areas
+            </p>
+        </div>
+        
+        <!-- Active Deface Areas -->
+        <div style="margin-bottom: 20px; padding: 15px; background: #2a2a2a; border-radius: 6px;">
+            <h3 style="margin-top: 0; color: #e0e0e0;">Active Deface Areas (<span id="activeAreasCount">0</span>):</h3>
+            <div id="activeAreasList" style="margin-top: 10px;">
+                <!-- Active areas will be listed here -->
+            </div>
+        </div>
+        
+        <!-- Modal Actions -->
+        <div style="display: flex; gap: 15px; justify-content: flex-end;">
+            <button class="btn btn-secondary" id="clearAllDefaceBtn" type="button">Clear All Deface Areas</button>
+            <button class="btn btn-primary" id="applyManualDefaceBtn" type="button">Apply Deface</button>
+            <button class="btn btn-secondary" id="cancelModalBtn" type="button">Cancel</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+

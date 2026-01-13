@@ -14,6 +14,9 @@
             <a href="/v2p-formatter/image-to-pdf" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
                 Image to PDF
             </a>
+            <a href="/v2p-formatter/deface" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Deface
+            </a>
         </div>
     </div>
 
@@ -423,7 +426,7 @@ window.loadFiles = function() {
     }
 })();
 
-// Render video list with bulk selection support
+// Render video list with bulk selection support and folder structure
 function renderVideoList(files) {
     const bulkMode = window.appData.bulkMode || false;
     const selectedVideos = window.appData.selectedVideos || [];
@@ -447,10 +450,47 @@ function renderVideoList(files) {
     // Get sort setting
     const sortBy = (window.appData && window.appData.sortBy) ? window.appData.sortBy : 'name';
     
-    // Sort files
-    const sortedFiles = [...files];
+    // Organize files by folder
+    const folders = {};
+    files.forEach(file => {
+        const folder = file.folder === 'root' ? 'root' : file.folder;
+        if (!folders[folder]) {
+            folders[folder] = [];
+        }
+        folders[folder].push(file);
+    });
+    
+    let html = '';
+    
+    // Render subfolders first (sorted) - all collapsed by default
+    const subfolders = Object.keys(folders).filter(f => f !== 'root').sort();
+    subfolders.forEach(folder => {
+        html += renderVideoFolder(folder, folders[folder], thumbnailsPerRow, sortBy, bulkMode, selectedPaths, currentVideoPath);
+    });
+    
+    // Render root videos last
+    if (folders['root'] && folders['root'].length > 0) {
+        if (subfolders.length > 0) {
+            html += '<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #555;"><strong style="color: #e0e0e0;">Direct videos:</strong></div>';
+        }
+        // Render root videos directly (not in a folder wrapper)
+        html += `<div style="display: grid; grid-template-columns: repeat(${thumbnailsPerRow}, 1fr); gap: 16px; width: 100%;">`;
+        const sortedRoot = sortFiles(folders['root'], sortBy);
+        sortedRoot.forEach(file => {
+            html += renderVideoItem(file, thumbnailsPerRow, bulkMode, selectedPaths, currentVideoPath);
+        });
+        html += '</div>';
+    }
+    
+    document.getElementById('fileTreeContent').innerHTML = html;
+    updateSelectionUI();
+}
+
+// Helper function to sort files
+function sortFiles(files, sortBy) {
+    const sorted = [...files];
     if (sortBy === 'date') {
-        sortedFiles.sort((a, b) => {
+        sorted.sort((a, b) => {
             const dateA = a.modified_time || a.created_time || 0;
             const dateB = b.modified_time || b.created_time || 0;
             if (dateA !== dateB) {
@@ -459,71 +499,118 @@ function renderVideoList(files) {
             return a.name.localeCompare(b.name);
         });
     } else {
-        sortedFiles.sort((a, b) => a.name.localeCompare(b.name));
+        sorted.sort((a, b) => a.name.localeCompare(b.name));
     }
+    return sorted;
+}
+
+// Render video folder with collapsible structure
+function renderVideoFolder(folderName, files, thumbnailsPerRow, sortBy, bulkMode, selectedPaths, currentVideoPath) {
+    const folderId = 'folder-' + folderName.replace(/[^a-zA-Z0-9]/g, '-');
+    const isCollapsed = true; // All folders collapsed by default
     
-    // Start with grid container
-    let html = `<div style="display: grid; grid-template-columns: repeat(${thumbnailsPerRow}, 1fr); gap: 16px; width: 100%;">`;
+    let html = '';
+    html += `<div class="video-folder" data-folder="${folderId}" style="width: 100%; margin-bottom: 20px;">`;
+    html += `<div class="folder-header" onclick="toggleVideoFolder('${folderId}')" style="cursor: pointer; padding: 10px; margin: 5px 0; background: #2a2a2a; border-radius: 4px; display: flex; align-items: center; gap: 10px;">`;
+    html += `<span class="folder-icon">${isCollapsed ? '▶' : '▼'}</span>`;
+    html += `<strong style="color: #e0e0e0;">${escapeHtml(folderName)}</strong>`;
+    html += `<span style="color: #666; margin-left: 10px;">(${files.length} videos)</span>`;
+    html += `</div>`;
+    html += `<div class="folder-content" id="${folderId}" style="display: ${isCollapsed ? 'none' : 'block'}; margin-top: 5px;">`;
+    html += `<div style="display: grid; grid-template-columns: repeat(${thumbnailsPerRow}, 1fr); gap: 16px; width: 100%;">`;
+    
+    // Sort files
+    const sortedFiles = sortFiles(files, sortBy);
     
     sortedFiles.forEach(file => {
-        const path = file.path.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
-        const name = file.name.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
-        const cacheKey = file.modified_time ? `m=${Math.floor(file.modified_time)}` : `t=${new Date().getTime()}`;
-        const thumbnailUrl = `/v2p-formatter/thumbnail?path=${encodeURIComponent(file.path)}&size=240x180&${cacheKey}`;
-        
-        // Check if selected: either in bulk mode selection OR is current video in single mode
-        const isSelected = bulkMode ? selectedPaths.includes(file.path) : (currentVideoPath === file.path);
-        
-        // Style based on selection state - make highlighting more prominent
-        const bgColor = isSelected ? '#2a3a4a' : '#1e1e1e';
-        const borderColor = isSelected ? '#667eea' : '#555';
-        const borderWidth = isSelected ? '3px' : '2px';
-        const boxShadow = isSelected ? '0 0 0 2px rgba(102, 126, 234, 0.3)' : 'none';
-        
-        // Escape path for use in JavaScript
-        const jsPath = path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        
-        html += `
-            <div class="video-item ${isSelected ? 'selected' : ''}" 
-                 data-video-path="${path}" 
-                 data-video-name="${name}"
-                 onclick="handleVideoClick('${path}', '${name}')" 
-                 style="cursor: pointer; padding: 12px; border-radius: 8px; background: ${bgColor}; border: ${borderWidth} solid ${borderColor}; box-shadow: ${boxShadow}; transition: all 0.2s; position: relative; width: 100%; box-sizing: border-box;"
-                 onmouseover="if (!this.classList.contains('selected')) { this.style.background='#2a2a2a'; this.style.borderColor='#667eea'; }"
-                 onmouseout="checkVideoSelectionState(this, '${jsPath}');">
-                ${isSelected ? `
-                    <div style="position: absolute; top: 8px; right: 8px; z-index: 10; background: #667eea; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.5);">✓</div>
-                ` : ''}
-                ${bulkMode ? `
-                    <div style="position: absolute; top: 8px; left: 8px; z-index: 10;">
-                        <input type="checkbox" 
-                               ${isSelected ? 'checked' : ''}
-                               onclick="event.stopPropagation(); toggleVideoSelection('${path}', '${name}');"
-                               style="width: 24px; height: 24px; cursor: pointer; accent-color: #667eea;">
-                    </div>
-                ` : ''}
-                <div style="width: 100%; padding-top: 75%; background: #1a1a1a; border-radius: 4px; overflow: hidden; position: relative; margin-bottom: 8px;">
-                    <img src="${thumbnailUrl}" 
-                         alt="${file.name}" 
-                         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;"
-                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-                         onload="this.nextElementSibling.style.display='none';">
-                    <div style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; background: #1a1a1a;">
-                        <span style="font-size: 2em;">🎬</span>
-                    </div>
-                    <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.7); color: #fff; padding: 2px 6px; border-radius: 3px; font-size: 10px;">▶️</div>
-                </div>
-                <div style="padding: 0 4px;">
-                    <div style="color: #e0e0e0; font-weight: 500; font-size: 13px; word-break: break-word; text-align: center; margin-bottom: 4px;">${file.name}</div>
-                    <div style="color: #666; font-size: 11px; text-align: center;">(${file.size_mb} MB)</div>
-                </div>
-            </div>
-        `;
+        html += renderVideoItem(file, thumbnailsPerRow, bulkMode, selectedPaths, currentVideoPath);
     });
-    html += '</div>'; // Close grid container
-    document.getElementById('fileTreeContent').innerHTML = html;
-    updateSelectionUI();
+    
+    html += `</div></div></div>`; // Close grid container, folder content, and folder
+    
+    return html;
 }
+
+// Render individual video item
+function renderVideoItem(file, thumbnailsPerRow, bulkMode, selectedPaths, currentVideoPath) {
+    const path = file.path.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+    const name = file.name.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+    const cacheKey = file.modified_time ? `m=${Math.floor(file.modified_time)}` : `t=${new Date().getTime()}`;
+    const thumbnailUrl = `/v2p-formatter/thumbnail?path=${encodeURIComponent(file.path)}&size=240x180&${cacheKey}`;
+    
+    // Check if selected: either in bulk mode selection OR is current video in single mode
+    const isSelected = bulkMode ? selectedPaths.includes(file.path) : (currentVideoPath === file.path);
+    
+    // Style based on selection state
+    const bgColor = isSelected ? '#2a3a4a' : '#1e1e1e';
+    const borderColor = isSelected ? '#667eea' : '#555';
+    const borderWidth = isSelected ? '3px' : '2px';
+    const boxShadow = isSelected ? '0 0 0 2px rgba(102, 126, 234, 0.3)' : 'none';
+    
+    // Escape path for use in JavaScript
+    const jsPath = path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    
+    return `
+        <div class="video-item ${isSelected ? 'selected' : ''}" 
+             data-video-path="${path}" 
+             data-video-name="${name}"
+             onclick="handleVideoClick('${path}', '${name}')" 
+             style="cursor: pointer; padding: 12px; border-radius: 8px; background: ${bgColor}; border: ${borderWidth} solid ${borderColor}; box-shadow: ${boxShadow}; transition: all 0.2s; position: relative; width: 100%; box-sizing: border-box;"
+             onmouseover="if (!this.classList.contains('selected')) { this.style.background='#2a2a2a'; this.style.borderColor='#667eea'; }"
+             onmouseout="checkVideoSelectionState(this, '${jsPath}');">
+            ${isSelected ? `
+                <div style="position: absolute; top: 8px; right: 8px; z-index: 10; background: #667eea; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.5);">✓</div>
+            ` : ''}
+            ${bulkMode ? `
+                <div style="position: absolute; top: 8px; left: 8px; z-index: 10;">
+                    <input type="checkbox" 
+                           ${isSelected ? 'checked' : ''}
+                           onclick="event.stopPropagation(); toggleVideoSelection('${path}', '${name}');"
+                           style="width: 24px; height: 24px; cursor: pointer; accent-color: #667eea;">
+                </div>
+            ` : ''}
+            <div style="width: 100%; padding-top: 75%; background: #1a1a1a; border-radius: 4px; overflow: hidden; position: relative; margin-bottom: 8px;">
+                <img src="${thumbnailUrl}" 
+                     alt="${file.name}" 
+                     style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                     onload="this.nextElementSibling.style.display='none';">
+                <div style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; color: #999; font-size: 11px; background: #1a1a1a;">
+                    <span style="font-size: 2em;">🎬</span>
+                </div>
+                <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.7); color: #fff; padding: 2px 6px; border-radius: 3px; font-size: 10px;">▶️</div>
+            </div>
+            <div style="padding: 0 4px;">
+                <div style="color: #e0e0e0; font-weight: 500; font-size: 13px; word-break: break-word; text-align: center; margin-bottom: 4px;">${file.name}</div>
+                <div style="color: #666; font-size: 11px; text-align: center;">(${file.size_mb} MB)</div>
+            </div>
+        </div>
+    `;
+}
+
+// Toggle video folder expand/collapse
+function toggleVideoFolder(folderId) {
+    const content = document.getElementById(folderId);
+    if (content) {
+        const isVisible = content.style.display !== 'none';
+        content.style.display = isVisible ? 'none' : 'block';
+        
+        // Update icon - find the header that contains this folder's ID
+        const folderDiv = content.parentElement;
+        if (folderDiv && folderDiv.classList.contains('video-folder')) {
+            const header = folderDiv.querySelector('.folder-header');
+            if (header) {
+                const icon = header.querySelector('.folder-icon');
+                if (icon) {
+                    icon.textContent = isVisible ? '▶' : '▼';
+                }
+            }
+        }
+    }
+}
+
+// Make toggleVideoFolder available globally
+window.toggleVideoFolder = toggleVideoFolder;
 
 // Helper function to check and update video selection state on mouseout
 window.checkVideoSelectionState = function(element, filePath) {

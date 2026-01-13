@@ -14,6 +14,9 @@
             <a href="/v2p-formatter/image-to-pdf" style="padding: 12px 24px; background: #1e1e1e; color: #667eea; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #667eea; border-bottom: none; font-weight: bold;">
                 Image to PDF
             </a>
+            <a href="/v2p-formatter/deface" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Deface
+            </a>
         </div>
     </div>
 
@@ -947,8 +950,8 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <!-- Media Bulk Image Selector Modal -->
-<link rel="stylesheet" href="{{ url_for('v2p_formatter.serve_static', filename='css/media-bulk-image-selector.css') }}">
-<script src="{{ url_for('v2p_formatter.serve_static', filename='js/media-bulk-image-selector.js') }}"></script>
+<link rel="stylesheet" href="/v2p-formatter/static/css/media-bulk-image-selector.css">
+<script src="/v2p-formatter/static/js/media-bulk-image-selector.js"></script>
 
 {% endblock %}
 

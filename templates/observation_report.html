@@ -3,8 +3,8 @@
 {% block content %}
 <!-- Observation Report Module - Isolated Styling -->
 <div class="obs-report-page-wrapper" id="obsReportPage">
-<link rel="stylesheet" href="{{ url_for('v2p_formatter.serve_static', filename='css/observation-report.css') }}">
-<link rel="stylesheet" href="{{ url_for('v2p_formatter.serve_static', filename='css/observation-report/observation-report-media-browser.css') }}">
+<link rel="stylesheet" href="/v2p-formatter/static/css/observation-report.css">
+<link rel="stylesheet" href="/v2p-formatter/static/css/observation-report/observation-report-media-browser.css">
 <style>
     /* CRITICAL: Scope all styles to observation report page wrapper */
     .obs-report-page-wrapper {
@@ -188,12 +188,12 @@ Created: Stage 3
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-report/observation-report-media-browser.js') }}"></script>
-<script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-report/observation-report-live-preview.js') }}"></script>
-<script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-report/observation-report-standards.js') }}"></script>
-<script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-report/observation-report-preview-draft.js') }}"></script>
-<script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-report/observation-report-column-resizer.js') }}"></script>
-<script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-report.js') }}"></script>
+<script src="/v2p-formatter/static/js/observation-report/observation-report-media-browser.js"></script>
+<script src="/v2p-formatter/static/js/observation-report/observation-report-live-preview.js"></script>
+<script src="/v2p-formatter/static/js/observation-report/observation-report-standards.js"></script>
+<script src="/v2p-formatter/static/js/observation-report/observation-report-preview-draft.js"></script>
+<script src="/v2p-formatter/static/js/observation-report/observation-report-column-resizer.js"></script>
+<script src="/v2p-formatter/static/js/observation-report.js"></script>
 <script>
 // Initialize Observation Report module
 document.addEventListener('DOMContentLoaded', () => {

@@ -1756,11 +1756,11 @@ window.handleLoadDraft = handleLoadDraft;
 window.handleDeleteDraft = handleDeleteDraft;
 </script>
 <!-- Standalone libraries - load first to avoid timing issues -->
-<script src="{{ url_for('v2p_formatter.serve_static', filename='js/live-preview.js') }}"></script>
-<script src="{{ url_for('v2p_formatter.serve_static', filename='js/media-browser.js') }}"></script>
-<script src="{{ url_for('v2p_formatter.serve_static', filename='js/standards.js') }}"></script>
-<script src="{{ url_for('v2p_formatter.serve_static', filename='js/reshuffle.js') }}"></script>
-<script src="{{ url_for('v2p_formatter.serve_static', filename='js/observation-media.js') }}"></script>
+<script src="/v2p-formatter/static/js/live-preview.js"></script>
+<script src="/v2p-formatter/static/js/media-browser.js"></script>
+<script src="/v2p-formatter/static/js/standards.js"></script>
+<script src="/v2p-formatter/static/js/reshuffle.js"></script>
+<script src="/v2p-formatter/static/js/observation-media.js"></script>
 <script>
 // Set up load draft button with event listener
 document.addEventListener('DOMContentLoaded', function() {
