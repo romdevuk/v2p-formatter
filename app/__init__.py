@@ -16,12 +16,6 @@ def create_app():
     app.config['SECRET_KEY'] = 'dev-secret-key-change-in-production'
     
     # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    
-    # Configure media converter logging
     from pathlib import Path
     import logging.handlers
     
@@ -29,33 +23,82 @@ def create_app():
     logs_dir = BASE_DIR / 'logs'
     logs_dir.mkdir(exist_ok=True)
     
+    # Configure root logger with file handler
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    
+    # Remove existing handlers to avoid duplicates
+    root_logger.handlers.clear()
+    
+    # File handler for all logs (including Flask/Werkzeug)
+    app_log_file = logs_dir / 'app.log'
+    file_handler = logging.handlers.RotatingFileHandler(
+        str(app_log_file),
+        maxBytes=10*1024*1024,  # 10MB
+        backupCount=5
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    file_handler.setFormatter(file_formatter)
+    root_logger.addHandler(file_handler)
+    
+    # Console handler for important messages
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s'
+    )
+    console_handler.setFormatter(console_formatter)
+    root_logger.addHandler(console_handler)
+    
+    # Configure Flask/Werkzeug logging
+    werkzeug_logger = logging.getLogger('werkzeug')
+    werkzeug_logger.setLevel(logging.INFO)
+    werkzeug_logger.addHandler(file_handler)
+    
+    # Configure media converter logging
     # Media converter logger with file handler
     media_converter_logger = logging.getLogger('media_converter')
     media_converter_logger.setLevel(logging.DEBUG)
     
-    # File handler (rotating, max 10MB, keep 5 backups)
-    file_handler = logging.handlers.RotatingFileHandler(
+    # File handler for media converter (separate from app log)
+    media_converter_file_handler = logging.handlers.RotatingFileHandler(
         str(logs_dir / 'media_converter.log'),
         maxBytes=10*1024*1024,
         backupCount=5
     )
-    file_handler.setLevel(logging.DEBUG)
+    media_converter_file_handler.setLevel(logging.DEBUG)
+    media_converter_file_handler.setFormatter(file_formatter)
     
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    
-    # Formatter
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
+    # Media converter console handler
+    media_converter_console_handler = logging.StreamHandler()
+    media_converter_console_handler.setLevel(logging.INFO)
+    media_converter_console_handler.setFormatter(console_formatter)
     
     # Add handlers if not already added
     if not media_converter_logger.handlers:
-        media_converter_logger.addHandler(file_handler)
-        media_converter_logger.addHandler(console_handler)
+        media_converter_logger.addHandler(media_converter_file_handler)
+        media_converter_logger.addHandler(media_converter_console_handler)
+    
+    # Deface module logger (app.routes) will use root logger handlers
+    # But we can add a specific file handler if needed
+    deface_logger = logging.getLogger('app.routes')
+    deface_logger.setLevel(logging.DEBUG)
+    
+    # File handler for deface logs
+    deface_file_handler = logging.handlers.RotatingFileHandler(
+        str(logs_dir / 'deface.log'),
+        maxBytes=10*1024*1024,
+        backupCount=5
+    )
+    deface_file_handler.setLevel(logging.DEBUG)
+    deface_file_handler.setFormatter(file_formatter)
+    
+    # Add file handler if not already added
+    if not any(isinstance(h, logging.handlers.RotatingFileHandler) and hasattr(h, 'baseFilename') and h.baseFilename == str(logs_dir / 'deface.log') for h in deface_logger.handlers):
+        deface_logger.addHandler(deface_file_handler)
     
     # Register blueprints
     from app.routes import bp

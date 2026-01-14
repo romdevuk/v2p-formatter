@@ -2605,7 +2605,8 @@ def generate_deface_documents():
         max_size = data.get('max_size', '640x480')
         # Determine if MP4 export is requested from output_format
         export_mp4_videos = output_format in ('mp4', 'mp4+pdf')
-        logger.info(f"Output format: {output_format}, Export MP4 videos: {export_mp4_videos}")
+        logger.info(f"🔍 DEBUG: Output format: {output_format}, Export MP4 videos: {export_mp4_videos}")
+        logger.info(f"🔍 DEBUG: Session ID: {session_id}")
         
         if not session_id:
             return jsonify({
@@ -2623,6 +2624,7 @@ def generate_deface_documents():
         
         # Get processed items from session
         processed_items = session.get('processed', [])
+        logger.info(f"🔍 DEBUG: Processed items count: {len(processed_items)}")
         if not processed_items:
             return jsonify({
                 'success': False,
@@ -2860,11 +2862,13 @@ def generate_deface_documents():
         
         # Export MP4 videos if requested
         exported_videos = []  # Initialize empty list for all cases
+        logger.info(f"🔍 DEBUG: export_mp4_videos={export_mp4_videos}, output_format={output_format}")
         if export_mp4_videos:
             try:
                 # Filter video items from processed items
                 video_items = [item for item in processed_items if item.get('type') == 'video']
-                logger.info(f"Found {len(video_items)} video items to export")
+                logger.info(f"🔍 DEBUG: Found {len(video_items)} video items to export out of {len(processed_items)} total items")
+                logger.info(f"🔍 DEBUG: Processed items types: {[item.get('type', 'unknown') for item in processed_items]}")
                 
                 for item in video_items:
                     defaced_video_path_str = item.get('defaced_path', '')
@@ -2914,30 +2918,52 @@ def generate_deface_documents():
             
         # Determine primary file path
         # If MP4 only, don't require PDF/DOCX
+        logger.info(f"🔍 DEBUG: Checking file path logic - output_format={output_format}, exported_videos count={len(exported_videos)}")
+        logger.info(f"🔍 DEBUG: results keys: {list(results.keys())}")
         if output_format == 'mp4':
             # MP4 only - just need exported videos
+            logger.info(f"🔍 DEBUG: MP4-only format detected, checking exported_videos")
             if not exported_videos:
+                logger.error(f"🔍 DEBUG: MP4 format selected but no videos exported! export_mp4_videos={export_mp4_videos}, video_items count={len([item for item in processed_items if item.get('type') == 'video'])}")
                 return jsonify({
                     'success': False,
                     'error': 'No videos to export'
                 }), 400
+            logger.info(f"🔍 DEBUG: MP4-only format: Successfully exported {len(exported_videos)} videos")
         else:
             # PDF/DOCX formats require at least one document
             # For mp4+pdf, allow success if MP4 export succeeded even if PDF failed
+            logger.info(f"🔍 DEBUG: Non-MP4 format path - output_format={output_format}")
             if 'pdf_path' in results:
+                logger.info(f"🔍 DEBUG: Using PDF path: {results['pdf_path']}")
                 results['file_path'] = results['pdf_path']
             elif 'docx_path' in results:
+                logger.info(f"🔍 DEBUG: Using DOCX path: {results['docx_path']}")
                 results['file_path'] = results['docx_path']
             elif output_format == 'mp4+pdf' and exported_videos:
                 # MP4+PDF: MP4 export succeeded, PDF failed - still success
                 # Set file_path to first exported video (or leave empty, videos are in exported_videos)
+                logger.info(f"🔍 DEBUG: MP4+PDF format with exported videos")
                 if exported_videos:
                     results['file_path'] = exported_videos[0].get('path', '')
             elif output_format not in ('mp4', 'mp4+pdf'):
+                # PDF/DOCX format requested but no documents generated
+                logger.error(f"🔍 DEBUG: ERROR PATH - output_format={output_format}, pdf_path in results={'pdf_path' in results}, docx_path in results={'docx_path' in results}")
+                error_details = []
+                if 'pdf_error' in results:
+                    error_details.append(f"PDF: {results['pdf_error']}")
+                if 'docx_error' in results:
+                    error_details.append(f"DOCX: {results['docx_error']}")
+                error_msg = 'Failed to generate any documents'
+                if error_details:
+                    error_msg += f" ({'; '.join(error_details)})"
+                logger.error(f"🔍 DEBUG: Failed to generate documents for format {output_format}: {error_details}")
                 return jsonify({
                     'success': False,
-                    'error': 'Failed to generate any documents'
+                    'error': error_msg
                 }), 500
+            else:
+                logger.warning(f"🔍 DEBUG: Unexpected else branch - output_format={output_format}, exported_videos={len(exported_videos) if exported_videos else 0}")
         
         # Cleanup session after successful document generation
         cleanup_session(session_id)
@@ -2951,8 +2977,11 @@ def generate_deface_documents():
         })
     
     except Exception as e:
-        logger.error(f"Error in generate_deface_documents: {e}", exc_info=True)
+        logger.error(f"🔍 DEBUG: Exception in generate_deface_documents: {e}", exc_info=True)
+        logger.error(f"🔍 DEBUG: Exception type: {type(e).__name__}, args: {e.args}")
+        import traceback
+        logger.error(f"🔍 DEBUG: Full traceback:\n{traceback.format_exc()}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': f'Error: {str(e)}'
         }), 500

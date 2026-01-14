@@ -2,6 +2,97 @@
 
 All notable changes to the Video to Image Formatter (v2p-formatter) project will be documented in this file.
 
+## [2026-01-14] - Deface Module MP4 Export and Logging Improvements
+
+### 🐛 Fixed
+
+#### Processed Items Scope Error
+- **Fixed UnboundLocalError in generate_deface_documents**: Debug log statement was trying to access `processed_items` before it was defined
+  - Moved debug log statement to after `processed_items` variable is initialized
+  - Resolves "cannot access local variable 'processed_items' where it is not associated with a value" error
+  - Prevents 500 Internal Server Error when generating deface documents
+
+#### MP4 Export Output Format Integration
+- **Integrated MP4 export into Output Format dropdown**: Replaced separate "Export MP4 Videos" checkbox with integrated dropdown options
+  - Output Format dropdown now includes: "PDF Only", "DOCX Only", "Both (PDF + DOCX)", "MP4 Only", "MP4 + PDF"
+  - MP4 export is now derived from `output_format` parameter instead of separate checkbox
+  - Simplified UI by removing redundant checkbox
+  - Backend now correctly handles `output_format` values: 'pdf', 'docx', 'both', 'mp4', 'mp4+pdf'
+
+#### MP4 Export Logic Fixes
+- **Fixed primary file path determination for MP4 formats**: Corrected logic for determining success response file path
+  - For 'mp4' format: Sets file_path to first exported video (doesn't require PDF/DOCX)
+  - For 'mp4+pdf' format: Allows success if MP4 export succeeded even if PDF generation failed
+  - Prevents "Failed to generate any documents" error when only MP4s are exported
+  - Enhanced error messages to include details from pdf_error and docx_error when available
+
+### Added
+
+#### Comprehensive Application Logging
+- **File-based logging for Flask and application modules**: Added comprehensive logging system
+  - Root logger writes all application logs (including Flask/Werkzeug) to `logs/app.log`
+  - Deface module logger writes specific logs to `logs/deface.log`
+  - Media converter logger writes logs to `logs/media_converter.log`
+  - All loggers use rotating file handlers (10MB max, 5 backups)
+  - Console handler for INFO level and above
+  - File handlers at DEBUG level for maximum detail
+  - Aids in debugging production issues and error tracing
+
+#### Debug Logging for MP4 Export
+- **Enhanced debug logging in generate_deface_documents**: Added extensive debug logging throughout the function
+  - Logs output_format and export_mp4_videos flag values
+  - Logs processed items count and types
+  - Logs video export path resolution and file existence checks
+  - Logs primary file path determination logic
+  - Includes error details in log messages for easier debugging
+
+### Changed
+
+#### Output Format Dropdown Options
+- **Updated Output Format dropdown in deface.html**: Replaced checkbox with integrated dropdown options
+  - Added "MP4 Only" option (value: 'mp4')
+  - Added "MP4 + PDF" option (value: 'mp4+pdf')
+  - Removed separate "Export MP4 Videos" checkbox
+  - More intuitive UI that groups all output format options together
+
+#### Backend Output Format Handling
+- **Updated generate_deface_documents route**: Now derives export behavior from output_format parameter
+  - `export_mp4_videos` flag is now derived from `output_format in ('mp4', 'mp4+pdf')`
+  - Skips image/frame extraction entirely when `output_format == 'mp4'`
+  - Conditionally processes PDF/DOCX generation based on output_format
+  - Handles edge cases where MP4 export succeeds but PDF generation fails
+
+### Technical Details
+
+#### Backend Changes
+- **`app/routes.py`**:
+  - Fixed `processed_items` scope error by moving debug log after variable initialization (line 2627)
+  - Updated `generate_deface_documents` to derive `export_mp4_videos` from `output_format`
+  - Added logic to skip image/frame extraction when `output_format == 'mp4'`
+  - Enhanced primary file path determination for MP4-only and MP4+PDF formats
+  - Added extensive debug logging throughout the function
+  - Enhanced error messages with pdf_error and docx_error details
+
+- **`app/__init__.py`**:
+  - Configured root logger with file handler to `logs/app.log`
+  - Added dedicated logger for deface module (`app.routes`) to `logs/deface.log`
+  - Added dedicated logger for media converter to `logs/media_converter.log`
+  - All loggers use rotating file handlers (10MB max, 5 backups)
+  - Console handler for INFO+ level, file handlers for DEBUG level
+
+#### Frontend Changes
+- **`templates/deface.html`**:
+  - Updated Output Format dropdown to include "MP4 Only" and "MP4 + PDF" options
+  - Removed "Export MP4 Videos" checkbox from Output Settings section
+  - Simplified JavaScript to derive MP4 export flag from dropdown selection
+
+### 🎯 Benefits
+- **Better Error Handling**: Fixed scope error prevents 500 errors during document generation
+- **Improved UI**: Integrated MP4 options into dropdown simplifies user interface
+- **Better Debugging**: Comprehensive logging enables easier troubleshooting of production issues
+- **Robust MP4 Export**: Correct handling of MP4-only and MP4+PDF formats prevents false errors
+- **Enhanced Error Messages**: More detailed error messages help identify specific failure points
+
 ## [2026-01-11] - Deface Module Enhancements
 
 ### Added
