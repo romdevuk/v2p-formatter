@@ -460,12 +460,23 @@ function renderVideoList(files) {
         folders[folder].push(file);
     });
     
+    // Preserve which folders are currently expanded so they stay expanded after re-render (e.g. after selecting a video)
+    const expandedFolderIds = new Set();
+    const fileTreeEl = document.getElementById('fileTreeContent');
+    if (fileTreeEl) {
+        fileTreeEl.querySelectorAll('.folder-content').forEach(function(el) {
+            if (el.id && el.style.display !== 'none') {
+                expandedFolderIds.add(el.id);
+            }
+        });
+    }
+    
     let html = '';
     
-    // Render subfolders first (sorted) - all collapsed by default
+    // Render subfolders first (sorted) - keep expanded if they were expanded before
     const subfolders = Object.keys(folders).filter(f => f !== 'root').sort();
     subfolders.forEach(folder => {
-        html += renderVideoFolder(folder, folders[folder], thumbnailsPerRow, sortBy, bulkMode, selectedPaths, currentVideoPath);
+        html += renderVideoFolder(folder, folders[folder], thumbnailsPerRow, sortBy, bulkMode, selectedPaths, currentVideoPath, expandedFolderIds);
     });
     
     // Render root videos last
@@ -505,9 +516,10 @@ function sortFiles(files, sortBy) {
 }
 
 // Render video folder with collapsible structure
-function renderVideoFolder(folderName, files, thumbnailsPerRow, sortBy, bulkMode, selectedPaths, currentVideoPath) {
+function renderVideoFolder(folderName, files, thumbnailsPerRow, sortBy, bulkMode, selectedPaths, currentVideoPath, expandedFolderIds) {
     const folderId = 'folder-' + folderName.replace(/[^a-zA-Z0-9]/g, '-');
-    const isCollapsed = true; // All folders collapsed by default
+    const wasExpanded = expandedFolderIds && expandedFolderIds.has(folderId);
+    const isCollapsed = !wasExpanded; // Preserve expanded state when re-rendering (e.g. after selecting a video)
     
     let html = '';
     html += `<div class="video-folder" data-folder="${folderId}" style="width: 100%; margin-bottom: 20px;">`;

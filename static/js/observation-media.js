@@ -4842,6 +4842,7 @@ function loadObservationSubfolders() {
  * Updated to support new two-level dropdown system
  */
 function loadObservationMedia() {
+    console.log('[SUBFOLDER-DBG] loadObservationMedia CALLED | caller:', new Error().stack?.split('\n').slice(1, 5).join(' <- '));
     // Check if new two-level system is being used
     const qualificationSelect = document.getElementById('qualificationSelect');
     const learnerSelect = document.getElementById('learnerSelect');
@@ -5031,6 +5032,15 @@ function displayObservationMedia(mediaFiles) {
         bulkSelectLabel.style.display = mediaFiles.length > 0 ? 'block' : 'none';
     }
     const grid = document.getElementById('observationMediaGrid');
+    // Preserve which subfolder sections are currently expanded so they stay expanded after re-render
+    const expandedSubfolders = new Set();
+    if (grid) {
+        grid.querySelectorAll('.media-subfolder-section:not(.collapsed)').forEach(section => {
+            const name = section.dataset.subfolder;
+            if (name) expandedSubfolders.add(name);
+        });
+    }
+    console.log('[SUBFOLDER-DBG] displayObservationMedia: about to re-render grid. Preserved expanded subfolders:', Array.from(expandedSubfolders), '| caller:', new Error().stack?.split('\n').slice(1, 4).join(' <- '));
     grid.innerHTML = '';
 
     if (mediaFiles.length === 0) {
@@ -5148,7 +5158,11 @@ function displayObservationMedia(mediaFiles) {
             // Add drag and click handlers for unassigned media
             if (!isAssigned) {
                 card.addEventListener('dragstart', handleMediaDragStart);
-                card.addEventListener('click', () => handleMediaClick(media));
+                card.addEventListener('click', (e) => {
+                    console.log('[SUBFOLDER-DBG] card click (root) received, stopping propagation');
+                    e.stopPropagation();
+                    handleMediaClick(media, e);
+                });
             }
 
             rootContainer.appendChild(card);
@@ -5165,32 +5179,50 @@ function displayObservationMedia(mediaFiles) {
             if (!subfolder || subfolder.trim() === '') return;
             
             const mediaCount = groupedMedia[subfolder].length;
+            const wasExpanded = expandedSubfolders.has(subfolder);
             
-            // Create section container
+            // Create section container (keep expanded if it was expanded before re-render)
             const section = document.createElement('div');
-            section.className = 'media-subfolder-section collapsed';
+            section.className = wasExpanded ? 'media-subfolder-section' : 'media-subfolder-section collapsed';
             section.dataset.subfolder = subfolder;
             
-            // Create header
+            // Create header - use section-level click so only clicks on the header toggle (not on cards)
             const header = document.createElement('div');
             header.className = 'media-subfolder-header';
-            header.onclick = function() { toggleSubfolderSection(subfolder); };
             header.innerHTML = `
-                <span class="section-icon">▶</span>
+                <span class="section-icon">${wasExpanded ? '▼' : '▶'}</span>
                 <span class="folder-icon">📁</span>
                 <span class="subfolder-name">${escapeHtml(subfolder)}</span>
                 <span class="file-count">(${mediaCount} file${mediaCount !== 1 ? 's' : ''})</span>
             `;
             section.appendChild(header);
+            // Only toggle when click is on the header, not when clicking cards inside content
+            section.addEventListener('click', function(e) {
+                const onHeader = e.target.closest('.media-subfolder-header');
+                const onContent = e.target.closest('.media-subfolder-content');
+                const onCard = e.target.closest('.observation-media-card');
+                console.log('[SUBFOLDER-DBG] section click', subfolder, '| target:', e.target?.className || e.target?.tagName, '| onHeader:', !!onHeader, '| onContent:', !!onContent, '| onCard:', !!onCard, '| willToggle:', !!onHeader);
+                if (onHeader) {
+                    toggleSubfolderSection(subfolder);
+                }
+            });
             
-            // Create content container
+            // Create content container (visible if section was expanded)
             const content = document.createElement('div');
             content.className = 'media-subfolder-content';
-            content.style.display = 'none';
-            content.style.visibility = 'hidden';
-            content.style.height = '0';
-            content.style.minHeight = '0';
-            content.style.maxHeight = '0';
+            if (wasExpanded) {
+                content.style.display = 'grid';
+                content.style.visibility = 'visible';
+                content.style.height = 'auto';
+                content.style.minHeight = 'auto';
+                content.style.maxHeight = 'none';
+            } else {
+                content.style.display = 'none';
+                content.style.visibility = 'hidden';
+                content.style.height = '0';
+                content.style.minHeight = '0';
+                content.style.maxHeight = '0';
+            }
             
             // Initialize grid layout for content
             updateSubfolderContentGrid(content);
@@ -5274,7 +5306,11 @@ function displayObservationMedia(mediaFiles) {
             // Add drag and click handlers for unassigned media
             if (!isAssigned) {
                 card.addEventListener('dragstart', handleMediaDragStart);
-                card.addEventListener('click', () => handleMediaClick(media));
+                card.addEventListener('click', (e) => {
+                    console.log('[SUBFOLDER-DBG] card click (subfolder) received, stopping propagation');
+                    e.stopPropagation();
+                    handleMediaClick(media, e);
+                });
             }
 
             content.appendChild(card);
@@ -5378,7 +5414,11 @@ function displayObservationMedia(mediaFiles) {
             // Add drag and click handlers for unassigned media
             if (!isAssigned) {
                 card.addEventListener('dragstart', handleMediaDragStart);
-                card.addEventListener('click', () => handleMediaClick(media));
+                card.addEventListener('click', (e) => {
+                    console.log('[SUBFOLDER-DBG] card click (flat) received, stopping propagation');
+                    e.stopPropagation();
+                    handleMediaClick(media, e);
+                });
             }
 
             rootContainer.appendChild(card);
@@ -5433,6 +5473,7 @@ function handleMediaDragStart(e) {
  * Handle media click
  */
 function handleMediaClick(media, event) {
+    console.log('[SUBFOLDER-DBG] handleMediaClick', media?.name, '| hasEvent:', !!event);
     // Check if bulk select mode is active
     const bulkSelectMode = document.getElementById('bulkSelectMode');
     if (bulkSelectMode && bulkSelectMode.checked) {
@@ -5469,6 +5510,7 @@ function handleMediaClick(media, event) {
  * Toggle subfolder section expand/collapse
  */
 function toggleSubfolderSection(subfolderName) {
+    console.log('[SUBFOLDER-DBG] toggleSubfolderSection CALLED', subfolderName, '| caller stack:', new Error().stack?.split('\n').slice(1, 6).join(' <- '));
     // Find section by data attribute (subfolder name)
     const sections = document.querySelectorAll('.media-subfolder-section');
     let section = null;
@@ -5479,9 +5521,13 @@ function toggleSubfolderSection(subfolderName) {
         }
     });
     
-    if (!section) return;
+    if (!section) {
+        console.log('[SUBFOLDER-DBG] toggleSubfolderSection: section not found for', subfolderName);
+        return;
+    }
     
     const isCollapsed = section.classList.contains('collapsed');
+    console.log('[SUBFOLDER-DBG] toggleSubfolderSection: section found, isCollapsed=', isCollapsed, '-> will', isCollapsed ? 'EXPAND' : 'COLLAPSE');
     const content = section.querySelector('.media-subfolder-content');
     const icon = section.querySelector('.section-icon');
     

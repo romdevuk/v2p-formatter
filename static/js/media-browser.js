@@ -159,7 +159,6 @@
                 
                 const header = document.createElement('div');
                 header.className = 'media-subfolder-header';
-                header.onclick = function() { toggleSubfolderSection(subfolder); };
                 header.innerHTML = `
                     <span class="section-icon">▶</span>
                     <span class="folder-icon">📁</span>
@@ -167,6 +166,16 @@
                     <span class="file-count">(${mediaCount} file${mediaCount !== 1 ? 's' : ''})</span>
                 `;
                 section.appendChild(header);
+                // Only toggle when click is on the header, not when clicking cards inside content
+                section.addEventListener('click', function(e) {
+                    const onHeader = e.target.closest('.media-subfolder-header');
+                    const onContent = e.target.closest('.media-subfolder-content');
+                    const onCard = e.target.closest('.observation-media-card');
+                    console.log('[SUBFOLDER-DBG] media-browser section click', subfolder, '| target:', e.target?.className || e.target?.tagName, '| onHeader:', !!onHeader, '| onContent:', !!onContent, '| onCard:', !!onCard, '| willToggle:', !!onHeader);
+                    if (onHeader) {
+                        toggleSubfolderSection(subfolder);
+                    }
+                });
                 
                 const content = document.createElement('div');
                 content.className = 'media-subfolder-content';
@@ -281,9 +290,10 @@
                 card.classList.remove('dragging');
                 card.style.opacity = '';
             });
-            card.addEventListener('click', function() {
+            card.addEventListener('click', function(e) {
+                e.stopPropagation();
                 if (typeof window.handleMediaClick === 'function') {
-                    window.handleMediaClick(media);
+                    window.handleMediaClick(media, e);
                 }
             });
         }
@@ -292,9 +302,11 @@
     }
     
     function toggleSubfolderSection(subfolder) {
+        console.log('[SUBFOLDER-DBG] media-browser toggleSubfolderSection CALLED', subfolder, '| caller:', new Error().stack?.split('\n').slice(1, 5).join(' <- '));
         const section = document.querySelector(`[data-subfolder="${subfolder}"]`);
         if (section) {
             const wasCollapsed = section.classList.contains('collapsed');
+            console.log('[SUBFOLDER-DBG] media-browser toggle: wasCollapsed=', wasCollapsed, '-> will', wasCollapsed ? 'EXPAND' : 'COLLAPSE');
             section.classList.toggle('collapsed');
             const content = section.querySelector('.media-subfolder-content');
             const icon = section.querySelector('.section-icon');
