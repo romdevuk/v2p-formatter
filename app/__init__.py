@@ -99,6 +99,19 @@ def create_app():
     # Add file handler if not already added
     if not any(isinstance(h, logging.handlers.RotatingFileHandler) and hasattr(h, 'baseFilename') and h.baseFilename == str(logs_dir / 'deface.log') for h in deface_logger.handlers):
         deface_logger.addHandler(deface_file_handler)
+
+    # Dedicated video processing debug log (file + in-memory for /deface_video_log)
+    deface_video_logger = logging.getLogger('app.deface_video')
+    deface_video_logger.setLevel(logging.DEBUG)
+    deface_video_file = logging.handlers.RotatingFileHandler(
+        str(logs_dir / 'deface_video.log'),
+        maxBytes=5*1024*1024,
+        backupCount=3
+    )
+    deface_video_file.setLevel(logging.DEBUG)
+    deface_video_file.setFormatter(file_formatter)
+    if not deface_video_logger.handlers:
+        deface_video_logger.addHandler(deface_video_file)
     
     # Register blueprints
     from app.routes import bp

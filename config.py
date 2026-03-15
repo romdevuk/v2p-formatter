@@ -87,6 +87,18 @@ IMAGE_QUALITY_PRESETS = {
 MAX_CONCURRENT_CONVERSIONS = 2  # Process 2 files in parallel
 CONVERSION_TIMEOUT = 3600  # 1 hour timeout per file
 
+# Deface video: timeout per video in seconds (env DEFACE_VIDEO_TIMEOUT overrides). Increase for very long videos.
+DEFACE_VIDEO_TIMEOUT = int(os.environ.get('DEFACE_VIDEO_TIMEOUT', '600'))
+
+# Deface video: max videos processed in parallel (1 = sequential; 2–4 = faster for batches; use with care on CPU/GPU).
+DEFACE_MAX_CONCURRENT_VIDEOS = int(os.environ.get('DEFACE_MAX_CONCURRENT_VIDEOS', '1'))
+
+# Deface: optional ONNX execution provider (e.g. CUDAExecutionProvider for Nvidia GPU). Empty = let deface auto-select.
+DEFACE_EXECUTION_PROVIDER = (os.environ.get('DEFACE_EXECUTION_PROVIDER') or '').strip() or None
+
+# Deface video: FFmpeg codec for output encoding. Default libx264; set to h264_nvenc for Nvidia GPU encoding (faster when available).
+DEFACE_FFMPEG_CODEC = (os.environ.get('DEFACE_FFMPEG_CODEC') or 'libx264').strip()
+
 # Debug Settings
 DEBUG_MODE = True
 DEBUG_LOG_LEVEL = 'DEBUG'

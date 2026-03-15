@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="app-container" style="max-width: 100%; padding: 20px;">
+  <h2 style="margin-bottom: 8px; color: #e0e0e0;">Video deface debug log (live)</h2>
+  <p style="color: #999; font-size: 14px; margin-bottom: 16px;">
+    Open this page in a new tab when you click Apply Deface. Same queue and progression as main page; each file shows its progress and, when done, a link to the defaced file. Refreshes every 1.5s.
+    <span style="color: #666; font-size: 11px;">(queue + per-file progress + View defaced links + debug panel)</span>
+  </p>
+
+  <!-- Overall progress bar (same as main page) -->
+  <div id="progressBarWrap" style="display: none; margin-bottom: 12px;">
+    <div style="width: 100%; height: 24px; background: #1e1e1e; border-radius: 4px; overflow: hidden; border: 1px solid #555;">
+      <div id="progressFill" style="height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); width: 0%; transition: width 0.3s ease;"></div>
+    </div>
+  </div>
+
+  <!-- Status line (same as main page) -->
+  <div id="progressStatusLine" style="display: none; margin-bottom: 12px; padding: 10px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555; color: #e0e0e0; font-weight: 500;"></div>
+
+  <!-- Queue list: files, their progress, and link to defaced file when done -->
+  <div id="queueList" style="display: none; margin-bottom: 16px; padding: 12px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555; font-size: 13px; color: #b0b0b0;"></div>
+
+  <!-- Run complete banner (only when status=complete) -->
+  <div id="logCompleteBanner" style="display: none; margin-bottom: 12px; padding: 10px; background: #1a3d1a; border: 1px solid #51cf66; border-radius: 6px; color: #51cf66; font-size: 13px;">Run completed. Log below is from that run.</div>
+
+  <!-- Live log -->
+  <div style="margin-bottom: 8px; color: #888; font-size: 13px;">Live log:</div>
+  <pre id="log" style="background: #1a1a1a; color: #ccc; padding: 16px; border-radius: 6px; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; max-height: 50vh; overflow-y: auto; border: 1px solid #444;"></pre>
+  <p style="color: #666; font-size: 12px; margin-top: 8px;">Last update: <span id="updated">-</span></p>
+
+  <!-- Debug: raw progress API — live updates every 1.5s when open -->
+  <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #444;">
+    <button type="button" id="debugToggle" style="background: none; border: none; color: #888; cursor: pointer; font-size: 13px; padding: 0;">▼ Show debug (raw progress API) — live</button>
+    <div id="debugContent" style="display: none; margin-top: 12px;">
+      <p id="debugMeta" style="color: #888; font-size: 12px; margin-bottom: 8px;"><span style="color: #51cf66;">● Live</span> — Last poll: — | Updates every 1.5s</p>
+      <pre id="debugProgressJson" style="background: #1a1a1a; color: #ccc; padding: 12px; border-radius: 4px; font-family: monospace; font-size: 11px; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; border: 1px solid #444; margin: 0;"></pre>
+    </div>
+  </div>
+</div>
+<script>
+(function() {
+  var pre = document.getElementById('log');
+  var updated = document.getElementById('updated');
+  var progressBarWrap = document.getElementById('progressBarWrap');
+  var progressFill = document.getElementById('progressFill');
+  var progressStatusLine = document.getElementById('progressStatusLine');
+  var queueList = document.getElementById('queueList');
+  var logCompleteBanner = document.getElementById('logCompleteBanner');
+  var debugToggle = document.getElementById('debugToggle');
+  var debugContent = document.getElementById('debugContent');
+  var debugMeta = document.getElementById('debugMeta');
+  var debugProgressJson = document.getElementById('debugProgressJson');
+  var lastProgress = null;
+  var lastPollTime = null;
+  var POLL_INTERVAL_MS = 1500;
+
+  function updateDebugPanel() {
+    if (debugMeta && lastPollTime) debugMeta.innerHTML = '<span style="color:#51cf66;">● Live</span> — Last poll: ' + lastPollTime.toLocaleTimeString() + ' | Updates every ' + (POLL_INTERVAL_MS / 1000) + 's';
+    if (debugProgressJson) debugProgressJson.textContent = lastProgress !== null ? JSON.stringify(lastProgress, null, 2) : '(no data yet — start Apply Deface and poll will fill this)';
+  }
+  if (debugToggle && debugContent) {
+    debugToggle.addEventListener('click', function() {
+      var isShown = debugContent.style.display !== 'none';
+      debugContent.style.display = isShown ? 'none' : 'block';
+      debugToggle.textContent = isShown ? '▼ Show debug (raw progress API) — live' : '▲ Hide debug';
+      if (!isShown) updateDebugPanel();
+    });
+  }
+
+  function fetchLog() {
+    fetch('/v2p-formatter/deface_video_log?limit=200')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var lines = data.lines || [];
+        var progress = data.progress || {};
+        lastProgress = progress;
+        lastPollTime = new Date();
+        pre.textContent = lines.length ? lines.join('\n') : '(no debug lines yet — start Apply Deface to see output)';
+        pre.scrollTop = pre.scrollHeight;
+
+        var total = progress.total || 0;
+        var completed = progress.completed || 0;
+        var status = progress.status || 'idle';
+
+        if (logCompleteBanner) logCompleteBanner.style.display = 'none';
+        if (status === 'processing' && total > 0) {
+          var currentPct = progress.current_item_pct != null ? progress.current_item_pct : 0;
+          var overallPct = (completed / total) * 100 + (currentPct / 100) * (1 / total) * 100;
+          overallPct = Math.round(overallPct * 10) / 10;
+          if (overallPct >= 100) overallPct = 99.9;
+          progressBarWrap.style.display = 'block';
+          progressFill.style.width = overallPct + '%';
+          var part = 'Processing ' + (completed + 1) + '/' + total;
+          if (progress.current_item) part += ' — ' + progress.current_item;
+          if (progress.elapsed_seconds != null) part += ' (' + progress.elapsed_seconds + 's)';
+          if (progress.current_item_pct != null) part += ' — ' + progress.current_item_pct + '%';
+          progressStatusLine.textContent = part;
+          progressStatusLine.style.display = 'block';
+          var elapsed = progress.elapsed_seconds != null ? progress.elapsed_seconds : 0;
+          var pct = progress.current_item_pct != null ? progress.current_item_pct : 0;
+          var base = window.location.origin || '';
+          if (progress.queue && progress.queue.length > 0) {
+            queueList.style.display = 'block';
+            var q = progress.queue;
+            var html = [];
+            for (var i = 0; i < q.length; i++) {
+              var ent = q[i];
+              var label = (i + 1) + '. ' + ent.name;
+              if (ent.state === 'done') {
+                var link = ent.url ? (ent.url.indexOf('http') === 0 ? ent.url : base + ent.url) : null;
+                if (link) html.push('<span style="color:#51cf66;">' + label + ' — ✓ done</span> <a href="' + link + '" target="_blank" rel="noopener" style="color:#667eea; margin-left:6px;">View defaced</a>');
+                else html.push('<span style="color:#51cf66;">' + label + ' — ✓ done</span>');
+              } else if (ent.state === 'in_progress') html.push('<span style="color:#667eea;">' + label + ' — ⟳ ' + elapsed + 's' + (pct ? ' — ' + pct + '%' : '') + ' (in progress)</span>');
+              else html.push('<span style="color:#666;">' + label + ' — waiting</span>');
+            }
+            queueList.innerHTML = html.join('<br>');
+          }
+        } else if (status === 'complete' && total > 0) {
+          if (logCompleteBanner) logCompleteBanner.style.display = 'block';
+          progressBarWrap.style.display = 'block';
+          progressFill.style.width = '100%';
+          progressStatusLine.textContent = 'Complete — ' + total + ' item(s) processed.';
+          progressStatusLine.style.display = 'block';
+          if (progress.queue && progress.queue.length > 0) {
+            queueList.style.display = 'block';
+            var q = progress.queue;
+            var base = window.location.origin || '';
+            var html = [];
+            for (var i = 0; i < q.length; i++) {
+              var ent = q[i];
+              var line = (i + 1) + '. ' + ent.name + ' — ✓ done';
+              var link = ent.url ? (ent.url.indexOf('http') === 0 ? ent.url : base + ent.url) : null;
+              if (link) line += ' <a href="' + link + '" target="_blank" rel="noopener" style="color:#667eea; margin-left:6px;">View defaced</a>';
+              html.push(line);
+            }
+            queueList.innerHTML = '<span style="color:#51cf66;">' + html.join('<br>') + '</span>';
+          }
+        } else {
+          if (logCompleteBanner) logCompleteBanner.style.display = 'none';
+          progressBarWrap.style.display = 'none';
+          progressStatusLine.style.display = 'none';
+          queueList.style.display = 'none';
+        }
+        updated.textContent = new Date().toLocaleTimeString();
+        if (debugContent && debugContent.style.display !== 'none') updateDebugPanel();
+      })
+      .catch(function() {
+        pre.textContent = '(failed to load log)';
+        if (logCompleteBanner) logCompleteBanner.style.display = 'none';
+        progressBarWrap.style.display = 'none';
+        progressStatusLine.style.display = 'none';
+        queueList.style.display = 'none';
+        updated.textContent = new Date().toLocaleTimeString();
+      });
+  }
+  fetchLog();
+  setInterval(fetchLog, POLL_INTERVAL_MS);
+})();
+</script>
+{% endblock %}

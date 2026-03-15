@@ -40,6 +40,16 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+4. **(Optional)** For much faster Deface video processing, install GPU support in the same environment, then restart the app:
+```bash
+pip install onnx onnxruntime-gpu   # Nvidia GPU; or onnxruntime-directml (Windows), onnxruntime-openvino (CPU)
+```
+   Optional environment variables:
+   - `DEFACE_VIDEO_TIMEOUT` — seconds per video (default 600).
+   - `DEFACE_MAX_CONCURRENT_VIDEOS` — process N videos in parallel (default 1; use 2–4 for batches).
+   - `DEFACE_EXECUTION_PROVIDER` — force ONNX provider (e.g. `CUDAExecutionProvider` for Nvidia). Leave unset to let deface auto-select.
+   - `DEFACE_FFMPEG_CODEC` — output video codec (default `libx264`). Set to `h264_nvenc` for Nvidia GPU encoding; the app will fall back to `libx264` if hardware encoding fails.
+
 ## Usage
 
 1. Start the Flask application:

@@ -3,14 +3,151 @@ Deface processor for face anonymization in images and videos
 Uses the deface command-line tool to anonymize faces in images and videos
 Also supports manual deface areas for precise control
 """
+import json
+import re
 import subprocess
 import logging
+import sys
+import threading
+import time
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict
 import tempfile
 import shutil
 
 logger = logging.getLogger(__name__)
+
+
+def _get_deface_video_timeout() -> int:
+    """Per-video timeout in seconds (from config or env)."""
+    try:
+        from config import DEFACE_VIDEO_TIMEOUT
+        return max(60, int(DEFACE_VIDEO_TIMEOUT))
+    except Exception:
+        return 600
+
+
+def _user_facing_deface_error(stderr: str) -> str:
+    """Map deface/FFmpeg stderr to a short user-facing message where possible."""
+    s = (stderr or '').lower()
+    if 'invalid data' in s or 'invalid argument' in s or 'could not find codec' in s:
+        return 'Video may be corrupt or in an unsupported format. Try re-exporting the video or use a different file.'
+    if 'no such file' in s or 'no route to host' in s:
+        return 'File not found or inaccessible. Check that the file exists and is readable.'
+    if 'timeout' in s or 'timed out' in s:
+        return 'Processing timed out. Try a shorter video or use Detection Scale 640×360 for faster processing.'
+    if 'resource temporarily unavailable' in s or 'errno' in s or 'memory' in s:
+        return 'System resource limit reached. Try again or use a smaller video / lower Detection Scale.'
+    if 'ffmpeg' in s and ('error' in s or 'failed' in s):
+        return 'Video encoding failed. The video may be in an unsupported format or corrupt.'
+    return (stderr or 'Unknown error')[:500]
+
+
+def _is_retryable_error(error_message: str) -> bool:
+    """True if the error suggests a transient failure worth one retry."""
+    if not error_message:
+        return False
+    s = error_message.lower()
+    if 'timeout' in s or 'timed out' in s:
+        return True
+    if 'resource temporarily unavailable' in s:
+        return True
+    if 'errno' in s and ('11' in s or 'eagain' in s or 'eintr' in s):
+        return True
+    return False
+
+
+def _is_codec_encode_error(stderr: str) -> bool:
+    """True if the error suggests hardware codec/encoding failure (e.g. nvenc not available)."""
+    if not stderr:
+        return False
+    s = stderr.lower()
+    if 'could not find codec' in s or 'codec' in s and ('not found' in s or 'not supported' in s or 'unavailable' in s):
+        return True
+    if 'nvenc' in s and ('error' in s or 'failed' in s or 'not' in s):
+        return True
+    if 'encoder' in s and ('error' in s or 'failed' in s):
+        return True
+    return False
+
+
+def _get_execution_provider() -> Optional[str]:
+    """Return DEFACE_EXECUTION_PROVIDER if set (e.g. CUDAExecutionProvider), else None."""
+    try:
+        from config import DEFACE_EXECUTION_PROVIDER
+        return DEFACE_EXECUTION_PROVIDER
+    except Exception:
+        return None
+
+
+def _get_ffmpeg_config(use_default_codec: bool = False) -> Optional[str]:
+    """Return JSON string for --ffmpeg-config, or None to use deface default. use_default_codec=True forces libx264 (fallback)."""
+    try:
+        from config import DEFACE_FFMPEG_CODEC
+        codec = 'libx264' if use_default_codec else (DEFACE_FFMPEG_CODEC or 'libx264')
+    except Exception:
+        codec = 'libx264'
+    if not codec or codec.strip() == 'libx264':
+        return None
+    return json.dumps({'codec': codec.strip()})
+
+
+def get_onnx_runtime_status() -> Dict:
+    """
+    Detect available ONNX Runtime execution providers (same env as deface).
+    Returns dict with 'summary' (e.g. 'GPU (CUDA)' or 'CPU') and 'providers' list.
+    """
+    try:
+        import onnxruntime as ort
+        providers = ort.get_available_providers()
+    except ImportError:
+        return {
+            'summary': 'Not installed',
+            'providers': [],
+            'error': 'onnxruntime not installed',
+            'install_hint': 'pip install onnx onnxruntime-gpu  (optional, for faster video)',
+        }
+    except Exception as e:
+        return {'summary': 'Unknown', 'providers': [], 'error': str(e)}
+    # Prefer first non-CPU provider for label
+    gpu_like = ('CUDAExecutionProvider', 'TensorrtExecutionProvider', 'DmlExecutionProvider',
+                'CoreMLExecutionProvider', 'ROCMExecutionProvider', 'OpenVINOExecutionProvider')
+    for p in providers:
+        if p in gpu_like:
+            short = p.replace('ExecutionProvider', '').replace('Dml', 'DirectML').replace('Rocm', 'ROCm')
+            return {'summary': f'GPU ({short})', 'providers': providers}
+    return {'summary': 'CPU', 'providers': providers}
+
+
+def _video_debug(stage: str, msg: str) -> None:
+    """Log to app.deface_video (file + in-memory buffer for live debug)."""
+    try:
+        from app.deface_video_log import append_video_log
+        append_video_log(f"[deface_video] {stage} | {msg}")
+    except Exception:
+        logger.info(f"[deface_video] {stage} | {msg}")
+
+
+def _find_deface_cmd() -> Optional[str]:
+    """Find deface executable: project venv/bin, same dir as running Python, then PATH."""
+    # 1) Project venv (works when app is run by Cursor/IDE using system Python)
+    try:
+        project_root = Path(__file__).resolve().parent.parent  # app/ -> project root
+        deface_in_project_venv = project_root / 'venv' / 'bin' / 'deface'
+        if deface_in_project_venv.exists():
+            return str(deface_in_project_venv)
+    except Exception:
+        pass
+    # 2) Same directory as sys.executable (e.g. venv/bin when started via ./scripts/restart.sh)
+    try:
+        python_dir = Path(sys.executable).resolve().parent
+        deface_next_to_python = python_dir / 'deface'
+        if deface_next_to_python.exists():
+            return str(deface_next_to_python)
+    except Exception:
+        pass
+    # 3) System PATH
+    return shutil.which('deface')
 
 
 def deface_image(
@@ -46,10 +183,10 @@ def deface_image(
         # Ensure output directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Build deface command - find deface in PATH (should be in venv/bin when Flask runs)
-        deface_cmd_path = shutil.which('deface')
+        # Build deface command (venv bin same as Python, then PATH)
+        deface_cmd_path = _find_deface_cmd()
         if not deface_cmd_path:
-            error_msg = 'deface command not found. Please install: pip install deface'
+            error_msg = 'deface command not found. Please install: pip install deface (in the same env that runs the app, then restart)'
             logger.error(error_msg)
             return {'success': False, 'error': error_msg}
         
@@ -74,6 +211,12 @@ def deface_image(
         
         if draw_scores:
             cmd.append('--draw-scores')
+        ep = _get_execution_provider()
+        if ep:
+            cmd.extend(['--execution-provider', ep])
+        ffmpeg_cfg = _get_ffmpeg_config(use_default_codec=False)
+        if ffmpeg_cfg:
+            cmd.extend(['--ffmpeg-config', ffmpeg_cfg])
         
         logger.info(f"Running deface: {' '.join(cmd)}")
         
@@ -139,8 +282,10 @@ def deface_images(
     
     for img_path in image_paths:
         try:
-            # Generate output filename with prefix
+            # Generate output filename with prefix (avoid double deface_ if input already has it)
             filename = img_path.name
+            if filename.startswith('deface_'):
+                filename = filename[7:]
             output_filename = f"{output_prefix}{filename}"
             output_path = output_dir / output_filename
             
@@ -193,23 +338,15 @@ def deface_video(
 ) -> dict:
     """
     Process video directly with deface tool and save as MP4 format
-    
-    Args:
-        video_path: Path to input video file
-        output_dir: Directory to save anonymized video
-        replacewith: Anonymization method ('blur', 'solid', 'mosaic')
-        boxes: Use rectangular boxes instead of ellipses
-        thresh: Detection threshold (0.0-1.0)
-        scale: Downsampling size (width, height) or None
-        mosaicsize: Size of mosaic tiles
-        draw_scores: Show detection scores
-        output_prefix: Prefix to add to output filename
-    
+
     Returns:
         dict with 'success' (bool), 'processed' (list with single MP4 path), 'errors' (list)
     """
     try:
+        # Stage 1: Input validation
+        _video_debug("1_input", f"input={video_path.name} path={video_path}")
         if not video_path.exists():
+            _video_debug("1_input", "FAIL video file not found")
             return {
                 'success': False,
                 'processed': [],
@@ -218,21 +355,43 @@ def deface_video(
                 'successful': 0,
                 'failed': 1
             }
-        
+        _video_debug("1_input", "OK file exists")
+
+        # Preflight: check file is a valid video (fail fast with clear message)
+        try:
+            from app.video_processor import get_video_info
+            info = get_video_info(video_path)
+            if not info:
+                _video_debug("1_preflight", "FAIL video not readable or unsupported format")
+                return {
+                    'success': False,
+                    'processed': [],
+                    'errors': [{'input': str(video_path), 'error': 'Video may be corrupt or in an unsupported format. Try re-exporting the video or use a different file.'}],
+                    'total': 1,
+                    'successful': 0,
+                    'failed': 1
+                }
+            _video_debug("1_preflight", f"OK duration={info.get('duration')} fps={info.get('fps')}")
+        except Exception as e:
+            logger.warning(f"Deface preflight skip (video_processor): {e}")
+            # Continue without preflight if dependency fails
+
+        # Stage 2: Output path (avoid double deface_ if input already has it)
         output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Generate output filename with prefix (MP4 format)
         video_stem = video_path.stem
+        if video_stem.startswith('deface_'):
+            video_stem = video_stem[7:]
         output_filename = f"{output_prefix}{video_stem}.mp4"
         output_path = output_dir / output_filename
-        
-        # Ensure output directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Build deface command - find deface in PATH (should be in venv/bin when Flask runs)
-        deface_cmd_path = shutil.which('deface')
+        _video_debug("2_output", f"output={output_path.name} dir={output_dir}")
+
+        # Stage 3: Find deface command
+        _video_debug("3_cmd_lookup", "finding deface executable...")
+        deface_cmd_path = _find_deface_cmd()
         if not deface_cmd_path:
-            error_msg = 'deface command not found. Please install: pip install deface'
+            _video_debug("3_cmd_lookup", "FAIL deface not found")
+            error_msg = 'deface command not found. Please install: pip install deface (in the same env that runs the app, then restart)'
             logger.error(error_msg)
             return {
                 'success': False,
@@ -242,83 +401,184 @@ def deface_video(
                 'successful': 0,
                 'failed': 1
             }
-        
-        cmd = [deface_cmd_path, str(video_path), '-o', str(output_path)]
-        
-        # Add options
+        _video_debug("3_cmd_lookup", f"OK deface={deface_cmd_path}")
+
+        # Stage 4: Build base command (extra args for GPU/hw encode added per attempt for fallback)
+        base_cmd = [deface_cmd_path, str(video_path), '-o', str(output_path)]
         if boxes:
-            cmd.append('--boxes')
-        
+            base_cmd.append('--boxes')
         if replacewith in ('solid', 'mosaic'):
-            cmd.extend(['--replacewith', replacewith])
-        
-        if thresh != 0.2:  # Default threshold
-            cmd.extend(['--thresh', str(thresh)])
-        
+            base_cmd.extend(['--replacewith', replacewith])
+        if thresh != 0.2:
+            base_cmd.extend(['--thresh', str(thresh)])
         if scale:
             width, height = scale
-            cmd.extend(['--scale', f'{width}x{height}'])
-        
-        if replacewith == 'mosaic' and mosaicsize != 20:  # Default mosaic size
-            cmd.extend(['--mosaicsize', str(mosaicsize)])
-        
+            base_cmd.extend(['--scale', f'{width}x{height}'])
+        if replacewith == 'mosaic' and mosaicsize != 20:
+            base_cmd.extend(['--mosaicsize', str(mosaicsize)])
         if draw_scores:
-            cmd.append('--draw-scores')
-        
-        logger.info(f"Processing video with deface: {' '.join(cmd)}")
-        
-        # Run deface command
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=600  # 10 minute timeout for videos
-        )
-        
-        if result.returncode != 0:
-            error_msg = result.stderr or result.stdout or 'Unknown error'
-            logger.error(f"Deface video processing failed: {error_msg}")
+            base_cmd.append('--draw-scores')
+        ep = _get_execution_provider()
+        ffmpeg_cfg_default = _get_ffmpeg_config(use_default_codec=True)
+        ffmpeg_cfg_hw = _get_ffmpeg_config(use_default_codec=False)
+        _video_debug("4_build", "base_cmd built; ep=%s ffmpeg=%s" % (ep or 'auto', 'hw' if ffmpeg_cfg_hw else 'default'))
+
+        # Stage 5: Run subprocess (with optional one retry on transient errors; hw encode fallback to libx264)
+        video_timeout = _get_deface_video_timeout()
+        last_failure = None
+        last_stderr = None
+        for attempt in range(2):
+            cmd = list(base_cmd)
+            if ep:
+                cmd.extend(['--execution-provider', ep])
+            if attempt > 0 and last_stderr and _is_codec_encode_error(last_stderr) and ffmpeg_cfg_hw:
+                _video_debug("5_run", "Retrying with default codec (libx264) after hardware encode failure...")
+            elif attempt > 0:
+                _video_debug("5_run", "Retrying once after transient error...")
+            use_ffmpeg = ffmpeg_cfg_hw if not (attempt > 0 and last_stderr and _is_codec_encode_error(last_stderr)) else ffmpeg_cfg_default
+            if use_ffmpeg:
+                cmd.extend(['--ffmpeg-config', use_ffmpeg])
+            _video_debug("4_build", f"attempt={attempt} cmd={' '.join(cmd)}")
+            _video_debug("5_run", f"starting subprocess (timeout={video_timeout}s)...")
+            video_name = video_path.name
+            _video_debug("5_run", f"processing {video_name} (this may take 1–2 min)...")
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            stderr_lines = []
+            heartbeat_stop = threading.Event()
+
+            def read_stderr():
+                for line in proc.stderr:
+                    if line:
+                        line = line.rstrip()
+                        stderr_lines.append(line)
+                        try:
+                            from app.deface_video_log import append_video_log, set_deface_current_item_pct
+                            append_video_log(f"[deface_video] 5_run | {line}")
+                            pct_matches = list(re.finditer(r'(\d+)%', line))
+                            if pct_matches:
+                                set_deface_current_item_pct(int(pct_matches[-1].group(1)))
+                            else:
+                                frac = re.search(r'(\d+)/(\d+)\b', line)
+                                if frac:
+                                    cur, tot = int(frac.group(1)), int(frac.group(2))
+                                    if tot > 0:
+                                        set_deface_current_item_pct(int(round(100 * cur / tot)))
+                        except Exception:
+                            pass
+
+            def heartbeat():
+                start = time.monotonic()
+                while True:
+                    if heartbeat_stop.wait(timeout=5):
+                        break
+                    elapsed = int(time.monotonic() - start)
+                    try:
+                        from app.deface_video_log import append_video_log, set_deface_elapsed
+                        set_deface_elapsed(elapsed)
+                        append_video_log(f"[deface_video] 5_run | still processing {video_name}... ({elapsed}s elapsed)")
+                    except Exception:
+                        pass
+
+            reader = threading.Thread(target=read_stderr, daemon=True)
+            reader.start()
+            heart = threading.Thread(target=heartbeat, daemon=True)
+            heart.start()
+            try:
+                stdout_raw, stderr_raw = proc.communicate(timeout=video_timeout)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate()
+                heartbeat_stop.set()
+                timeout_sec = _get_deface_video_timeout()
+                mins = timeout_sec // 60
+                last_failure = {
+                    'success': False,
+                    'processed': [],
+                    'errors': [{'input': str(video_path), 'error': f'Processing timed out (exceeded {mins} minute{"s" if mins != 1 else ""}). Try a shorter video or use Detection Scale 640×360 for faster processing.'}],
+                    'total': 1,
+                    'successful': 0,
+                    'failed': 1
+                }
+                if attempt == 0:
+                    continue
+                return last_failure
+            heartbeat_stop.set()
+            reader.join(timeout=2)
+            combined_stderr = (stderr_raw or '') + ('\n'.join(stderr_lines) if stderr_lines else '')
+            result = type('Result', (), {'returncode': proc.returncode, 'stdout': stdout_raw or '', 'stderr': combined_stderr})()
+
+            _video_debug("5_run", f"subprocess finished returncode={result.returncode} stdout_len={len(result.stdout or '')} stderr_len={len(result.stderr or '')}")
+
+            if result.returncode != 0:
+                raw_error = result.stderr or result.stdout or 'Unknown error'
+                last_stderr = raw_error
+                user_msg = _user_facing_deface_error(raw_error)
+                _video_debug("5_run", f"FAIL stderr={raw_error[:500]}")
+                logger.error(f"Deface video processing failed: {raw_error}")
+                last_failure = {
+                    'success': False,
+                    'processed': [],
+                    'errors': [{'input': str(video_path), 'error': f'Deface processing failed: {user_msg}'}],
+                    'total': 1,
+                    'successful': 0,
+                    'failed': 1
+                }
+                if _is_retryable_error(user_msg) and attempt == 0:
+                    continue
+                if _is_codec_encode_error(last_stderr) and ffmpeg_cfg_hw and attempt == 0:
+                    continue
+                return last_failure
+
+            # Stage 6: Verify output file
+            _video_debug("6_verify", f"checking output exists: {output_path}")
+            if not output_path.exists():
+                _video_debug("6_verify", "FAIL output file was not created")
+                return {
+                    'success': False,
+                    'processed': [],
+                    'errors': [{'input': str(video_path), 'error': 'Output video file was not created'}],
+                    'total': 1,
+                    'successful': 0,
+                    'failed': 1
+                }
+            size = output_path.stat().st_size
+            _video_debug("6_verify", f"OK output size={size} bytes")
+
+            # Stage 7: Success
+            _video_debug("7_done", f"success output={output_path}")
             return {
-                'success': False,
-                'processed': [],
-                'errors': [{'input': str(video_path), 'error': f'Deface processing failed: {error_msg}'}],
+                'success': True,
+                'processed': [str(output_path)],
+                'errors': [],
                 'total': 1,
-                'successful': 0,
-                'failed': 1
+                'successful': 1,
+                'failed': 0
             }
-        
-        if not output_path.exists():
-            return {
-                'success': False,
-                'processed': [],
-                'errors': [{'input': str(video_path), 'error': 'Output video file was not created'}],
-                'total': 1,
-                'successful': 0,
-                'failed': 1
-            }
-        
-        logger.info(f"Deface video processing successful: {output_path}")
-        return {
-            'success': True,
-            'processed': [str(output_path)],
-            'errors': [],
-            'total': 1,
-            'successful': 1,
-            'failed': 0
-        }
-    
-    except subprocess.TimeoutExpired:
+
+        if last_failure:
+            return last_failure
+
+    except subprocess.TimeoutExpired as e:
+        timeout_sec = getattr(e, 'timeout', _get_deface_video_timeout())
+        mins = timeout_sec // 60
+        _video_debug("5_run", f"FAIL timeout after {timeout_sec}s")
         logger.error(f"Deface video processing timeout for {video_path}")
         return {
             'success': False,
             'processed': [],
-            'errors': [{'input': str(video_path), 'error': 'Processing timeout (exceeded 10 minutes)'}],
+            'errors': [{'input': str(video_path), 'error': f'Processing timed out (exceeded {mins} minute{"s" if mins != 1 else ""}). Try a shorter video or use Detection Scale 640×360 for faster processing.'}],
             'total': 1,
             'successful': 0,
             'failed': 1
         }
     except Exception as e:
-        logger.error(f"Error in deface_video: {e}", exc_info=True)
+        _video_debug("exception", f"{video_path.name}: {e}")
+        logger.exception(f"[deface_video] exception | {video_path.name}: {e}")
         return {
             'success': False,
             'processed': [],

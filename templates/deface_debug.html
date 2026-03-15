@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="app-container">
+    <!-- Navigation Tabs (same as deface) -->
+    <div style="margin-bottom: 30px; border-bottom: 2px solid #555;">
+        <div style="display: flex; gap: 10px;">
+            <a href="/v2p-formatter/" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Video to Image
+            </a>
+            <a href="/v2p-formatter/media-converter" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Media Converter
+            </a>
+            <a href="/v2p-formatter/image-to-pdf" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Image to PDF
+            </a>
+            <a href="/v2p-formatter/deface" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Deface
+            </a>
+            <a href="/v2p-formatter/deface/debug" style="padding: 12px 24px; background: #1e1e1e; color: #667eea; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #667eea; border-bottom: none; font-weight: bold;">
+                Debug
+            </a>
+        </div>
+    </div>
+
+    <section style="padding: 24px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555; margin-bottom: 24px;">
+        <h2 style="color: #e0e0e0; margin-top: 0;">Deface Debug</h2>
+        <p style="color: #aaa;">Open DevTools (F12 or Cmd+Option+I) → Sources tab. Ensure breakpoints are not disabled, then refresh this page or click below. Execution will pause at the debugger.</p>
+        <button type="button" id="debuggerTrigger" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">Pause at debugger</button>
+        <p id="onnxRuntimeStatusDebug" style="margin-top: 16px; font-size: 13px; color: #999;">ONNX runtime: …</p>
+    </section>
+
+    <section style="padding: 24px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+        <h3 style="color: #e0e0e0; margin-top: 0;">Deface API log (tracked &amp; analysed)</h3>
+        <p style="color: #aaa; font-size: 14px;">Recent <code>apply_deface</code> and <code>generate_deface_documents</code> requests. Use this to debug 400/500 errors.</p>
+        <button type="button" id="refreshLogBtn" style="padding: 8px 16px; background: #555; color: #e0e0e0; border: 1px solid #666; border-radius: 4px; cursor: pointer; font-size: 13px;">Refresh log</button>
+        <div id="defaceLogContainer" style="margin-top: 16px; overflow-x: auto;">
+            <p id="defaceLogLoading" style="color: #999;">Loading...</p>
+            <table id="defaceLogTable" style="display: none; width: 100%; border-collapse: collapse; font-size: 13px;">
+                <thead>
+                    <tr style="border-bottom: 1px solid #555;">
+                        <th style="text-align: left; padding: 8px; color: #aaa;">Time</th>
+                        <th style="text-align: left; padding: 8px; color: #aaa;">Endpoint</th>
+                        <th style="text-align: left; padding: 8px; color: #aaa;">Status</th>
+                        <th style="text-align: left; padding: 8px; color: #aaa;">Request</th>
+                        <th style="text-align: left; padding: 8px; color: #aaa;">Response / Error</th>
+                        <th style="text-align: left; padding: 8px; color: #aaa;">Diagnostics</th>
+                    </tr>
+                </thead>
+                <tbody id="defaceLogBody"></tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<script>
+(function() {
+    debugger; // Pause when this page loads (if DevTools is open)
+
+    document.getElementById('debuggerTrigger').addEventListener('click', function() {
+        debugger; // Pause when button is clicked (if DevTools is open)
+    });
+
+    function escapeHtml(s) {
+        if (s == null) return '';
+        var div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+    function renderLog() {
+        var loading = document.getElementById('defaceLogLoading');
+        var table = document.getElementById('defaceLogTable');
+        var body = document.getElementById('defaceLogBody');
+        loading.style.display = 'block';
+        table.style.display = 'none';
+        fetch('/v2p-formatter/deface/debug/log')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                loading.style.display = 'none';
+                var entries = (data.entries || []).slice().reverse();
+                if (entries.length === 0) {
+                    body.innerHTML = '<tr><td colspan="6" style="padding: 12px; color: #999;">No deface API calls logged yet. Use Deface → Apply deface or Generate Documents to generate entries.</td></tr>';
+                } else {
+                    body.innerHTML = entries.map(function(e) {
+                        var status = e.status;
+                        var statusColor = status >= 500 ? '#f66' : (status >= 400 ? '#fa0' : '#6a6');
+                        var req = typeof e.request === 'object' ? JSON.stringify(e.request) : String(e.request || '');
+                        var resp = typeof e.response === 'object' ? JSON.stringify(e.response) : String(e.response || '');
+                        var err = e.error ? '<span style="color:#f44;">' + escapeHtml(e.error) + '</span>' : '';
+                        var respCell = err || escapeHtml(resp);
+                        var diag = e.diagnostics;
+                        var diagCell = '';
+                        if (diag != null) {
+                            try {
+                                var diagJson = typeof diag === 'string' ? diag : JSON.stringify(diag, null, 2);
+                                diagCell = '<details style="cursor:pointer;"><summary style="color:#667eea;">View analysis</summary><pre style="margin:8px 0 0; padding:8px; background:#1e1e1e; border-radius:4px; font-size:11px; max-height:300px; overflow:auto; white-space: pre-wrap; word-break: break-all;">' + escapeHtml(diagJson) + '</pre></details>';
+                            } catch (x) {
+                                diagCell = '<span style="color:#999;">—</span>';
+                            }
+                        } else {
+                            diagCell = '<span style="color:#555;">—</span>';
+                        }
+                        return '<tr style="border-bottom: 1px solid #333;">' +
+                            '<td style="padding: 8px; color: #999;">' + escapeHtml(e.ts || '') + '</td>' +
+                            '<td style="padding: 8px; color: #e0e0e0;">' + escapeHtml(e.endpoint || '') + '</td>' +
+                            '<td style="padding: 8px; color: ' + statusColor + ';">' + status + '</td>' +
+                            '<td style="padding: 8px; color: #aaa; max-width: 200px; word-break: break-all;">' + escapeHtml(req) + '</td>' +
+                            '<td style="padding: 8px; color: #aaa; max-width: 400px;">' + respCell + '</td>' +
+                            '<td style="padding: 8px; color: #aaa; max-width: 360px;">' + diagCell + '</td>' +
+                            '</tr>';
+                    }).join('');
+                }
+                table.style.display = 'table';
+            })
+            .catch(function(err) {
+                loading.style.display = 'none';
+                body.innerHTML = '<tr><td colspan="6" style="padding: 12px; color: #f44;">Failed to load log: ' + escapeHtml(err.message) + '</td></tr>';
+                table.style.display = 'table';
+            });
+    }
+    document.getElementById('refreshLogBtn').addEventListener('click', renderLog);
+    renderLog();
+
+    var onnxEl = document.getElementById('onnxRuntimeStatusDebug');
+    if (onnxEl) {
+        fetch('/v2p-formatter/deface/onnx_status').then(function(r) { return r.json(); }).then(function(d) {
+            var label = d.summary || 'Unknown';
+            if (d.install_hint) {
+                onnxEl.textContent = 'ONNX runtime: ' + label + ' — ' + d.install_hint;
+                onnxEl.title = d.install_hint;
+            } else {
+                onnxEl.textContent = 'ONNX runtime: ' + label;
+                if (d.providers && d.providers.length) onnxEl.title = d.providers.join(', ');
+            }
+        }).catch(function() {
+            onnxEl.textContent = 'ONNX runtime: —';
+        });
+    }
+})();
+</script>
+{% endblock %}

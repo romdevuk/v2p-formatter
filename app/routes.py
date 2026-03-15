@@ -4,6 +4,29 @@ import logging
 import json
 import time
 from pathlib import Path
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# In-memory deface API log for Debug page (last N entries)
+_DEFACE_DEBUG_LOG = []
+_DEFACE_DEBUG_LOG_MAX = 100
+
+
+def _deface_debug_append(endpoint, request_summary, status_code, response_summary, error=None, diagnostics=None):
+    """Append a deface API call to the debug log (tracked and analysable on Debug page)."""
+    entry = {
+        'ts': datetime.utcnow().isoformat() + 'Z',
+        'endpoint': endpoint,
+        'request': request_summary,
+        'status': status_code,
+        'response': response_summary,
+        'error': error,
+    }
+    if diagnostics is not None:
+        entry['diagnostics'] = diagnostics
+    _DEFACE_DEBUG_LOG.append(entry)
+    if len(_DEFACE_DEBUG_LOG) > _DEFACE_DEBUG_LOG_MAX:
+        del _DEFACE_DEBUG_LOG[:-_DEFACE_DEBUG_LOG_MAX]
 from werkzeug.utils import secure_filename
 from app.utils import allowed_file, create_output_folder, get_pdf_output_path, parse_time_points
 from app.video_processor import get_video_info, extract_frames_at_times
@@ -20,7 +43,8 @@ from app.deface_session import (
     cleanup_session, get_session_temp_dir, update_session_progress,
     get_session_progress
 )
-from config import UPLOAD_FOLDER, DEFAULT_IMAGE_QUALITY, DEFAULT_RESOLUTION, RESOLUTION_PRESETS, INPUT_FOLDER, OUTPUT_FOLDER
+from app.deface_video_log import append_video_log, set_deface_progress, clear_deface_progress, get_deface_progress, add_deface_completed_item_url
+from config import UPLOAD_FOLDER, DEFAULT_IMAGE_QUALITY, DEFAULT_RESOLUTION, RESOLUTION_PRESETS, INPUT_FOLDER, OUTPUT_FOLDER, DEFACE_MAX_CONCURRENT_VIDEOS
 from app.observation_media_scanner import list_output_subfolders, scan_media_subfolder, list_qualifications, list_learners
 from app.placeholder_parser import extract_placeholders, validate_placeholders, assign_placeholder_colors
 from app.observation_report_scanner import scan_media_files
@@ -85,6 +109,7 @@ def get_input_learners():
         return jsonify({'success': False, 'error': 'Qualification not provided'}), 400
     try:
         learners = list_learners(OUTPUT_FOLDER, qualification)
+        logger.info(f"[deface] GET /learners qualification={qualification!r} -> {len(learners)} learners: {learners[:20]!r}")
         return jsonify({'success': True, 'learners': learners})
     except Exception as e:
         logger.error(f"Error listing learners for qualification {qualification}: {e}")
@@ -1773,20 +1798,22 @@ def list_images():
         if qualification and learner:
             # Scan only within qualification/learner folder and all its subfolders
             scan_path = OUTPUT_FOLDER / qualification / learner
-            if not scan_path.exists():
+            exists = scan_path.exists()
+            logger.info(f"[deface] GET /list_images qualification={qualification!r} learner={learner!r} scan_path={scan_path!r} exists={exists}")
+            if not exists:
                 return jsonify({
                     'success': True,
                     'files': [],
                     'tree': {},
                     'count': 0,
-                    'output_folder': str(OUTPUT_FOLDER)
+                    'output_folder': str(OUTPUT_FOLDER),
+                    'debug': {'scan_path': str(scan_path), 'exists': False}
                 })
             
             # Scan images recursively from the specific qualification/learner path
             all_image_files = scan_image_files(str(scan_path))
-            
-            # Scan videos (MP4 files) recursively
             all_video_files = scan_mp4_files(str(scan_path))
+            logger.info(f"[deface] list_images scan_path={scan_path!r} -> images={len(all_image_files)} videos={len(all_video_files)}")
             
             # Combine images and videos
             # Add 'type' field to distinguish between images and videos
@@ -1795,30 +1822,40 @@ def list_images():
             
             for file_info in all_video_files:
                 file_info['type'] = 'video'
+                # Add duration for display in deface file selector (min/sec under file name)
+                try:
+                    info = get_video_info(file_info['path'])
+                    file_info['duration_seconds'] = round(info['duration'], 2) if info and info.get('duration') is not None else None
+                except Exception:
+                    file_info['duration_seconds'] = None
             
             all_files = all_image_files + all_video_files
             
             # Update relative paths to be relative to OUTPUT_FOLDER (for downloads)
             # But folder paths should be relative to the learner folder (scan_path)
+            # Exclude files inside the deface output subfolder so the selector shows only source media to deface
             base_path = OUTPUT_FOLDER
             filtered_files = []
             for file_info in all_files:
                 file_path = Path(file_info['path'])
                 try:
+                    # Calculate folder relative to scan_path (learner folder) for UI display
+                    relative_to_learner = file_path.relative_to(scan_path)
+                    # Exclude anything under the 'deface' subfolder (defaced outputs)
+                    if relative_to_learner.parts and relative_to_learner.parts[0] == 'deface':
+                        continue
                     # Calculate relative path from OUTPUT_FOLDER (for download links)
                     relative_to_base = file_path.relative_to(base_path)
                     rel_str = str(relative_to_base)
                     file_info['relative_path'] = rel_str
                     
-                    # Calculate folder relative to scan_path (learner folder) for UI display
-                    relative_to_learner = file_path.relative_to(scan_path)
                     folder_path = relative_to_learner.parent
                     # If image is directly in learner folder, it's 'root', otherwise use folder name
                     file_info['folder'] = str(folder_path) if folder_path != Path('.') else 'root'
                     
                     filtered_files.append(file_info)
                 except ValueError:
-                    # Path not relative to base, skip
+                    # Path not relative to base or scan_path, skip
                     continue
             
             # Sort files: subfolders first, then root, then alphabetical within each
@@ -1836,7 +1873,8 @@ def list_images():
                 'files': filtered_files,
                 'tree': tree,
                 'count': len(filtered_files),
-                'output_folder': str(OUTPUT_FOLDER)
+                'output_folder': str(OUTPUT_FOLDER),
+                'debug': {'scan_path': str(scan_path), 'exists': True, 'images': len(all_image_files), 'videos': len(all_video_files)}
             })
         else:
             # No learner selected - return empty (only show files when learner is selected)
@@ -2053,6 +2091,42 @@ def deface_index():
                          selected_learner=selected_learner)
 
 
+@bp.route('/deface/onnx_status', methods=['GET'])
+def deface_onnx_status():
+    """Return ONNX Runtime status (GPU/CPU) for Deface page and debug page."""
+    from app.deface_processor import get_onnx_runtime_status
+    return jsonify(get_onnx_runtime_status())
+
+
+@bp.route('/deface/debug', methods=['GET'])
+def deface_debug():
+    """Deface debug page (breakpoints, inspect state)."""
+    return render_template('deface_debug.html')
+
+
+@bp.route('/deface/debug/log', methods=['GET'])
+def deface_debug_log():
+    """Return recent deface API log entries for the Debug page (tracked and analysed)."""
+    return jsonify({'entries': list(_DEFACE_DEBUG_LOG)})
+
+
+@bp.route('/deface_video_log', methods=['GET'])
+def deface_video_log_json():
+    """Return recent video processing debug lines and current deface progress (for live UI when request is in flight)."""
+    from app.deface_video_log import get_recent_lines
+    limit = min(int(request.args.get('limit', 200)), 300)
+    return jsonify({
+        'lines': get_recent_lines(limit=limit),
+        'progress': get_deface_progress(),
+    })
+
+
+@bp.route('/deface_video_log/view', methods=['GET'])
+def deface_video_log_view():
+    """HTML page that polls /deface_video_log and displays lines (open in new tab during Apply Deface)."""
+    return render_template('deface_video_log_view.html')
+
+
 @bp.route('/apply_deface', methods=['POST'])
 def apply_deface():
     """Apply deface to images/videos and return preview URLs with session ID"""
@@ -2060,11 +2134,17 @@ def apply_deface():
     from pathlib import Path
     import tempfile
     
+    def _log_apply(status_code, response_summary, error=None, diagnostics=None):
+        req = {'image_paths_count': len(data.get('image_paths', []))}
+        _deface_debug_append('apply_deface', req, status_code, response_summary, error=error, diagnostics=diagnostics)
+    
     try:
-        data = request.json
+        data = request.json or {}
         image_paths = data.get('image_paths', [])
         quality = int(data.get('quality', 95))
         max_size = data.get('max_size', '640x480')
+        qualification = (data.get('qualification') or '').strip()
+        learner = (data.get('learner') or '').strip()
         
         # Deface settings
         replacewith = data.get('replacewith', 'blur')
@@ -2076,10 +2156,9 @@ def apply_deface():
         approve_video_processing = data.get('approve_video_processing', False)
         
         if not image_paths:
-            return jsonify({
-                'success': False,
-                'error': 'No images or videos provided'
-            }), 400
+            out = {'success': False, 'error': 'No images or videos provided'}
+            _log_apply(400, out, error=out['error'])
+            return jsonify(out), 400
         
         # Validate paths and separate images from videos
         validated_images = []
@@ -2092,10 +2171,9 @@ def apply_deface():
             try:
                 file_path.resolve().relative_to(OUTPUT_FOLDER.resolve())
             except ValueError:
-                return jsonify({
-                    'success': False,
-                    'error': f'Invalid file path: {path}'
-                }), 400
+                out = {'success': False, 'error': f'Invalid file path: {path}'}
+                _log_apply(400, out, error=out['error'])
+                return jsonify(out), 400
             
             if file_path.exists():
                 ext = file_path.suffix.lower()
@@ -2105,17 +2183,22 @@ def apply_deface():
                     validated_images.append(file_path.resolve())
         
         if not validated_images and not validated_videos:
-            return jsonify({
-                'success': False,
-                'error': 'No valid images or videos found'
-            }), 400
+            out = {'success': False, 'error': 'No valid images or videos found'}
+            _log_apply(400, out, error=out['error'])
+            return jsonify(out), 400
         
         # Check approval for video processing
         if validated_videos and not approve_video_processing:
-            return jsonify({
-                'success': False,
-                'error': 'Video processing requires approval. Please check "Approve Video Processing" setting.'
-            }), 400
+            out = {'success': False, 'error': 'Video processing requires approval. Please check "Approve Video Processing" setting.'}
+            _log_apply(400, out, error=out['error'])
+            return jsonify(out), 400
+
+        def _video_log(stage: str, msg: str) -> None:
+            line = f"[apply_deface] video {stage} | {msg}"
+            logger.info(line)
+            append_video_log(line)
+        if validated_videos:
+            _video_log("start", f"images={len(validated_images)} videos={len(validated_videos)} (video processing can take several minutes)")
         
         # Parse scale if provided
         scale = None
@@ -2151,14 +2234,29 @@ def apply_deface():
         
         processed_items = []
         sequence = 0
+        # Diagnostics for debug log when deface produces no output
+        diagnostics_log = {
+            'validated_images_count': len(validated_images),
+            'validated_videos_count': len(validated_videos),
+            'image_paths_sample': [str(p) for p in validated_images[:3]],
+            'video_paths_sample': [str(p) for p in validated_videos[:3]],
+            'deface_images_result': None,
+            'image_skip_reasons': [],
+            'video_results': [],
+        }
         
-        # Calculate total items for progress tracking
+        # Calculate total items for progress tracking (queue order: images then videos)
         total_items = len(validated_images) + len(validated_videos)
+        queue_item_names = [p.name for p in validated_images] + [p.name for p in validated_videos]
         update_session_progress(session_id, total=total_items, completed=0, status='processing')
+        clear_deface_progress()
+        set_deface_progress(total=total_items, completed=0, status='processing', phase='images' if validated_images else 'videos', item_names=queue_item_names)
         
         try:
             # Process images with deface
             if validated_images:
+                n_imgs = len(validated_images)
+                append_video_log(f"[apply_deface] images start | {n_imgs} image(s) (usually a few seconds)")
                 deface_result = deface_images(
                     validated_images,
                     temp_dir,
@@ -2170,6 +2268,12 @@ def apply_deface():
                     draw_scores=draw_scores,
                     output_prefix='deface_'
                 )
+                diagnostics_log['deface_images_result'] = {
+                    'processed_count': len(deface_result.get('processed', [])),
+                    'processed_paths': list(deface_result.get('processed', [])),
+                    'errors': list(deface_result.get('errors', [])),
+                    'success': deface_result.get('success'),
+                }
                 
                 # Log errors if any
                 if deface_result.get('errors'):
@@ -2181,6 +2285,7 @@ def apply_deface():
                     
                     # Verify file exists
                     if not defaced_file.exists():
+                        diagnostics_log['image_skip_reasons'].append(f"{defaced_file.name}: file does not exist after deface")
                         logger.error(f"Defaced file does not exist: {defaced_file}")
                         continue
                     
@@ -2192,6 +2297,7 @@ def apply_deface():
                             break
                     
                     if not original_path:
+                        diagnostics_log['image_skip_reasons'].append(f"{defaced_file.name}: no matching original in validated list")
                         logger.warning(f"Could not find original for defaced file: {defaced_file.name}")
                         continue
                     
@@ -2199,6 +2305,7 @@ def apply_deface():
                     try:
                         rel_path = defaced_file.relative_to(temp_dir)
                     except ValueError:
+                        diagnostics_log['image_skip_reasons'].append(f"{defaced_file.name}: not under temp_dir")
                         logger.error(f"Defaced file {defaced_file} is not in temp_dir {temp_dir}")
                         continue
                     
@@ -2216,70 +2323,194 @@ def apply_deface():
                         'sequence': sequence,
                         'manual_defaces': []
                     })
+                    add_deface_completed_item_url(defaced_url)
+                set_deface_progress(completed=len(processed_items), phase='videos' if validated_videos else None)
+                append_video_log(f"[apply_deface] images done | {len(processed_items)} image(s) processed")
             
-            # Process videos: process directly with deface tool (outputs MP4)
+            # Process videos: process directly with deface tool (outputs MP4); optional parallel (DEFACE_MAX_CONCURRENT_VIDEOS)
             if validated_videos:
                 completed_images = len([item for item in processed_items if item.get('type') == 'image'])
                 completed = completed_images
-                for video_path in validated_videos:
-                    # Update progress
-                    update_session_progress(session_id, completed=completed, current_item=video_path.name)
-                    video_result = deface_video(
-                        video_path,
-                        temp_dir,
-                        replacewith=replacewith,
-                        boxes=boxes,
-                        thresh=thresh,
-                        scale=scale,
-                        mosaicsize=mosaicsize,
-                        draw_scores=draw_scores,
-                        output_prefix='deface_'
-                    )
-                    
-                    # Process video result (single MP4 file)
-                    if video_result.get('processed'):
-                        defaced_path = video_result.get('processed', [])[0]
-                        defaced_file = Path(defaced_path)
-                        
-                        # Verify file exists
-                        if not defaced_file.exists():
-                            logger.error(f"Defaced video file does not exist: {defaced_file}")
-                            continue
-                        
-                        # Calculate relative path for URL
-                        try:
-                            rel_path = defaced_file.relative_to(temp_dir)
-                        except ValueError:
-                            logger.error(f"Defaced file {defaced_file} is not in temp_dir {temp_dir}")
-                            continue
-                        
-                        # Convert to string with forward slashes
-                        rel_path_str = str(rel_path).replace('\\', '/')
-                        defaced_url = f'/v2p-formatter/deface_temp/{session_id}/{rel_path_str}'
-                        
-                        sequence += 1
-                        processed_items.append({
-                            'original_path': str(video_path),
-                            'original_name': video_path.name,
-                            'defaced_path': str(defaced_file),
-                            'defaced_url': defaced_url,
-                            'type': 'video',
-                            'sequence': sequence,
-                            'manual_defaces': []
+                n_videos = len(validated_videos)
+                max_parallel = max(1, min(8, int(DEFACE_MAX_CONCURRENT_VIDEOS)))
+                if max_parallel <= 1:
+                    # Sequential (default): one video at a time, progress shows current video name and %
+                    for idx, video_path in enumerate(validated_videos):
+                        _video_log("loop_start", f"video {idx + 1}/{n_videos} name={video_path.name} path={video_path}")
+                        set_deface_progress(completed=completed, current_item=video_path.name, phase='videos', elapsed_seconds=0)
+                        update_session_progress(session_id, completed=completed, current_item=video_path.name)
+                        _video_log("call_deface_video", f"calling deface_video for {video_path.name}...")
+                        video_result = deface_video(
+                            video_path,
+                            temp_dir,
+                            replacewith=replacewith,
+                            boxes=boxes,
+                            thresh=thresh,
+                            scale=scale,
+                            mosaicsize=mosaicsize,
+                            draw_scores=draw_scores,
+                            output_prefix='deface_'
+                        )
+                        _video_log("call_deface_video", f"returned success={video_result.get('success')} processed={len(video_result.get('processed', []))} errors={len(video_result.get('errors', []))}")
+                        diagnostics_log['video_results'].append({
+                            'input': video_path.name,
+                            'processed_count': len(video_result.get('processed', [])),
+                            'processed': list(video_result.get('processed', [])),
+                            'errors': list(video_result.get('errors', [])),
+                            'success': video_result.get('success'),
                         })
-                    
-                    # Log errors if any
-                    if video_result.get('errors'):
-                        logger.warning(f"Video deface processing errors: {video_result.get('errors')}")
-                    
-                    completed += 1
+                        if video_result.get('processed'):
+                            defaced_path = video_result.get('processed', [])[0]
+                            defaced_file = Path(defaced_path)
+                            _video_log("add_item", f"defaced_file={defaced_file.name} exists={defaced_file.exists()}")
+                            if defaced_file.exists():
+                                try:
+                                    rel_path = defaced_file.relative_to(temp_dir)
+                                    rel_path_str = str(rel_path).replace('\\', '/')
+                                    defaced_url = f'/v2p-formatter/deface_temp/{session_id}/{rel_path_str}'
+                                    sequence += 1
+                                    processed_items.append({
+                                        'original_path': str(video_path),
+                                        'original_name': video_path.name,
+                                        'defaced_path': str(defaced_file),
+                                        'defaced_url': defaced_url,
+                                        'type': 'video',
+                                        'sequence': sequence,
+                                        'manual_defaces': []
+                                    })
+                                    add_deface_completed_item_url(defaced_url)
+                                    _video_log("add_item", f"added to processed_items sequence={sequence}")
+                                except ValueError:
+                                    logger.error(f"Defaced file {defaced_file} is not in temp_dir {temp_dir}")
+                        if video_result.get('errors'):
+                            logger.warning(f"Video deface processing errors: {video_result.get('errors')}")
+                        completed += 1
+                        _video_log("loop_end", f"video {idx + 1}/{n_videos} done processed_items={len(processed_items)}")
+                else:
+                    # Parallel: run up to max_parallel videos at once; progress shows "Videos (N in parallel)"
+                    _video_log("parallel_start", f"videos={n_videos} max_workers={max_parallel}")
+                    set_deface_progress(completed=completed, current_item=f"Videos (up to {max_parallel} in parallel)", phase='videos', elapsed_seconds=0)
+                    update_session_progress(session_id, completed=completed, current_item=f"Processing {n_videos} videos in parallel")
+                    video_results_by_idx = {}
+
+                    def run_one(idx_video):
+                        idx, video_path = idx_video
+                        _video_log("call_deface_video", f"[worker] calling deface_video for {video_path.name}...")
+                        result = deface_video(
+                            video_path,
+                            temp_dir,
+                            replacewith=replacewith,
+                            boxes=boxes,
+                            thresh=thresh,
+                            scale=scale,
+                            mosaicsize=mosaicsize,
+                            draw_scores=draw_scores,
+                            output_prefix='deface_'
+                        )
+                        return idx, video_path, result
+
+                    with ThreadPoolExecutor(max_workers=max_parallel) as executor:
+                        futures = {executor.submit(run_one, (idx, vp)): idx for idx, vp in enumerate(validated_videos)}
+                        for future in as_completed(futures):
+                            try:
+                                idx, video_path, video_result = future.result()
+                                video_results_by_idx[idx] = (video_path, video_result)
+                            except Exception as e:
+                                idx = futures[future]
+                                video_path = validated_videos[idx]
+                                video_results_by_idx[idx] = (video_path, {
+                                    'success': False, 'processed': [], 'errors': [{'input': str(video_path), 'error': str(e)}],
+                                    'total': 1, 'successful': 0, 'failed': 1
+                                })
+                                logger.exception(f"Deface video task failed for {video_path.name}")
+
+                    # Build processed_items and diagnostics in original order; update progress per item so UI is accurate
+                    for idx in range(n_videos):
+                        video_path, video_result = video_results_by_idx[idx]
+                        diagnostics_log['video_results'].append({
+                            'input': video_path.name,
+                            'processed_count': len(video_result.get('processed', [])),
+                            'processed': list(video_result.get('processed', [])),
+                            'errors': list(video_result.get('errors', [])),
+                            'success': video_result.get('success'),
+                        })
+                        if video_result.get('processed'):
+                            defaced_path = video_result.get('processed', [])[0]
+                            defaced_file = Path(defaced_path)
+                            if defaced_file.exists():
+                                try:
+                                    rel_path = defaced_file.relative_to(temp_dir)
+                                    rel_path_str = str(rel_path).replace('\\', '/')
+                                    defaced_url = f'/v2p-formatter/deface_temp/{session_id}/{rel_path_str}'
+                                    sequence += 1
+                                    processed_items.append({
+                                        'original_path': str(video_path),
+                                        'original_name': video_path.name,
+                                        'defaced_path': str(defaced_file),
+                                        'defaced_url': defaced_url,
+                                        'type': 'video',
+                                        'sequence': sequence,
+                                        'manual_defaces': []
+                                    })
+                                    add_deface_completed_item_url(defaced_url)
+                                except ValueError:
+                                    logger.error(f"Defaced file {defaced_file} is not in temp_dir {temp_dir}")
+                        if video_result.get('errors'):
+                            logger.warning(f"Video deface processing errors: {video_result.get('errors')}")
+                        set_deface_progress(completed=len(processed_items), phase='videos')
+                        update_session_progress(session_id, completed=len(processed_items))
+
+                    _video_log("parallel_done", f"total processed_items={len(processed_items)}")
+
+                _video_log("all_done", f"total processed_items={len(processed_items)}")
             
-            # Update progress to complete
+            # Update progress to complete and append a clear completion line so the log shows run finished
+            set_deface_progress(completed=total_items, status='complete', current_item=None)
             update_session_progress(session_id, completed=total_items, status='complete')
+            append_video_log(f"[apply_deface] run complete — {len(processed_items)} item(s) processed")
+            
+            # Do not return success if no files were actually processed (avoids 400 on generate_documents)
+            if not processed_items:
+                cleanup_session(session_id)
+                num_images = len(validated_images)
+                num_videos = len(validated_videos)
+                detail = f'{num_images} image(s) and {num_videos} video(s) were sent but deface produced no output.'
+                err_msg = 'No files were defaced. ' + detail + ' Check that the deface tool is installed (pip install deface), paths are readable, and files are valid images/MP4.'
+                out = {'success': False, 'error': err_msg, 'validated_images': num_images, 'validated_videos': num_videos}
+                _log_apply(400, out, error=err_msg, diagnostics=diagnostics_log)
+                return jsonify({'success': False, 'error': err_msg}), 400
             
             # Update session with processed items
             update_session_processed(session_id, processed_items)
-            
+            # Optionally copy defaced output to OUTPUT_FOLDER/qual/learner/deface/ so the review section appears when opening the page by URL
+            if qualification and learner and processed_items:
+                try:
+                    deface_dir = OUTPUT_FOLDER / qualification / learner / 'deface'
+                    deface_dir.mkdir(parents=True, exist_ok=True)
+                    import shutil
+                    for item in processed_items:
+                        src = Path(item.get('defaced_path', ''))
+                        if not src.exists():
+                            continue
+                        # Always use canonical deface_<original_name> so we never get deface_deface_* in output
+                        original_name = item.get('original_name') or src.name
+                        base = original_name[7:] if original_name.startswith('deface_') else original_name
+                        name = f'deface_{base}' if base else src.name
+                        dest = deface_dir / name
+                        if dest.exists():
+                            base, ext = dest.stem, dest.suffix
+                            n = 1
+                            while dest.exists():
+                                dest = deface_dir / f'{base}_{n}{ext}'
+                                n += 1
+                        shutil.copy2(src, dest)
+                    _video_log("response", f"copied {len(processed_items)} file(s) to {deface_dir}")
+                except Exception as e:
+                    logger.warning(f"apply_deface: could not copy to output folder: {e}")
+            if validated_videos:
+                _video_log("response", f"returning success processed_count={len(processed_items)} session_id={session_id}")
+            out = {'success': True, 'processed_count': len(processed_items), 'session_id': session_id}
+            _log_apply(200, out)
             return jsonify({
                 'success': True,
                 'processed': processed_items,
@@ -2289,18 +2520,21 @@ def apply_deface():
         
         except Exception as e:
             logger.error(f"Error in apply_deface: {e}", exc_info=True)
+            clear_deface_progress()
             cleanup_session(session_id)
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
+            out = {'success': False, 'error': str(e)}
+            _log_apply(500, out, error=str(e))
+            return jsonify(out), 500
     
     except Exception as e:
         logger.error(f"Error in apply_deface: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        clear_deface_progress()
+        out = {'success': False, 'error': str(e)}
+        try:
+            _log_apply(500, out, error=str(e))
+        except Exception:
+            pass
+        return jsonify(out), 500
 
 
 @bp.route('/apply_manual_deface', methods=['POST'])
@@ -2561,6 +2795,106 @@ def apply_manual_deface_route():
         }), 500
 
 
+@bp.route('/deface_existing')
+def deface_existing():
+    """List existing defaced files in OUTPUT_FOLDER/<qualification>/<learner>/deface/ for ongoing edit."""
+    from pathlib import Path
+    qualification = request.args.get('qualification', '').strip()
+    learner = request.args.get('learner', '').strip()
+    if not qualification or not learner:
+        return jsonify({'items': [], 'error': 'qualification and learner required'})
+    try:
+        deface_dir = OUTPUT_FOLDER / qualification / learner / 'deface'
+        if not deface_dir.exists() or not deface_dir.is_dir():
+            return jsonify({'items': []})
+        items = []
+        sequence = 0
+        for path in sorted(deface_dir.iterdir()):
+            if not path.is_file():
+                continue
+            suf = path.suffix.lower()
+            if suf in ('.mp4', '.webm', '.mov'):
+                ftype = 'video'
+            elif suf in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
+                ftype = 'image'
+            else:
+                continue
+            sequence += 1
+            name = path.name
+            original_name = name[7:] if name.startswith('deface_') else name
+            url = f'/v2p-formatter/deface_output/{qualification}/{learner}/{name}'
+            items.append({
+                'original_name': original_name,
+                'defaced_url': url,
+                'type': ftype,
+                'sequence': sequence,
+                'manual_defaces': [],
+                'from_existing': True,
+            })
+        return jsonify({'items': items})
+    except Exception as e:
+        logger.error(f"deface_existing: {e}", exc_info=True)
+        return jsonify({'items': [], 'error': str(e)})
+
+
+def _serve_file_with_range(file_path: Path, mimetype: str):
+    """Return Flask Response for file with Range request support (206)."""
+    from flask import Response
+    range_header = request.headers.get('Range')
+    size = file_path.stat().st_size
+    if not range_header or size == 0:
+        return send_file(str(file_path), mimetype=mimetype)
+    range_match = None
+    for part in range_header.replace('bytes=', '').split(','):
+        part = part.strip().split('-')
+        if len(part) == 2:
+            start = int(part[0]) if (part[0] and part[0].strip()) else 0
+            end = int(part[1]) if (part[1] and part[1].strip()) else size - 1
+            start = max(0, min(start, size - 1))
+            end = max(0, min(end, size - 1))
+            if start <= end:
+                range_match = (start, end)
+                break
+    if not range_match:
+        return send_file(str(file_path), mimetype=mimetype)
+    start, end = range_match
+    length = end - start + 1
+    with open(file_path, 'rb') as f:
+        f.seek(start)
+        data = f.read(length)
+    if len(data) != length:
+        data = data[:length]
+    r = Response(data, status=206, mimetype=mimetype, direct_passthrough=False)
+    r.headers['Content-Range'] = f'bytes {start}-{end}/{size}'
+    r.headers['Accept-Ranges'] = 'bytes'
+    r.headers['Content-Length'] = str(len(data))
+    return r
+
+
+@bp.route('/deface_output/<qualification>/<learner>/<path:filename>')
+def serve_deface_output(qualification: str, learner: str, filename: str):
+    """Serve existing defaced files from OUTPUT_FOLDER/<qualification>/<learner>/deface/ (for ongoing edit)."""
+    try:
+        base = (OUTPUT_FOLDER / qualification / learner / 'deface').resolve()
+        file_path = (base / filename).resolve()
+        if not file_path.exists():
+            return jsonify({'error': 'Not found'}), 404
+        try:
+            file_path.resolve().relative_to(base)
+        except ValueError:
+            return jsonify({'error': 'Invalid path'}), 403
+        suf = file_path.suffix.lower()
+        if suf in ('.mp4', '.webm', '.mov'):
+            mimetype = 'video/mp4' if suf == '.mp4' else ('video/webm' if suf == '.webm' else 'video/quicktime')
+            return _serve_file_with_range(file_path, mimetype)
+        if suf in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
+            return send_file(str(file_path), mimetype='image/jpeg' if suf in ('.jpg', '.jpeg') else f'image/{suf[1:]}')
+        return jsonify({'error': 'Unsupported type'}), 404
+    except Exception as e:
+        logger.error(f"serve_deface_output: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/deface_temp/<session_id>/<path:filename>')
 def serve_deface_temp(session_id: str, filename: str):
     """Serve temporary defaced images from session"""
@@ -2580,7 +2914,11 @@ def serve_deface_temp(session_id: str, filename: str):
         if not file_path.exists():
             return jsonify({'error': 'File not found'}), 404
         
-        return send_from_directory(str(temp_dir), filename)
+        suf = file_path.suffix.lower()
+        if suf in ('.mp4', '.webm', '.mov'):
+            mimetype = 'video/mp4' if suf == '.mp4' else ('video/webm' if suf == '.webm' else 'video/quicktime')
+            return _serve_file_with_range(file_path, mimetype)
+        return send_from_directory(str(temp_dir), filename, conditional=True)
     
     except Exception as e:
         logger.error(f"Error serving deface temp file: {e}", exc_info=True)
@@ -2594,11 +2932,15 @@ def generate_deface_documents():
     from pathlib import Path
     import shutil
     
+    def _log_generate(status_code, response_summary, error=None):
+        req = {'session_id': (data or {}).get('session_id'), 'output_format': (data or {}).get('output_format')}
+        _deface_debug_append('generate_deface_documents', req, status_code, response_summary, error=error)
+    
     try:
         data = request.json
         session_id = data.get('session_id')
         image_order = data.get('image_order', [])  # Use custom order if provided
-        output_format = data.get('output_format', 'pdf')  # 'pdf', 'docx', 'both', 'mp4', 'mp4+pdf'
+        output_format = data.get('output_format', 'pdf')  # 'pdf', 'docx', 'both', 'media', 'mp4', 'mp4+pdf'
         layout = data.get('layout', 'grid')
         images_per_page = int(data.get('images_per_page', 2))
         quality = int(data.get('quality', 95))
@@ -2607,46 +2949,82 @@ def generate_deface_documents():
         export_mp4_videos = output_format in ('mp4', 'mp4+pdf')
         logger.info(f"🔍 DEBUG: Output format: {output_format}, Export MP4 videos: {export_mp4_videos}")
         logger.info(f"🔍 DEBUG: Session ID: {session_id}")
-        
+        qualification = data.get('qualification', '').strip()
+        learner = data.get('learner', '').strip()
+
+        from_existing_folder = False
         if not session_id:
-            return jsonify({
-                'success': False,
-                'error': 'Session ID required'
-            }), 400
+            # Generate from existing deface folder (user returned to page; no session)
+            if not qualification or not learner:
+                out = {'success': False, 'error': 'When no session ID, qualification and learner are required to use existing deface output'}
+                _log_generate(400, out, error=out['error'])
+                return jsonify(out), 400
+            deface_dir_existing = OUTPUT_FOLDER / qualification / learner / 'deface'
+            if not deface_dir_existing.exists() or not deface_dir_existing.is_dir():
+                out = {'success': False, 'error': 'No existing deface output found for this qualification and learner'}
+                _log_generate(404, out, error=out['error'])
+                return jsonify(out), 404
+            processed_items = []
+            for path in sorted(deface_dir_existing.iterdir()):
+                if not path.is_file():
+                    continue
+                suf = path.suffix.lower()
+                if suf in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
+                    ftype = 'image'
+                elif suf in ('.mp4', '.webm', '.mov'):
+                    ftype = 'video'
+                else:
+                    continue
+                sequence = len(processed_items) + 1
+                name = path.name
+                original_name = name[7:] if name.startswith('deface_') else name
+                processed_items.append({
+                    'defaced_path': str(path),
+                    'original_name': original_name,
+                    'type': ftype,
+                    'sequence': sequence,
+                    'manual_defaces': [],
+                    'manual_frames': [],
+                })
+            if not processed_items:
+                out = {'success': False, 'error': 'No defaced image or video files found in existing deface folder'}
+                _log_generate(400, out, error=out['error'])
+                return jsonify(out), 400
+            temp_dir = None
+            from_existing_folder = True
+            logger.info(f"🔍 DEBUG: Using existing deface folder: {deface_dir_existing}, items: {len(processed_items)}")
+        else:
+            from_existing_folder = False
+            # Get session
+            session = get_session(session_id)
+            if not session:
+                out = {'success': False, 'error': 'Session expired or not found'}
+                _log_generate(404, out, error=out['error'])
+                return jsonify(out), 404
+
+            # Get processed items from session
+            processed_items = session.get('processed', [])
+            logger.info(f"🔍 DEBUG: Processed items count: {len(processed_items)}")
+            if not processed_items:
+                out = {'success': False, 'error': 'No processed files found in session'}
+                _log_generate(400, out, error=out['error'])
+                return jsonify(out), 400
+
+            # Get session settings for quality/max_size if not provided
+            session_settings = session.get('settings', {})
+            if not quality:
+                quality = session_settings.get('quality', 95)
+            if not max_size:
+                max_size = session_settings.get('max_size', '640x480')
+
+            # Get temp directory for session
+            temp_dir = get_session_temp_dir(session_id)
+            if not temp_dir:
+                out = {'success': False, 'error': 'Session temp directory not found'}
+                _log_generate(404, out, error=out['error'])
+                return jsonify(out), 404
         
-        # Get session
-        session = get_session(session_id)
-        if not session:
-            return jsonify({
-                'success': False,
-                'error': 'Session expired or not found'
-            }), 404
-        
-        # Get processed items from session
-        processed_items = session.get('processed', [])
-        logger.info(f"🔍 DEBUG: Processed items count: {len(processed_items)}")
-        if not processed_items:
-            return jsonify({
-                'success': False,
-                'error': 'No processed files found in session'
-            }), 400
-        
-        # Get session settings for quality/max_size if not provided
-        session_settings = session.get('settings', {})
-        if not quality:
-            quality = session_settings.get('quality', 95)
-        if not max_size:
-            max_size = session_settings.get('max_size', '640x480')
-        
-        # Get temp directory for session
-        temp_dir = get_session_temp_dir(session_id)
-        if not temp_dir:
-            return jsonify({
-                'success': False,
-                'error': 'Session temp directory not found'
-            }), 404
-        
-        # Build list of defaced images from session processed items (skip for MP4-only format)
+        # Build list of defaced images from session processed items (skip only for mp4-only format)
         defaced_images = []
         image_names = []
         
@@ -2747,17 +3125,13 @@ def generate_deface_documents():
                                 # Note: temp_frames_dir cleanup happens after document generation
                                 pass
         
-        # Only require defaced_images for PDF/DOCX generation, not for MP4-only export
+        # Only require defaced_images for PDF/DOCX/media (standalone images); not for MP4-only export
         if output_format not in ('mp4',) and not defaced_images:
-            return jsonify({
-                'success': False,
-                'error': 'No defaced files found in session'
-            }), 400
+            out = {'success': False, 'error': 'No defaced files found in session'}
+            _log_generate(400, out, error=out['error'])
+            return jsonify(out), 400
         
         # Determine output location (use learner folder if provided, otherwise use first original file's directory)
-        qualification = data.get('qualification', '')
-        learner = data.get('learner', '')
-        
         if qualification and learner:
             # Output to learner folder: OUTPUT_FOLDER/qualification/learner
             output_dir = OUTPUT_FOLDER / qualification / learner
@@ -2773,6 +3147,10 @@ def generate_deface_documents():
                     output_dir = OUTPUT_FOLDER
             else:
                 output_dir = OUTPUT_FOLDER
+        
+        # All deface output goes into a 'deface' subfolder
+        deface_dir = output_dir / 'deface'
+        deface_dir.mkdir(parents=True, exist_ok=True)
         
         # Get resolution settings
         max_width = None
@@ -2793,10 +3171,9 @@ def generate_deface_documents():
         # Get filename from request (mandatory)
         filename = data.get('filename', '').strip()
         if not filename:
-            return jsonify({
-                'success': False,
-                'error': 'Filename is required'
-            }), 400
+            out = {'success': False, 'error': 'Filename is required'}
+            _log_generate(400, out, error=out['error'])
+            return jsonify(out), 400
         
         # Sanitize filename: remove invalid characters
         import re
@@ -2805,21 +3182,52 @@ def generate_deface_documents():
         filename = re.sub(r'^[.\s]+|[.\s]+$', '', filename)
         
         if not filename:
-            return jsonify({
-                'success': False,
-                'error': 'Filename contains only invalid characters'
-            }), 400
+            out = {'success': False, 'error': 'Filename contains only invalid characters'}
+            _log_generate(400, out, error=out['error'])
+            return jsonify(out), 400
         
         # Add 'deface_' prefix to output filename
         output_base_name = f'deface_{filename}'
         
         results = {}
+        exported_standalone_images = []
+        exported_videos = []
         
-        # Generate PDF if requested
+        # Always export standalone defaced images (individual files) in addition to merged PDF/DOCX
+        if defaced_images and image_names:
+            try:
+                used_names = set()
+                for i, (img_path, name) in enumerate(zip(defaced_images, image_names)):
+                    src = Path(img_path)
+                    if not src.exists():
+                        continue
+                    base = f"deface_{name}"
+                    suffix = src.suffix or '.jpg'
+                    out_name = base + suffix
+                    n = 0
+                    while out_name in used_names or (deface_dir / out_name).exists():
+                        n += 1
+                        out_name = f"{base}_{n}{suffix}"
+                    used_names.add(out_name)
+                    dest = deface_dir / out_name
+                    shutil.copy2(src, dest)
+                    exported_standalone_images.append({
+                        'path': str(dest),
+                        'relative_path': str(dest.relative_to(OUTPUT_FOLDER)),
+                        'name': out_name,
+                    })
+                if exported_standalone_images:
+                    results['exported_standalone_images'] = exported_standalone_images
+                    results['exported_standalone_images_count'] = len(exported_standalone_images)
+            except Exception as e:
+                logger.error(f"Error exporting standalone defaced images: {e}", exc_info=True)
+                results['exported_standalone_images_error'] = str(e)
+        
+        # Generate PDF if requested (skip for media-only)
         if output_format in ('pdf', 'both', 'mp4+pdf'):
             # Skip PDF generation if no images (e.g., MP4+PDF with only videos)
             if defaced_images:
-                pdf_path = output_dir / f'{output_base_name}.pdf'
+                pdf_path = deface_dir / f'{output_base_name}.pdf'
                 try:
                     create_image_pdf(
                         images=[str(p) for p in defaced_images],
@@ -2840,9 +3248,9 @@ def generate_deface_documents():
                 logger.warning("Skipping PDF generation: no images available (MP4+PDF with only videos)")
                 results['pdf_error'] = 'No images available for PDF generation'
         
-        # Generate DOCX if requested
+        # Generate DOCX if requested (skip for media-only)
         if output_format in ('docx', 'both'):
-            docx_path = output_dir / f'{output_base_name}.docx'
+            docx_path = deface_dir / f'{output_base_name}.docx'
             try:
                 create_image_docx(
                     images=[str(p) for p in defaced_images],
@@ -2860,61 +3268,42 @@ def generate_deface_documents():
                 logger.error(f"Error generating DOCX: {e}", exc_info=True)
                 results['docx_error'] = str(e)
         
-        # Export MP4 videos if requested
-        exported_videos = []  # Initialize empty list for all cases
-        logger.info(f"🔍 DEBUG: export_mp4_videos={export_mp4_videos}, output_format={output_format}")
-        if export_mp4_videos:
-            try:
-                # Filter video items from processed items
-                video_items = [item for item in processed_items if item.get('type') == 'video']
-                logger.info(f"🔍 DEBUG: Found {len(video_items)} video items to export out of {len(processed_items)} total items")
-                logger.info(f"🔍 DEBUG: Processed items types: {[item.get('type', 'unknown') for item in processed_items]}")
+        # Always export standalone defaced videos (individual MP4 files) in addition to merged PDF/DOCX
+        try:
+            video_items = [item for item in processed_items if item.get('type') == 'video']
+            logger.info(f"🔍 DEBUG: Found {len(video_items)} video items to export out of {len(processed_items)} total items")
+            for item in video_items:
+                defaced_video_path_str = item.get('defaced_path', '')
+                defaced_video_path = Path(defaced_video_path_str)
                 
-                for item in video_items:
-                    defaced_video_path_str = item.get('defaced_path', '')
-                    defaced_video_path = Path(defaced_video_path_str)
-                    
-                    logger.info(f"Processing video item: {item.get('original_name')}, defaced_path: {defaced_video_path_str}")
-                    
-                    # Path is already absolute (stored as absolute in apply_deface)
-                    # Just verify it exists
-                    if not defaced_video_path.exists():
-                        logger.warning(f"Defaced video file does not exist (absolute path): {defaced_video_path}")
-                        # If it's an absolute path that doesn't exist, there's nothing we can do
-                        logger.error(f"Cannot export video - file not found: {defaced_video_path}")
-                        continue
-                    
-                    if defaced_video_path.suffix.lower() == '.mp4':
-                        # Get original filename (without deface_ prefix if present)
-                        original_name = item.get('original_name', defaced_video_path.name)
-                        if original_name.startswith('deface_'):
-                            output_name = original_name
-                        else:
-                            output_name = f'deface_{original_name}'
-                        
-                        # Copy video to output directory
-                        output_video_path = output_dir / output_name
-                        logger.info(f"Copying video from {defaced_video_path} to {output_video_path}")
-                        shutil.copy2(defaced_video_path, output_video_path)
-                        exported_videos.append({
-                            'path': str(output_video_path),
-                            'relative_path': str(output_video_path.relative_to(OUTPUT_FOLDER)),
-                            'url': f'/v2p-formatter/download?path={output_video_path.relative_to(OUTPUT_FOLDER)}',
-                            'name': output_name
-                        })
-                        logger.info(f"Exported defaced video: {output_video_path}")
-                    else:
-                        logger.warning(f"Defaced video file is not MP4: {defaced_video_path}")
+                logger.info(f"Processing video item: {item.get('original_name')}, defaced_path: {defaced_video_path_str}")
                 
-                if exported_videos:
-                    results['exported_videos'] = exported_videos
-                    results['exported_videos_count'] = len(exported_videos)
-                    logger.info(f"Successfully exported {len(exported_videos)} MP4 videos")
+                if not defaced_video_path.exists():
+                    logger.warning(f"Defaced video file does not exist (absolute path): {defaced_video_path}")
+                    continue
+                
+                if defaced_video_path.suffix.lower() == '.mp4':
+                    original_name = item.get('original_name', defaced_video_path.name)
+                    output_name = original_name if original_name.startswith('deface_') else f'deface_{original_name}'
+                    output_video_path = deface_dir / output_name
+                    shutil.copy2(defaced_video_path, output_video_path)
+                    exported_videos.append({
+                        'path': str(output_video_path),
+                        'relative_path': str(output_video_path.relative_to(OUTPUT_FOLDER)),
+                        'url': f'/v2p-formatter/download?path={output_video_path.relative_to(OUTPUT_FOLDER)}',
+                        'name': output_name
+                    })
+                    logger.info(f"Exported defaced video: {output_video_path}")
                 else:
-                    logger.warning("No videos were exported (video_items found but export failed)")
-            except Exception as e:
-                logger.error(f"Error exporting MP4 videos: {e}", exc_info=True)
-                results['exported_videos_error'] = str(e)
+                    logger.warning(f"Defaced video file is not MP4: {defaced_video_path}")
+            
+            if exported_videos:
+                results['exported_videos'] = exported_videos
+                results['exported_videos_count'] = len(exported_videos)
+                logger.info(f"Successfully exported {len(exported_videos)} standalone MP4 videos")
+        except Exception as e:
+            logger.error(f"Error exporting standalone defaced videos: {e}", exc_info=True)
+            results['exported_videos_error'] = str(e)
             
         # Determine primary file path
         # If MP4 only, don't require PDF/DOCX
@@ -2924,12 +3313,18 @@ def generate_deface_documents():
             # MP4 only - just need exported videos
             logger.info(f"🔍 DEBUG: MP4-only format detected, checking exported_videos")
             if not exported_videos:
-                logger.error(f"🔍 DEBUG: MP4 format selected but no videos exported! export_mp4_videos={export_mp4_videos}, video_items count={len([item for item in processed_items if item.get('type') == 'video'])}")
-                return jsonify({
-                    'success': False,
-                    'error': 'No videos to export'
-                }), 400
+                logger.error(f"🔍 DEBUG: MP4 format selected but no videos exported!")
+                out = {'success': False, 'error': 'No videos to export'}
+                _log_generate(400, out, error=out['error'])
+                return jsonify(out), 400
             logger.info(f"🔍 DEBUG: MP4-only format: Successfully exported {len(exported_videos)} videos")
+        elif output_format == 'media':
+            # Media only - no PDF/DOCX; success if we have any standalone files
+            if not exported_standalone_images and not exported_videos:
+                out = {'success': False, 'error': 'No defaced media files to export'}
+                _log_generate(400, out, error=out['error'])
+                return jsonify(out), 400
+            logger.info(f"🔍 DEBUG: Media-only format: exported {len(exported_standalone_images)} images, {len(exported_videos)} videos")
         else:
             # PDF/DOCX formats require at least one document
             # For mp4+pdf, allow success if MP4 export succeeded even if PDF failed
@@ -2942,11 +3337,10 @@ def generate_deface_documents():
                 results['file_path'] = results['docx_path']
             elif output_format == 'mp4+pdf' and exported_videos:
                 # MP4+PDF: MP4 export succeeded, PDF failed - still success
-                # Set file_path to first exported video (or leave empty, videos are in exported_videos)
                 logger.info(f"🔍 DEBUG: MP4+PDF format with exported videos")
                 if exported_videos:
                     results['file_path'] = exported_videos[0].get('path', '')
-            elif output_format not in ('mp4', 'mp4+pdf'):
+            elif output_format not in ('mp4', 'mp4+pdf', 'media'):
                 # PDF/DOCX format requested but no documents generated
                 logger.error(f"🔍 DEBUG: ERROR PATH - output_format={output_format}, pdf_path in results={'pdf_path' in results}, docx_path in results={'docx_path' in results}")
                 error_details = []
@@ -2958,19 +3352,20 @@ def generate_deface_documents():
                 if error_details:
                     error_msg += f" ({'; '.join(error_details)})"
                 logger.error(f"🔍 DEBUG: Failed to generate documents for format {output_format}: {error_details}")
-                return jsonify({
-                    'success': False,
-                    'error': error_msg
-                }), 500
+                out = {'success': False, 'error': error_msg}
+                _log_generate(500, out, error=error_msg)
+                return jsonify(out), 500
             else:
                 logger.warning(f"🔍 DEBUG: Unexpected else branch - output_format={output_format}, exported_videos={len(exported_videos) if exported_videos else 0}")
         
-        # Cleanup session after successful document generation
-        cleanup_session(session_id)
+        # Cleanup session after successful document generation (skip when using existing deface folder)
+        if not from_existing_folder and session_id:
+            cleanup_session(session_id)
         
-        # Add output folder path to response
-        results['output_folder_path'] = str(output_dir)
+        # Add output folder path to response (deface subfolder where files were written)
+        results['output_folder_path'] = str(deface_dir)
         
+        _log_generate(200, {'success': True, 'output_folder_path': str(deface_dir), **{k: v for k, v in results.items() if k in ('pdf_path', 'docx_path', 'exported_videos_count')}})
         return jsonify({
             'success': True,
             **results
@@ -2981,7 +3376,9 @@ def generate_deface_documents():
         logger.error(f"🔍 DEBUG: Exception type: {type(e).__name__}, args: {e.args}")
         import traceback
         logger.error(f"🔍 DEBUG: Full traceback:\n{traceback.format_exc()}")
-        return jsonify({
-            'success': False,
-            'error': f'Error: {str(e)}'
-        }), 500
+        out = {'success': False, 'error': f'Error: {str(e)}'}
+        try:
+            _log_generate(500, out, error=str(e))
+        except Exception:
+            pass
+        return jsonify(out), 500

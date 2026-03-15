@@ -2,16 +2,45 @@
 """
 Run script for Video to Image Formatter
 """
+import os
+import signal
+import sys
+from pathlib import Path
+
 from app import create_app
 
+PORT = 5001
+PID_FILE = Path(__file__).resolve().parent / ".flask.pid"
+RUN_PY = str(Path(__file__).resolve())
+
+
+def write_pid():
+    PID_FILE.write_text(str(os.getpid()))
+
+
+def remove_pid():
+    if PID_FILE.exists():
+        try:
+            PID_FILE.unlink()
+        except OSError:
+            pass
+
+
+def _restart_self(signum, frame):
+    """SIGUSR1: replace this process with a fresh run (same PID, no respawn)."""
+    os.execv(sys.executable, [sys.executable, RUN_PY])
+
+
 if __name__ == '__main__':
+    signal.signal(signal.SIGUSR1, _restart_self)
     app = create_app()
-    print("Starting Video to Image Formatter...")
-    print("Access the application at: http://localhost/v2p-formatter")
-    # Use port 5001 to avoid macOS AirPlay Receiver conflict on port 5000
-    print("(Flask running on port 5001, proxied by nginx on port 80)")
-    # Run on port 5001 - nginx will proxy port 80 to this
-    # Note: Changed from 5000 to avoid macOS AirPlay Receiver conflict
-    # use_reloader=False to prevent server restarts that clear in-memory sessions
-    app.run(debug=True, host='127.0.0.1', port=5001, use_reloader=False)
+    try:
+        write_pid()
+        print("Starting Video to Image Formatter...")
+        print("Access the application at: http://localhost/v2p-formatter")
+        print("(Flask running on port {}, proxied by nginx on port 80)".format(PORT))
+        print("(PID file: {}). Send SIGUSR1 or run ./scripts/restart.sh to restart.".format(PID_FILE))
+        app.run(debug=True, host='127.0.0.1', port=PORT, use_reloader=False, threaded=True)
+    finally:
+        remove_pid()
 

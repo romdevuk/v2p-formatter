@@ -12,6 +12,7 @@ ENV/
 # Flask
 instance/
 .webassets-cache
+.flask.pid
 
 # IDE
 .vscode/

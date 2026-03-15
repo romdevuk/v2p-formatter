@@ -17,6 +17,9 @@
             <a href="/v2p-formatter/deface" style="padding: 12px 24px; background: #1e1e1e; color: #667eea; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #667eea; border-bottom: none; font-weight: bold;">
                 Deface
             </a>
+            <a href="/v2p-formatter/deface/debug" style="padding: 12px 24px; background: #2a2a2a; color: #e0e0e0; text-decoration: none; border-radius: 6px 6px 0 0; border: 1px solid #555; border-bottom: none;">
+                Debug
+            </a>
         </div>
     </div>
 
@@ -37,13 +40,723 @@
                 <option value="{{ learner }}" {% if learner == selected_learner %}selected{% endif %}>{{ learner }}</option>
                 {% endfor %}
             </select>
-            <button class="btn btn-secondary" onclick="loadImages()" style="padding: 8px 16px;">🔄 Refresh</button>
+            <button type="button" class="btn btn-secondary" id="defaceRefreshBtn" style="padding: 8px 16px;">🔄 Refresh</button>
+            <button type="button" id="toggleDefaceDebugBtn" style="padding: 6px 12px; font-size: 12px; background: #333; color: #999; border: 1px solid #555; border-radius: 4px; cursor: pointer;">Hide debug</button>
         </div>
+        <div id="defaceDebugPanel" style="margin-top: 12px; padding: 12px; background: #1a1a1a; border: 1px solid #444; border-radius: 4px; font-family: monospace; font-size: 12px; color: #ccc; max-height: 280px; overflow-y: auto;">
+            <div style="color: #888; margin-bottom: 6px;">Debug: qualification / learners (every step). URL filter trace in console: <code style="color:#8ab4b4">window.appData.urlFilterDebugTrace</code></div>
+            <pre id="defaceDebugLog" style="margin: 0; white-space: pre-wrap; word-break: break-all; min-height: 60px;"></pre>
+        </div>
+        <script>
+        (function() {
+            var pre = document.getElementById('defaceDebugLog');
+            window._defaceDebugLines = [];
+            function defaceLog(msg) {
+                var line = '[' + new Date().toISOString().slice(11, 23) + '] ' + msg;
+                window._defaceDebugLines.push(line);
+                if (window._defaceDebugLines.length > 50) window._defaceDebugLines.shift();
+                if (pre) pre.textContent = window._defaceDebugLines.join('\n');
+                console.log('[Deface]', msg);
+            }
+            if (pre) defaceLog('Debug panel ready (inline)');
+            window._defaceLogInline = defaceLog;
+
+            function escapeHtmlSimple(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+            window.appData = window.appData || {};
+            if (!window.appData.selectedImages) window.appData.selectedImages = [];
+            if (!window.appData.imageOrder) window.appData.imageOrder = [];
+            window.openManualDefaceEditor = function(mediaId) {
+                if (typeof window._openManualDefaceEditorImpl === 'function') return window._openManualDefaceEditorImpl(mediaId);
+                alert('Editor is loading. Please try again in a moment.');
+            };
+
+            function renderFilesInline(images, videos) {
+                images = images || window.appData.availableImages || [];
+                videos = videos || window.appData.availableVideos || [];
+                var selected = window.appData.selectedImages || [];
+                var imgList = document.getElementById('imageFilesList');
+                var vidList = document.getElementById('videoFilesList');
+                if (imgList && images.length > 0) {
+                    var html = '<div style="display:flex;flex-wrap:wrap;gap:12px;">';
+                    images.forEach(function(img) {
+                        var isSel = selected.some(function(s) { return s.path === img.path; });
+                        var url = '/v2p-formatter/thumbnail?path=' + encodeURIComponent(img.path) + '&size=240x180';
+                        html += '<div style="width:200px;background:' + (isSel ? '#2a3a4a' : '#1e1e1e') + ';border-radius:8px;overflow:hidden;border:2px solid ' + (isSel ? '#667eea' : '#555') + ';position:relative;cursor:pointer;">';
+                        html += '<input type="checkbox" ' + (isSel ? 'checked' : '') + ' onclick="event.stopPropagation();window.toggleImageSelectionDeface(\'' + escapeHtmlSimple(img.path).replace(/'/g, "\\'") + '\',\'' + escapeHtmlSimple(img.name).replace(/'/g, "\\'") + '\')" style="position:absolute;top:8px;left:8px;z-index:10;width:24px;height:24px;cursor:pointer;accent-color:#667eea;">';
+                        html += '<img src="' + url + '" alt="" style="width:100%;height:150px;object-fit:contain;background:#1a1a1a;display:block;"><div style="padding:8px;color:#e0e0e0;font-size:12px;word-break:break-word;">' + escapeHtmlSimple(img.name) + '</div></div>';
+                    });
+                    html += '</div>';
+                    imgList.innerHTML = html;
+                }
+                if (vidList && videos.length > 0) {
+                    var html = '<div style="display:flex;flex-wrap:wrap;gap:12px;">';
+                    videos.forEach(function(v) {
+                        var isSel = selected.some(function(s) { return s.path === v.path; });
+                        var url = '/v2p-formatter/thumbnail?path=' + encodeURIComponent(v.path) + '&size=240x180';
+                        html += '<div style="width:200px;background:' + (isSel ? '#2a3a4a' : '#1e1e1e') + ';border-radius:8px;overflow:hidden;border:2px solid ' + (isSel ? '#667eea' : '#555') + ';position:relative;cursor:pointer;">';
+                        html += '<input type="checkbox" ' + (isSel ? 'checked' : '') + ' onclick="event.stopPropagation();window.toggleImageSelectionDeface(\'' + escapeHtmlSimple(v.path).replace(/'/g, "\\'") + '\',\'' + escapeHtmlSimple(v.name).replace(/'/g, "\\'") + '\')" style="position:absolute;top:8px;left:8px;z-index:10;width:24px;height:24px;cursor:pointer;accent-color:#667eea;">';
+                        html += '<img src="' + url + '" alt="" style="width:100%;height:150px;object-fit:contain;background:#1a1a1a;display:block;"><div style="padding:8px;color:#e0e0e0;font-size:12px;">' + escapeHtmlSimple(v.name) + '</div><div style="padding:0 8px 8px;color:#999;font-size:11px;">Video</div></div>';
+                    });
+                    html += '</div>';
+                    vidList.innerHTML = html;
+                }
+                var ic = document.getElementById('imageCount');
+                var vc = document.getElementById('videoCount');
+                if (ic) ic.textContent = '(' + (images.length) + ' files)';
+                if (vc) vc.textContent = '(' + (videos.length) + ' files)';
+                if (typeof updateSelectionUIDeface === 'function') updateSelectionUIDeface();
+            }
+            window.renderFilesInline = renderFilesInline;
+
+            window.toggleSelectAllDeface = function(type) {
+                var checkbox = document.getElementById(type === 'image' ? 'selectAllImages' : 'selectAllVideos');
+                var files = type === 'image' ? (window.appData.availableImages || []) : (window.appData.availableVideos || []);
+                var checked = checkbox ? checkbox.checked : false;
+                window.appData.selectedImages = window.appData.selectedImages || [];
+                window.appData.imageOrder = window.appData.imageOrder || [];
+                files.forEach(function(file) {
+                    var idx = window.appData.selectedImages.findIndex(function(s) { return s.path === file.path; });
+                    if (checked && idx < 0) {
+                        window.appData.selectedImages.push({ path: file.path, name: file.name, folder: file.folder || 'root', type: file.type || type });
+                        window.appData.imageOrder.push(file.path);
+                    } else if (!checked && idx >= 0) {
+                        window.appData.selectedImages.splice(idx, 1);
+                        window.appData.imageOrder = window.appData.imageOrder.filter(function(p) { return p !== file.path; });
+                    }
+                });
+                renderFilesInline();
+                updateSelectionUIDeface();
+            };
+            window.toggleImageSelectionDeface = function(path, name) {
+                window.appData.selectedImages = window.appData.selectedImages || [];
+                window.appData.imageOrder = window.appData.imageOrder || [];
+                var idx = window.appData.selectedImages.findIndex(function(s) { return s.path === path; });
+                var isVideo = (window.appData.availableVideos || []).some(function(v) { return v.path === path; });
+                if (idx >= 0) {
+                    window.appData.selectedImages.splice(idx, 1);
+                    window.appData.imageOrder = window.appData.imageOrder.filter(function(p) { return p !== path; });
+                } else {
+                    window.appData.selectedImages.push({ path: path, name: name, folder: 'root', type: isVideo ? 'video' : 'image' });
+                    window.appData.imageOrder.push(path);
+                }
+                renderFilesInline();
+                updateSelectionUIDeface();
+            };
+
+            window.toggleSection = function(sectionId) {
+                var section = document.getElementById(sectionId);
+                var toggle = document.getElementById(sectionId.replace('Section', 'Toggle'));
+                if (section && toggle) {
+                    var isVisible = section.style.display !== 'none';
+                    section.style.display = isVisible ? 'none' : 'block';
+                    toggle.textContent = isVisible ? '\u25B6' : '\u25BC';
+                }
+            };
+
+            function updateSelectionUIDeface() {
+                var selected = window.appData.selectedImages || [];
+                var count = selected.length;
+                var imageCount = selected.filter(function(f) { return !f.type || f.type === 'image'; }).length;
+                var videoCount = selected.filter(function(f) { return f.type === 'video'; }).length;
+                var countBadge = document.getElementById('selectionCountBadge');
+                var selectionCount = document.getElementById('selectionCount');
+                var selectionBreakdown = document.getElementById('selectionBreakdown');
+                var resetBtn = document.getElementById('resetSelectionBtn');
+                var orderControls = document.getElementById('orderControls');
+                if (countBadge && selectionCount) {
+                    if (count > 0) {
+                        countBadge.style.display = 'block';
+                        selectionCount.textContent = count;
+                        if (selectionBreakdown) {
+                            if (imageCount > 0 && videoCount > 0) selectionBreakdown.textContent = ' (' + imageCount + ' images, ' + videoCount + ' videos)';
+                            else if (imageCount > 0) selectionBreakdown.textContent = ' (' + imageCount + ' images)';
+                            else if (videoCount > 0) selectionBreakdown.textContent = ' (' + videoCount + ' videos)';
+                            else selectionBreakdown.textContent = '';
+                        }
+                    } else {
+                        countBadge.style.display = 'none';
+                    }
+                }
+                if (resetBtn) resetBtn.style.display = count > 0 ? 'block' : 'none';
+                if (orderControls) orderControls.style.display = count > 0 ? 'flex' : 'none';
+            }
+
+            var qSelect = document.getElementById('qualificationSelect');
+            var lSelect = document.getElementById('learnerSelect');
+            defaceLog('qSelect=' + (qSelect ? 'ok' : 'MISSING') + ' lSelect=' + (lSelect ? 'ok' : 'MISSING'));
+            if (!qSelect || !lSelect) return;
+
+            qSelect.addEventListener('change', function() {
+                var qual = this.value;
+                defaceLog('Qualification changed: ' + (qual || '(empty)'));
+                lSelect.disabled = !qual;
+                lSelect.innerHTML = '<option value="">Select Learner...</option>';
+                if (!qual) return;
+                var url = '/v2p-formatter/learners?qualification=' + encodeURIComponent(qual);
+                defaceLog('Fetch: ' + url);
+                fetch(url)
+                    .then(function(r) {
+                        defaceLog('Response: ' + r.status + ' ' + r.statusText);
+                        return r.text();
+                    })
+                    .then(function(text) {
+                        defaceLog('Body length: ' + text.length);
+                        var data;
+                        try { data = JSON.parse(text); } catch (e) {
+                            defaceLog('JSON error: ' + e.message);
+                            defaceLog('Raw: ' + text.slice(0, 300));
+                            return;
+                        }
+                        defaceLog('data.success=' + data.success + ' learners=' + (data.learners ? data.learners.length : 'missing'));
+                        if (data.success && data.learners && data.learners.length > 0) {
+                            data.learners.forEach(function(l) {
+                                var opt = document.createElement('option');
+                                opt.value = l;
+                                opt.textContent = l;
+                                lSelect.appendChild(opt);
+                            });
+                            defaceLog('Added ' + data.learners.length + ' learners');
+                            if (typeof loadDefaceFiles === 'function') {
+                                var urlLearner = new URLSearchParams(window.location.search).get('learner');
+                                if (urlLearner && data.learners.indexOf(urlLearner) !== -1) {
+                                    lSelect.value = urlLearner;
+                                    loadDefaceFiles(qual, urlLearner);
+                                    defaceLog('Loaded from URL: ' + urlLearner);
+                                }
+                            }
+                        } else {
+                            defaceLog('No learners: ' + (data.error || 'empty'));
+                        }
+                    })
+                    .catch(function(err) {
+                        defaceLog('Fetch error: ' + (err.message || err));
+                    });
+            });
+
+            document.addEventListener('DOMContentLoaded', function() {
+                var fullScreenBtn = document.getElementById('openFullScreenSelectorBtn');
+                if (fullScreenBtn) {
+                    fullScreenBtn.addEventListener('click', function() {
+                        if (window.MediaBulkImageSelector && typeof window.MediaBulkImageSelector.open === 'function') {
+                            window.MediaBulkImageSelector.open();
+                        } else {
+                            if (window._defaceLogInline) window._defaceLogInline('Full screen: MediaBulkImageSelector not loaded');
+                        }
+                    });
+                }
+            });
+
+            lSelect.addEventListener('change', function() {
+                var q = qSelect.value;
+                var l = lSelect.value;
+                defaceLog('Learner changed: ' + (l || '(empty)'));
+                if (!q || !l) return;
+                if (typeof loadDefaceFiles === 'function') {
+                    defaceLog('Calling loadDefaceFiles(' + q + ', ' + l + ')');
+                    loadDefaceFiles(q, l);
+                } else {
+                    defaceLog('loadDefaceFiles not defined yet - fetch list_images');
+                    var listUrl = '/v2p-formatter/list_images?qualification=' + encodeURIComponent(q) + '&learner=' + encodeURIComponent(l);
+                    fetch(listUrl).then(function(r) { return r.json(); }).then(function(data) {
+                        defaceLog('list_images: success=' + data.success + ' count=' + (data.files ? data.files.length : 0));
+                        if (!data.success || !data.files) return;
+                        var images = data.files.filter(function(f) { return f.type === 'image'; });
+                        var videos = data.files.filter(function(f) { return f.type === 'video'; });
+                        window.appData = window.appData || {};
+                        window.appData.availableImages = images;
+                        window.appData.availableVideos = videos;
+                        if (typeof applyUrlFilesFilterInline === 'function') applyUrlFilesFilterInline(images, videos, q, l);
+                        function tryRender() {
+                            if (typeof renderImageListDeface === 'function' && typeof renderVideoListDeface === 'function') {
+                                renderImageListDeface(images);
+                                renderVideoListDeface(videos);
+                                if (typeof updateFileCounts === 'function') updateFileCounts(images.length, videos.length);
+                                if (typeof updateSelectionUI === 'function') updateSelectionUI();
+                                if (typeof updateSequenceNumbers === 'function') updateSequenceNumbers();
+                                defaceLog('Rendered ' + images.length + ' images, ' + videos.length + ' videos');
+                                return true;
+                            }
+                            return false;
+                        }
+                        if (tryRender()) {
+                            if (window.appData.urlFilterResult && typeof renderUrlFilterStatusBlock === 'function') renderUrlFilterStatusBlock();
+                            return;
+                        }
+                        defaceLog('Using inline render');
+                        renderFilesInline(images, videos);
+                        if (typeof updateSelectionUIDeface === 'function') updateSelectionUIDeface();
+                        if (window.appData.urlFilterResult && typeof renderUrlFilterStatusBlock === 'function') renderUrlFilterStatusBlock();
+                    }).catch(function(e) { defaceLog('list_images error: ' + (e.message || e)); });
+                }
+            });
+
+            function applyUrlFilesFilterInline(images, videos, qualification, learner) {
+                var urlParams = new URLSearchParams(window.location.search);
+                var filesParam = urlParams.get('files');
+                if (!filesParam) return;
+                var requestedNames = filesParam.split(',').map(function(s) {
+                    try { return decodeURIComponent(s.trim()); } catch (e) { return s.trim(); }
+                }).filter(Boolean);
+                if (requestedNames.length === 0) return;
+                window.appData.selectedImages = [];
+                window.appData.imageOrder = [];
+                var selectedNames = [];
+                var missingNames = [];
+                var matchByBasename = function(f, basename) {
+                    var fn = (f.name || '').toLowerCase();
+                    var bn = (basename || '').toLowerCase();
+                    if (fn === bn) return true;
+                    if (f.path && basename) {
+                        var pathLower = f.path.replace(/\\/g, '/').toLowerCase();
+                        return pathLower.endsWith('/' + bn);
+                    }
+                    return false;
+                };
+                var usedPaths = {};
+                requestedNames.forEach(function(requestedName, idx) {
+                    var file = images.filter(function(f) { return !usedPaths[f.path] && matchByBasename(f, requestedName); })[0]
+                        || videos.filter(function(f) { return !usedPaths[f.path] && matchByBasename(f, requestedName); })[0];
+                    if (file) {
+                        usedPaths[file.path] = true;
+                        selectedNames.push(file.name);
+                        window.appData.selectedImages.push({
+                            path: file.path,
+                            name: file.name,
+                            folder: file.folder || 'root',
+                            type: file.type || 'image',
+                            sequence: idx + 1
+                        });
+                        window.appData.imageOrder.push(file.path);
+                    } else {
+                        missingNames.push(requestedName);
+                    }
+                });
+                window.appData.urlFilterResult = {
+                    qualification: qualification,
+                    learner: learner,
+                    requestedCount: requestedNames.length,
+                    selectedNames: selectedNames,
+                    missingNames: missingNames
+                };
+                defaceLog('URL filter (inline): ' + selectedNames.length + ' selected, ' + missingNames.length + ' missing');
+            }
+
+            function loadFilesForQualLearner(q, l) {
+                if (typeof loadDefaceFiles === 'function') {
+                    defaceLog('Initial URL load: loadDefaceFiles(' + q + ', ' + l + ')');
+                    loadDefaceFiles(q, l);
+                    return;
+                }
+                defaceLog('Initial URL load: fetch list_images for ' + q + ' / ' + l);
+                var listUrl = '/v2p-formatter/list_images?qualification=' + encodeURIComponent(q) + '&learner=' + encodeURIComponent(l);
+                fetch(listUrl).then(function(r) { return r.json(); }).then(function(data) {
+                    defaceLog('list_images: success=' + data.success + ' count=' + (data.files ? data.files.length : 0));
+                    if (!data.success || !data.files) return;
+                    var images = data.files.filter(function(f) { return f.type === 'image'; });
+                    var videos = data.files.filter(function(f) { return f.type === 'video'; });
+                    window.appData = window.appData || {};
+                    window.appData.availableImages = images;
+                    window.appData.availableVideos = videos;
+                    applyUrlFilesFilterInline(images, videos, q, l);
+                    if (typeof renderImageListDeface === 'function' && typeof renderVideoListDeface === 'function') {
+                        renderImageListDeface(images);
+                        renderVideoListDeface(videos);
+                        if (typeof updateFileCounts === 'function') updateFileCounts(images.length, videos.length);
+                        if (typeof updateSelectionUI === 'function') updateSelectionUI();
+                        if (typeof updateSequenceNumbers === 'function') updateSequenceNumbers();
+                    } else {
+                        renderFilesInline(images, videos);
+                        if (typeof updateSelectionUIDeface === 'function') updateSelectionUIDeface();
+                    }
+                    if (window.appData.urlFilterResult && typeof renderUrlFilterStatusBlock === 'function') {
+                        renderUrlFilterStatusBlock();
+                    }
+                }).catch(function(e) { defaceLog('list_images error: ' + (e.message || e)); });
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                var urlParams = new URLSearchParams(window.location.search);
+                var urlQual = urlParams.get('qualification');
+                var urlLearner = urlParams.get('learner');
+                if (!urlQual || !urlLearner) return;
+                var qs = document.getElementById('qualificationSelect');
+                var ls = document.getElementById('learnerSelect');
+                if (!qs || !ls) return;
+                defaceLog('Initial load from URL: ' + urlQual + ' / ' + urlLearner);
+                qs.value = urlQual;
+                ls.disabled = false;
+                var learnerOpt = ls.querySelector('option[value="' + urlLearner.replace(/"/g, '&quot;') + '"]');
+                if (learnerOpt) {
+                    ls.value = urlLearner;
+                    loadFilesForQualLearner(urlQual, urlLearner);
+                } else {
+                    fetch('/v2p-formatter/learners?qualification=' + encodeURIComponent(urlQual))
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) {
+                            if (data.success && data.learners) {
+                                ls.innerHTML = '<option value="">Select Learner...</option>';
+                                data.learners.forEach(function(l) {
+                                    var opt = document.createElement('option');
+                                    opt.value = l;
+                                    opt.textContent = l;
+                                    ls.appendChild(opt);
+                                });
+                                ls.value = urlLearner;
+                                loadFilesForQualLearner(urlQual, urlLearner);
+                            }
+                        })
+                        .catch(function(e) { defaceLog('Learners fetch error: ' + (e.message || e)); });
+                }
+
+                // Apply Deface button (ensure it works even if main script fails to attach)
+                var applyDefaceBtn = document.getElementById('applyDefaceBtn');
+                if (applyDefaceBtn && !applyDefaceBtn._defaceInlineBound) {
+                    applyDefaceBtn._defaceInlineBound = true;
+                    applyDefaceBtn.addEventListener('click', function() {
+                        var selected = window.appData && window.appData.selectedImages ? window.appData.selectedImages : [];
+                        if (selected.length === 0) {
+                            alert('Please select at least one image or video');
+                            return;
+                        }
+                        if (typeof window.applyDeface === 'function') {
+                            window.applyDeface();
+                            return;
+                        }
+                        // Fallback when main script did not load: call apply_deface API and update UI
+                        defaceLog('Apply Deface: using inline fallback');
+                        var imagePaths = selected.map(function(img) { return img.path; });
+                        var getVal = function(id, def) {
+                            var el = document.getElementById(id);
+                            return el ? (el.value !== undefined ? el.value : (el.checked || false)) : def;
+                        };
+                        var qSel = document.getElementById('qualificationSelect');
+                        var lSel = document.getElementById('learnerSelect');
+                        var urlParams = new URLSearchParams(window.location.search);
+                        var payload = {
+                            image_paths: imagePaths,
+                            quality: parseInt(getVal('qualitySlider', 95), 10) || 95,
+                            max_size: getVal('resolutionSelect', '640x480') || '640x480',
+                            replacewith: getVal('replacewithSelect', 'blur') || 'blur',
+                            boxes: !!document.getElementById('boxesCheckbox') && document.getElementById('boxesCheckbox').checked,
+                            thresh: parseFloat(getVal('threshSlider', 0.2)) || 0.2,
+                            scale: getVal('scaleSelect', 'original') || 'original',
+                            mosaicsize: parseInt(getVal('mosaicsizeSlider', 20), 10) || 20,
+                            draw_scores: !!document.getElementById('drawScoresCheckbox') && document.getElementById('drawScoresCheckbox').checked,
+                            approve_video_processing: !!document.getElementById('approveVideoProcessingCheckbox') && document.getElementById('approveVideoProcessingCheckbox').checked,
+                            qualification: (qSel && qSel.value) || urlParams.get('qualification') || '',
+                            learner: (lSel && lSel.value) || urlParams.get('learner') || ''
+                        };
+                        var progressContainer = document.getElementById('defaceProgressContainer');
+                        var progressFill = document.getElementById('defaceProgressFill');
+                        var progressText = document.getElementById('defaceProgressText');
+                        var reviewInterface = document.getElementById('reviewInterface');
+                        if (progressContainer) progressContainer.style.display = 'block';
+                        if (progressFill) progressFill.style.width = '0%';
+                        if (progressText) progressText.textContent = 'Processing...';
+                        if (reviewInterface) reviewInterface.style.display = 'none';
+                        applyDefaceBtn.disabled = true;
+                        applyDefaceBtn.textContent = 'Processing...';
+                        fetch('/v2p-formatter/apply_deface', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        })
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) {
+                            if (progressFill) progressFill.style.width = '100%';
+                            if (progressText) progressText.textContent = 'Complete!';
+                            applyDefaceBtn.disabled = false;
+                            applyDefaceBtn.textContent = 'Apply Deface';
+                            if (data.success) {
+                                window.appData = window.appData || {};
+                                window.appData.defaceSessionId = data.session_id;
+                                window.appData.defacedItems = data.processed || [];
+                                var genBtn = document.getElementById('generateDocumentsBtn');
+                                if (genBtn) genBtn.disabled = !(window.appData.defacedItems && window.appData.defacedItems.length > 0);
+                                if (reviewInterface) {
+                                    reviewInterface.style.display = 'block';
+                                    var grid = document.getElementById('reviewGrid');
+                                    if (grid && data.processed && data.processed.length) {
+                                        if (typeof window.renderReviewGrid === 'function') {
+                                            window.renderReviewGrid(data.processed);
+                                        } else {
+                                            var escapeHtmlSimple = function(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+                                            var parts = [];
+                                            data.processed.forEach(function(item, index) {
+                                                var mediaId = item.sequence != null ? item.sequence : index;
+                                                var isVideo = item.type === 'video';
+                                                var defacedUrl = item.defaced_url || (item.defaced_urls && item.defaced_urls[0]) || '';
+                                                var originalName = item.original_name || 'Unknown';
+                                                parts.push('<div style="padding:15px;background:#1e1e1e;border-radius:6px;border:1px solid #555;">' +
+                                                    '<div style="position:relative;width:100%;padding-top:75%;background:#000;border-radius:4px;overflow:hidden;margin-bottom:10px;">' +
+                                                    (isVideo ? '<video src="' + escapeHtmlSimple(defacedUrl) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;" controls></video>' :
+                                                        '<img src="' + escapeHtmlSimple(defacedUrl) + '" alt="' + escapeHtmlSimple(originalName) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;">') +
+                                                    '</div><div style="text-align:center;">' +
+                                                    '<div style="color:#e0e0e0;font-weight:500;margin-bottom:5px;">' + escapeHtmlSimple(originalName) + '</div>' +
+                                                    '<div style="color:#51cf66;font-size:12px;margin-bottom:10px;">✓ Defaced</div>' +
+                                                    '<button class="btn btn-secondary" onclick="openManualDefaceEditor(' + mediaId + ')" style="padding:6px 12px;font-size:13px;">Edit</button>' +
+                                                    '</div></div>');
+                                            });
+                                            grid.innerHTML = parts.join('');
+                                        }
+                                    } else if (grid) {
+                                        grid.innerHTML = '<p style="color:#aaa;">Defaced ' + (data.processed ? data.processed.length : 0) + ' item(s). You can proceed to Generate Documents.</p>';
+                                    }
+                                }
+                            } else {
+                                alert('Error: ' + (data.error || 'Failed to apply deface'));
+                            }
+                            if (progressContainer) progressContainer.style.display = 'none';
+                        })
+                        .catch(function(err) {
+                            if (progressFill) progressFill.style.width = '0%';
+                            if (progressText) progressText.textContent = 'Error';
+                            applyDefaceBtn.disabled = false;
+                            applyDefaceBtn.textContent = 'Apply Deface';
+                            if (progressContainer) progressContainer.style.display = 'none';
+                            alert('Error: ' + (err.message || 'Network error'));
+                        });
+                    });
+                }
+
+                // Adjust Settings & Re-apply (same as Apply Deface)
+                var adjustSettingsBtn = document.getElementById('adjustSettingsBtn');
+                if (adjustSettingsBtn && !adjustSettingsBtn._defaceInlineBound) {
+                    adjustSettingsBtn._defaceInlineBound = true;
+                    adjustSettingsBtn.addEventListener('click', function() {
+                        if (typeof window.applyDeface === 'function') {
+                            window.applyDeface();
+                        } else {
+                            var applyBtn = document.getElementById('applyDefaceBtn');
+                            if (applyBtn && window.appData && window.appData.selectedImages && window.appData.selectedImages.length > 0) {
+                                applyBtn.click();
+                            } else {
+                                alert('Please select at least one image or video');
+                            }
+                        }
+                    });
+                }
+
+                // Accept & Proceed to Document Generation
+                var acceptAndProceedBtn = document.getElementById('acceptAndProceedBtn');
+                if (acceptAndProceedBtn && !acceptAndProceedBtn._defaceInlineBound) {
+                    acceptAndProceedBtn._defaceInlineBound = true;
+                    acceptAndProceedBtn.addEventListener('click', function() {
+                        if (typeof window.toggleFormatDependentFields === 'function') {
+                            window.toggleFormatDependentFields();
+                        }
+                        var processingSection = document.getElementById('processingSection');
+                        if (processingSection) {
+                            processingSection.style.display = 'block';
+                            processingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    });
+                }
+
+                // Reset Selection button
+                var resetSelectionBtn = document.getElementById('resetSelectionBtn');
+                if (resetSelectionBtn && !resetSelectionBtn._defaceInlineBound) {
+                    resetSelectionBtn._defaceInlineBound = true;
+                    resetSelectionBtn.addEventListener('click', function() {
+                        window.appData = window.appData || {};
+                        window.appData.selectedImages = [];
+                        window.appData.imageOrder = [];
+                        if (typeof window.resetSelection === 'function') {
+                            window.resetSelection();
+                        } else {
+                            renderFilesInline();
+                            if (typeof updateSelectionUIDeface === 'function') updateSelectionUIDeface();
+                        }
+                    });
+                }
+
+                // Reset to Default Order button
+                var resetOrderBtn = document.getElementById('resetOrderBtn');
+                if (resetOrderBtn && !resetOrderBtn._defaceInlineBound) {
+                    resetOrderBtn._defaceInlineBound = true;
+                    resetOrderBtn.addEventListener('click', function() {
+                        if (!window.appData.selectedImages || window.appData.selectedImages.length === 0) return;
+                        if (typeof window.resetOrder === 'function') {
+                            window.resetOrder();
+                            return;
+                        }
+                        var sorted = window.appData.selectedImages.slice().sort(function(a, b) {
+                            if ((a.folder || '') !== (b.folder || '')) {
+                                if ((a.folder || '') === 'root') return 1;
+                                if ((b.folder || '') === 'root') return -1;
+                                return String(a.folder).localeCompare(String(b.folder));
+                            }
+                            return String(a.name || '').localeCompare(String(b.name || ''));
+                        });
+                        window.appData.selectedImages = sorted;
+                        window.appData.imageOrder = sorted.map(function(img) { return img.path; });
+                        renderFilesInline();
+                        if (typeof updateSelectionUIDeface === 'function') updateSelectionUIDeface();
+                    });
+                }
+
+                // Thumbnails per row
+                var thumbnailsPerRowSelect = document.getElementById('thumbnailsPerRow');
+                if (thumbnailsPerRowSelect && !thumbnailsPerRowSelect._defaceInlineBound) {
+                    thumbnailsPerRowSelect._defaceInlineBound = true;
+                    thumbnailsPerRowSelect.value = (window.appData && window.appData.thumbnailsPerRow) || 3;
+                    thumbnailsPerRowSelect.addEventListener('change', function() {
+                        window.appData = window.appData || {};
+                        window.appData.thumbnailsPerRow = parseInt(this.value, 10) || 3;
+                        if (typeof window.renderImageListDeface === 'function' && window.appData.availableImages && window.appData.availableImages.length > 0) {
+                            window.renderImageListDeface(window.appData.availableImages);
+                        }
+                        if (typeof window.renderVideoListDeface === 'function' && window.appData.availableVideos && window.appData.availableVideos.length > 0) {
+                            window.renderVideoListDeface(window.appData.availableVideos);
+                        }
+                        renderFilesInline();
+                    });
+                }
+
+                // Sort by (Name / Date)
+                var sortBySelect = document.getElementById('sortBy');
+                if (sortBySelect && !sortBySelect._defaceInlineBound) {
+                    sortBySelect._defaceInlineBound = true;
+                    sortBySelect.value = (window.appData && window.appData.sortBy) || 'name';
+                    sortBySelect.addEventListener('change', function() {
+                        window.appData = window.appData || {};
+                        window.appData.sortBy = this.value || 'name';
+                        var imgs = (window.appData.availableImages || []).slice();
+                        var vids = (window.appData.availableVideos || []).slice();
+                        var cmp = function(a, b) { return String(a.name || '').localeCompare(String(b.name || '')); };
+                        imgs.sort(cmp);
+                        vids.sort(cmp);
+                        window.appData.availableImages = imgs;
+                        window.appData.availableVideos = vids;
+                        if (typeof window.renderImageListDeface === 'function' && imgs.length > 0) {
+                            window.renderImageListDeface(imgs);
+                        }
+                        if (typeof window.renderVideoListDeface === 'function' && vids.length > 0) {
+                            window.renderVideoListDeface(vids);
+                        }
+                        renderFilesInline(imgs, vids);
+                    });
+                }
+
+                // Generate Documents button
+                var generateBtn = document.getElementById('generateDocumentsBtn');
+                if (generateBtn && !generateBtn._defaceInlineBound) {
+                    generateBtn._defaceInlineBound = true;
+                    generateBtn.addEventListener('click', function() {
+                        var app = window.appData || {};
+                        if (!app.defaceSessionId) {
+                            alert('Please apply deface first');
+                            return;
+                        }
+                        if (!app.defacedItems || app.defacedItems.length === 0) {
+                            alert('No defaced files in session. Apply deface first and wait for it to complete.');
+                            return;
+                        }
+                        if (typeof window.generateImageDocuments === 'function') {
+                            window.generateImageDocuments();
+                            return;
+                        }
+                        // Fallback: call generate_deface_documents API
+                        defaceLog('Generate Documents: using inline fallback');
+                        var outputFormat = (document.getElementById('outputFormat') && document.getElementById('outputFormat').value) || 'media';
+                        var filename = outputFormat === 'media' ? 'media' : ((document.getElementById('outputFilename') && document.getElementById('outputFilename').value.trim()) || 'output');
+                        filename = filename.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/^[.\s]+|[.\s]+$/g, '') || 'output';
+                        var imageOrder = (app.defacedItems || []).slice().sort(function(a, b) {
+                            return (a.sequence || 999999) - (b.sequence || 999999);
+                        }).map(function(item) { return item.sequence || 0; });
+                        var payload = {
+                            session_id: app.defaceSessionId,
+                            image_order: imageOrder,
+                            quality: parseInt((document.getElementById('qualitySlider') && document.getElementById('qualitySlider').value) || 95, 10) || 95,
+                            max_size: (document.getElementById('resolutionSelect') && document.getElementById('resolutionSelect').value) || '640x480',
+                            output_format: outputFormat,
+                            layout: (document.getElementById('layoutSelect') && document.getElementById('layoutSelect').value) || 'grid',
+                            images_per_page: parseInt((document.getElementById('imagesPerPage') && document.getElementById('imagesPerPage').value) || 2, 10) || 2,
+                            qualification: (document.getElementById('qualificationSelect') && document.getElementById('qualificationSelect').value) || '',
+                            learner: (document.getElementById('learnerSelect') && document.getElementById('learnerSelect').value) || '',
+                            filename: filename
+                        };
+                        var progressContainer = document.getElementById('batchProgressContainer');
+                        var progressFill = document.getElementById('batchProgressFill');
+                        var progressText = document.getElementById('batchProgressText');
+                        var resultsDiv = document.getElementById('results');
+                        var filenameInput = document.getElementById('outputFilename');
+                        if (progressContainer) progressContainer.style.display = 'block';
+                        if (progressFill) progressFill.style.width = '0%';
+                        if (progressText) progressText.textContent = 'Generating documents...';
+                        if (resultsDiv) resultsDiv.innerHTML = '';
+                        generateBtn.disabled = true;
+                        generateBtn.textContent = 'Generating...';
+                        if (filenameInput) filenameInput.disabled = true;
+                        fetch('/v2p-formatter/generate_deface_documents', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        })
+                        .then(function(r) { return r.json().catch(function() { return {}; }).then(function(data) {
+                            if (!r.ok) throw new Error(data.error || data.message || r.statusText || 'Request failed');
+                            return data;
+                        }); })
+                        .then(function(data) {
+                            if (progressFill) progressFill.style.width = '100%';
+                            if (progressText) progressText.textContent = 'Complete!';
+                            generateBtn.disabled = false;
+                            generateBtn.textContent = 'Generate Documents';
+                            if (filenameInput) filenameInput.disabled = false;
+                            if (!resultsDiv) return;
+                            if (data.success) {
+                                var html = '<div style="padding:20px;background:#2a2a2a;border-radius:6px;margin-top:20px;">';
+                                html += '<h3 style="color:#e0e0e0;margin-top:0;">✅ Documents Generated Successfully!</h3>';
+                                if (data.output_folder_path) {
+                                    html += '<p style="margin-bottom:15px;"><strong style="color:#e0e0e0;">Output Folder:</strong></p>';
+                                    html += '<p style="margin-bottom:15px;padding:10px;background:#1e1e1e;border-radius:4px;word-break:break-all;font-family:monospace;color:#999;font-size:12px;">' + (data.output_folder_path || '').replace(/</g, '&lt;') + '</p>';
+                                }
+                                if (data.exported_standalone_images && data.exported_standalone_images.length > 0) {
+                                    html += '<p style="color:#e0e0e0;"><strong>Standalone images: ' + data.exported_standalone_images.length + '</strong></p>';
+                                }
+                                if (data.exported_videos && data.exported_videos.length > 0) {
+                                    html += '<p style="color:#e0e0e0;"><strong>Standalone videos: ' + data.exported_videos.length + '</strong></p>';
+                                }
+                                html += '</div>';
+                                resultsDiv.innerHTML = html;
+                            } else {
+                                resultsDiv.innerHTML = '<div style="padding:20px;background:#4a2a2a;border-radius:6px;margin-top:20px;color:#f44;">❌ ' + (data.error || 'Unknown error').replace(/</g, '&lt;') + '</div>';
+                            }
+                        })
+                        .catch(function(err) {
+                            if (progressFill) progressFill.style.width = '0%';
+                            if (progressText) progressText.textContent = 'Error occurred';
+                            generateBtn.disabled = false;
+                            generateBtn.textContent = 'Generate Documents';
+                            if (filenameInput) filenameInput.disabled = false;
+                            if (resultsDiv) resultsDiv.innerHTML = '<div style="padding:20px;background:#4a2a2a;border-radius:6px;margin-top:20px;color:#f44;">❌ ' + (err && err.message ? String(err.message).replace(/</g, '&lt;') : 'Request failed') + '</div>';
+                        });
+                    });
+                }
+            });
+
+            defaceLog('Learner change listener attached');
+        })();
+        </script>
     </section>
+
+    <!-- URL filter status block (shown when page opened with ?files=...) -->
+    <div id="urlFilterStatusBlock" style="display: none; margin-bottom: 20px; padding: 15px; background: #1e2a2a; border: 1px solid #4a6666; border-radius: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; cursor: pointer;" id="urlFilterStatusBlockHeader" title="Click to expand or collapse">
+            <h3 style="margin: 0; color: #8ab4b4; font-size: 14px;">Pre-selection from link</h3>
+            <span id="urlFilterStatusSummary" style="color: #b0d0d0; font-size: 13px;"></span>
+            <span id="urlFilterStatusToggle" style="color: #8ab4b4; font-size: 12px;">▼ Details</span>
+        </div>
+        <div id="urlFilterStatusBlockDetails" style="margin-top: 12px;">
+            <div id="urlFilterWhatWasExecuted" style="color: #b0d0d0; font-size: 13px; margin-bottom: 10px;"></div>
+            <div id="urlFilterFilesSelected" style="color: #c0e0c0; font-size: 12px; margin-bottom: 8px;"></div>
+            <div id="urlFilterMissing" style="color: #e8c070; font-size: 12px;"></div>
+        </div>
+    </div>
     
     <!-- Image/Video Selection Section -->
     <section class="upload-section">
-        <h2>1. Select Images and Videos</h2>
+        <h2>1. Select Images and Videos to Deface</h2>
         
         <!-- Bulk Selection Controls -->
         <div id="bulkSelectionControls" style="margin-bottom: 15px; padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
@@ -230,22 +943,23 @@
                 <div class="config-grid">
                     <div class="config-item">
                         <label for="outputFormat">Format:</label>
-                        <select id="outputFormat">
-                            <option value="pdf" selected>PDF Only</option>
+                        <select id="outputFormat" title="Output Format: choose what to generate" onchange="toggleFormatDependentFields()">
+                            <option value="media" selected>Media only (no PDF/DOCX)</option>
+                            <option value="pdf">PDF Only</option>
                             <option value="both">Both (PDF + DOCX)</option>
                             <option value="docx">DOCX Only</option>
                             <option value="mp4">MP4 Only</option>
                             <option value="mp4+pdf">MP4 + PDF</option>
                         </select>
                     </div>
-                    <div class="config-item" id="pdfSettingsContainer">
+                    <div class="config-item" id="pdfSettingsContainer" style="display: none !important;">
                         <label for="layoutSelect">Layout:</label>
                         <select id="layoutSelect">
                             <option value="grid" selected>Grid</option>
                             <option value="custom">Custom</option>
                         </select>
                     </div>
-                    <div class="config-item" id="imagesPerPageContainer">
+                    <div class="config-item" id="imagesPerPageContainer" style="display: none !important;">
                         <label for="imagesPerPage">Images per Page:</label>
                         <select id="imagesPerPage">
                             <option value="1">1</option>
@@ -278,7 +992,19 @@
             <div id="defaceProgressBar" style="width: 100%; height: 30px; background: #1e1e1e; border-radius: 4px; overflow: hidden; margin-bottom: 15px; border: 1px solid #555;">
                 <div id="defaceProgressFill" style="height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); width: 0%; transition: width 0.3s ease;"></div>
             </div>
-            <div id="defaceProgressText" style="color: #e0e0e0; margin-bottom: 15px; font-weight: 500;">Preparing...</div>
+            <div id="defaceProgressText" style="color: #e0e0e0; margin-bottom: 8px; font-weight: 500;">Preparing...</div>
+            <div id="defaceProgressStatusLine" style="color: #b0b0b0; font-size: 13px; margin-bottom: 8px; display: none;"></div>
+            <div id="defaceProgressEstimate" style="color: #888; font-size: 12px; margin-bottom: 12px;">Estimate: images take a few seconds; each video often 1–2 minutes.</div>
+            <div id="defaceProgressQueueList" style="display: none; margin-bottom: 12px; font-size: 12px; color: #b0b0b0;"></div>
+            <div style="margin-bottom: 10px;">
+                <button type="button" id="defaceDetailedStepsToggle" onclick="typeof toggleDefaceDetailedSteps === 'function' && toggleDefaceDetailedSteps();" style="background: none; border: none; color: #667eea; cursor: pointer; font-size: 13px; padding: 0; text-align: left;">▼ Show detailed steps (live log)</button>
+            </div>
+            <div id="defaceDetailedStepsContent" style="display: none; margin-bottom: 12px;">
+                <pre id="defaceDetailedStepsLog" style="background: #1a1a1a; color: #ccc; padding: 12px; border-radius: 4px; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; min-height: 80px; max-height: 200px; overflow-y: auto; border: 1px solid #444; margin: 0 0 8px 0;"></pre>
+            </div>
+            <div style="font-size: 13px;">
+                <a href="/v2p-formatter/deface_video_log/view" target="_blank" rel="noopener" style="color: #667eea;">Open video debug log (new tab)</a> — full log in a separate tab if needed.
+            </div>
         </div>
         
         <!-- Review Interface -->
@@ -307,8 +1033,8 @@
     <section class="processing-section" id="processingSection" style="display: none;">
         <h2>4. Generate Documents</h2>
         
-        <!-- Filename Input -->
-        <div style="margin-bottom: 20px; padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555;">
+        <!-- Filename Input (hidden when Format is "Media only") -->
+        <div id="outputFilenameContainer" style="margin-bottom: 20px; padding: 15px; background: #2a2a2a; border-radius: 6px; border: 1px solid #555; display: none !important;">
             <label for="outputFilename" style="display: block; color: #e0e0e0; font-size: 14px; font-weight: 500; margin-bottom: 8px;">
                 Output Filename <span style="color: #f44;">*</span>
             </label>
@@ -363,14 +1089,64 @@ window.appData = {
     manualDefaceAreas: []  // Current deface areas being edited
 };
 
-// Initialize qualification/learner dropdowns
-(function() {
+// Toggle "Show detailed steps (live log)" on main Deface page (available for onclick)
+function toggleDefaceDetailedSteps() {
+    var content = document.getElementById('defaceDetailedStepsContent');
+    var btn = document.getElementById('defaceDetailedStepsToggle');
+    if (!content || !btn) return;
+    var isShown = content.style.display !== 'none';
+    content.style.display = isShown ? 'none' : 'block';
+    btn.textContent = isShown ? '▼ Show detailed steps (live log)' : '▲ Hide detailed steps';
+}
+
+// Debug logging for Deface – writes to panel and console; syncs with inline script
+function defaceDebugLog(label, detail) {
+    try {
+        var msg = label + (detail !== undefined ? ': ' + (typeof detail === 'object' ? JSON.stringify(detail) : String(detail)) : '');
+        var line = '[' + new Date().toISOString().slice(11, 23) + '] ' + msg;
+        window._defaceDebugLines = window._defaceDebugLines || [];
+        window._defaceDebugLines.push(line);
+        if (window._defaceDebugLines.length > 50) window._defaceDebugLines.shift();
+        var pre = document.getElementById('defaceDebugLog');
+        if (pre) pre.textContent = window._defaceDebugLines.join('\n');
+        console.log('[Deface]', label, detail !== undefined ? detail : '');
+    } catch (e) {
+        console.error('[Deface] defaceDebugLog error', e);
+    }
+}
+
+// Initialize qualification/learner dropdowns (run on DOMContentLoaded so DOM is ready)
+function initQualificationLearnerDeface() {
     const qualificationSelect = document.getElementById('qualificationSelect');
     const learnerSelect = document.getElementById('learnerSelect');
+    const toggleDebugBtn = document.getElementById('toggleDefaceDebugBtn');
+    const debugPanel = document.getElementById('defaceDebugPanel');
+    defaceDebugLog('init', qualificationSelect ? 'qualificationSelect ok' : 'qualificationSelect MISSING');
+    defaceDebugLog('init', learnerSelect ? 'learnerSelect ok' : 'learnerSelect MISSING');
+    if (toggleDebugBtn && debugPanel) {
+        toggleDebugBtn.addEventListener('click', function() {
+            const show = debugPanel.style.display === 'none';
+            debugPanel.style.display = show ? 'block' : 'none';
+            this.textContent = show ? 'Hide debug' : 'Show debug';
+        });
+    }
+    
+    function updateDefaceUrl(qualification, learner) {
+        const params = new URLSearchParams(window.location.search);
+        if (qualification) params.set('qualification', qualification); else params.delete('qualification');
+        if (learner) params.set('learner', learner); else params.delete('learner');
+        const qs = params.toString();
+        const url = qs ? '/v2p-formatter/deface?' + qs : '/v2p-formatter/deface';
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', url);
+        }
+    }
     
     function handleLearnerChange() {
         const qualification = qualificationSelect.value;
         const learner = learnerSelect.value;
+        
+        updateDefaceUrl(qualification, learner);
         
         if (qualification && learner) {
             loadDefaceFiles(qualification, learner);
@@ -385,63 +1161,161 @@ window.appData = {
     
     if (qualificationSelect) {
         qualificationSelect.addEventListener('change', function() {
-            const qualification = this.value;
+            var qualification = this.value;
+            try {
+                defaceDebugLog('1. Qualification changed', qualification || '(cleared)');
+            } catch (e) { if (window._defaceLogInline) window._defaceLogInline('err: ' + e.message); }
             learnerSelect.disabled = !qualification;
             learnerSelect.innerHTML = '<option value="">Select Learner...</option>';
+            updateDefaceUrl(qualification, '');
             
             if (qualification) {
-                fetch(`/v2p-formatter/learners?qualification=${encodeURIComponent(qualification)}`)
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.success && data.learners) {
-                            data.learners.forEach(learner => {
-                                const option = document.createElement('option');
+                var learnersUrl = '/v2p-formatter/learners?qualification=' + encodeURIComponent(qualification);
+                defaceDebugLog('2. Fetching learners', learnersUrl);
+                fetch(learnersUrl)
+                    .then(function(r) {
+                        defaceDebugLog('3. learners HTTP', r.status + ' ' + r.statusText + ' url=' + r.url);
+                        return r.text();
+                    })
+                    .then(function(text) {
+                        defaceDebugLog('4. learners response length', text.length);
+                        var data;
+                        try {
+                            data = JSON.parse(text);
+                        } catch (e) {
+                            defaceDebugLog('4b. learners JSON parse error', e.message);
+                            defaceDebugLog('4c. learners raw (first 200)', text.slice(0, 200));
+                            return;
+                        }
+                        defaceDebugLog('5. learners data.success', data.success);
+                        defaceDebugLog('6. learners data.learners', data.learners ? data.learners.length + ' items: ' + (data.learners.slice(0, 5).join(', ')) : (data.error || 'missing'));
+                        if (data.success && data.learners && data.learners.length > 0) {
+                            data.learners.forEach(function(learner) {
+                                var option = document.createElement('option');
                                 option.value = learner;
                                 option.textContent = learner;
                                 learnerSelect.appendChild(option);
                             });
-                            // Don't auto-call handleLearnerChange here - wait for user to select learner
+                            defaceDebugLog('7. Learner options added', learnerSelect.options.length);
+                            if (selectedLearner && data.learners.indexOf(selectedLearner) !== -1) {
+                                learnerSelect.value = selectedLearner;
+                                updateDefaceUrl(qualification, selectedLearner);
+                                loadDefaceFiles(qualification, selectedLearner);
+                                defaceDebugLog('8. Selected from URL', selectedLearner);
+                            }
+                        } else {
+                            defaceDebugLog('7. No learners in response', data.error || 'success but empty learners');
                         }
                     })
-                    .catch(err => console.error('Error loading learners:', err));
+                    .catch(function(err) {
+                        defaceDebugLog('ERR. learners fetch', err.message || String(err));
+                        console.error('Error loading learners:', err);
+                    });
             } else {
-                const imageFilesList = document.getElementById('imageFilesList');
-                const videoFilesList = document.getElementById('videoFilesList');
+                defaceDebugLog('Qualification cleared', '');
+                var imageFilesList = document.getElementById('imageFilesList');
+                var videoFilesList = document.getElementById('videoFilesList');
                 if (imageFilesList) imageFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Please select both qualification and learner to view images</p>';
                 if (videoFilesList) videoFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Please select both qualification and learner to view videos</p>';
                 updateFileCounts(0, 0);
             }
         });
+        defaceDebugLog('init', 'change listener attached to qualification');
+    } else {
+        defaceDebugLog('init', 'qualificationSelect NOT FOUND - cannot attach change');
     }
     
     if (learnerSelect) {
         learnerSelect.addEventListener('change', handleLearnerChange);
     }
     
-    // Auto-load if URL parameters are present
+    // Auto-load if URL parameters are present (selectedLearner is applied in the fetch callback when learners load)
     const urlParams = new URLSearchParams(window.location.search);
     const selectedQualification = urlParams.get('qualification');
     const selectedLearner = urlParams.get('learner');
     
     if (selectedQualification && qualificationSelect) {
+        defaceDebugLog('URL params', { qualification: selectedQualification, learner: selectedLearner });
         qualificationSelect.value = selectedQualification;
         qualificationSelect.dispatchEvent(new Event('change'));
-        
-        setTimeout(() => {
-            if (selectedLearner && learnerSelect) {
-                learnerSelect.value = selectedLearner;
-                handleLearnerChange();
-            }
-        }, 500);
     }
-})();
+}
 
-// Load deface files function (renamed from loadImages to loadDefaceFiles)
-function loadDefaceFiles(qualification, learner) {
-    if (!qualification || !learner) {
+function escapeHtmlForBlock(s) {
+    if (s == null || s === undefined) return '';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+}
+
+function urlFilterDebug(step, data) {
+    window.appData = window.appData || {};
+    window.appData.urlFilterDebugTrace = window.appData.urlFilterDebugTrace || [];
+    const entry = { step: step, time: new Date().toISOString(), data: data };
+    window.appData.urlFilterDebugTrace.push(entry);
+    if (window.appData.urlFilterDebugTrace.length > 100) window.appData.urlFilterDebugTrace.shift();
+    const msg = '[URL filter] ' + step + (data !== undefined ? ': ' + (typeof data === 'object' ? JSON.stringify(data) : String(data)) : '');
+    if (typeof defaceDebugLog === 'function') defaceDebugLog('URL filter ' + step, typeof data === 'object' ? data : data);
+    console.log(msg);
+    return entry;
+}
+
+function renderUrlFilterStatusBlock() {
+    const r = window.appData && window.appData.urlFilterResult;
+    const block = document.getElementById('urlFilterStatusBlock');
+    const whatEl = document.getElementById('urlFilterWhatWasExecuted');
+    const selectedEl = document.getElementById('urlFilterFilesSelected');
+    const missingEl = document.getElementById('urlFilterMissing');
+    const summaryEl = document.getElementById('urlFilterStatusSummary');
+    const detailsEl = document.getElementById('urlFilterStatusBlockDetails');
+    const toggleEl = document.getElementById('urlFilterStatusToggle');
+    const headerEl = document.getElementById('urlFilterStatusBlockHeader');
+    if (!block || !whatEl || !selectedEl || !missingEl) return;
+    if (!r) {
+        block.style.display = 'none';
         return;
     }
-    
+    const selectedCount = (r.selectedNames && r.selectedNames.length) || 0;
+    const missingCount = (r.missingNames && r.missingNames.length) || 0;
+    if (summaryEl) summaryEl.textContent = r.requestedCount + ' requested, ' + selectedCount + ' selected, ' + missingCount + ' missing.';
+    whatEl.textContent = 'URL filter applied: qualification=' + escapeHtmlForBlock(r.qualification) + ', learner=' + escapeHtmlForBlock(r.learner) + ', ' + r.requestedCount + ' file(s) requested.';
+    const maxShow = 20;
+    if (r.selectedNames && r.selectedNames.length > 0) {
+        const show = r.selectedNames.length <= maxShow ? r.selectedNames : r.selectedNames.slice(0, maxShow);
+        selectedEl.innerHTML = '<strong>Files selected (' + r.selectedNames.length + '):</strong> ' + show.map(escapeHtmlForBlock).join(', ') + (r.selectedNames.length > maxShow ? ' <span style="color:#888">(and ' + (r.selectedNames.length - maxShow) + ' more)</span>' : '');
+        selectedEl.style.display = '';
+    } else {
+        selectedEl.textContent = 'Files selected (0): No files from the URL were found in the file list.';
+        selectedEl.style.display = '';
+    }
+    if (r.missingNames && r.missingNames.length > 0) {
+        const show = r.missingNames.length <= maxShow ? r.missingNames : r.missingNames.slice(0, maxShow);
+        missingEl.innerHTML = '<strong>Missing (not found in folder):</strong> <span style="color:#e8c070">' + show.map(escapeHtmlForBlock).join(', ') + (r.missingNames.length > maxShow ? ' <span style="color:#888">(and ' + (r.missingNames.length - maxShow) + ' more)</span>' : '') + '</span>';
+        missingEl.style.display = '';
+    } else {
+        missingEl.textContent = 'Missing: None (all requested files were found).';
+        missingEl.style.display = '';
+    }
+    block.style.display = 'block';
+    if (detailsEl) detailsEl.style.display = 'block';
+    if (toggleEl) toggleEl.textContent = '▼ Details';
+    if (!headerEl || headerEl._urlFilterToggleBound) return;
+    headerEl._urlFilterToggleBound = true;
+    headerEl.addEventListener('click', function() {
+        if (!detailsEl || !toggleEl) return;
+        const isHidden = detailsEl.style.display === 'none';
+        detailsEl.style.display = isHidden ? 'block' : 'none';
+        toggleEl.textContent = isHidden ? '▼ Details' : '▶ Details';
+    });
+}
+
+// Load deface files function
+function loadDefaceFiles(qualification, learner) {
+    if (!qualification || !learner) {
+        defaceDebugLog('loadDefaceFiles skipped', { qualification: qualification || '(empty)', learner: learner || '(empty)' });
+        return;
+    }
+    defaceDebugLog('loadDefaceFiles', qualification + ' / ' + learner);
     const imageFilesList = document.getElementById('imageFilesList');
     const videoFilesList = document.getElementById('videoFilesList');
     const fileTreeLoading = document.getElementById('fileTreeLoading');
@@ -450,7 +1324,18 @@ function loadDefaceFiles(qualification, learner) {
     if (videoFilesList) videoFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Loading videos...</p>';
     if (fileTreeLoading) fileTreeLoading.style.display = 'block';
     
-    fetch(`/v2p-formatter/list_images?qualification=${encodeURIComponent(qualification)}&learner=${encodeURIComponent(learner)}`)
+    const listUrl = `/v2p-formatter/list_images?qualification=${encodeURIComponent(qualification)}&learner=${encodeURIComponent(learner)}`;
+    defaceDebugLog('Fetching list_images', listUrl);
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('files') && typeof urlFilterDebug === 'function') {
+        urlFilterDebug('init', {
+            qualification: qualification,
+            learner: learner,
+            filesParamLength: urlParams.get('files').length,
+            filesParamPreview: urlParams.get('files').slice(0, 120) + (urlParams.get('files').length > 120 ? '...' : '')
+        });
+    }
+    fetch(listUrl)
         .then(r => {
             if (!r.ok) {
                 return r.json().then(data => {
@@ -463,34 +1348,236 @@ function loadDefaceFiles(qualification, learner) {
         })
         .then(data => {
             if (fileTreeLoading) fileTreeLoading.style.display = 'none';
-            
+            defaceDebugLog('list_images response', data.success ? ((data.files && data.files.length) + ' files') : (data.error || data));
+            if (data.debug) defaceDebugLog('list_images debug', data.debug);
+            const filesParam = urlParams.get('files');
+            const requestedNames = filesParam ? filesParam.split(',').map(s => {
+                try { return decodeURIComponent(s.trim()); } catch (e) { return s.trim(); }
+            }).filter(Boolean) : [];
+            if (filesParam && requestedNames.length > 0 && typeof urlFilterDebug === 'function') {
+                urlFilterDebug('parsed_requested', { count: requestedNames.length, names: requestedNames });
+            }
             if (data.success && data.files) {
                 // Separate images and videos using 'type' field from backend
                 const images = data.files.filter(f => f.type === 'image');
                 const videos = data.files.filter(f => f.type === 'video');
-                
                 window.appData.availableImages = images;
                 window.appData.availableVideos = videos;
-                
-                // Render separately
+                if (filesParam && requestedNames.length > 0 && typeof urlFilterDebug === 'function') {
+                    const apiNames = (images || []).concat(videos || []).map(f => f.name);
+                    urlFilterDebug('api_files', { images: images.length, videos: videos.length, nameSample: (apiNames || []).slice(0, 10) });
+                }
+                if (filesParam && requestedNames.length > 0) {
+                    window.appData.selectedImages = [];
+                    window.appData.imageOrder = [];
+                    const selectedNames = [];
+                    const missingNames = [];
+                    const matchDetails = [];
+                    const matchByBasename = (f, basename) => {
+                        const fn = (f.name || '').toLowerCase();
+                        const bn = (basename || '').toLowerCase();
+                        if (fn === bn) return true;
+                        if (f.path && basename) {
+                            const pathLower = f.path.replace(/\\/g, '/').toLowerCase();
+                            const suffix = '/' + bn;
+                            return pathLower.endsWith(suffix);
+                        }
+                        return false;
+                    };
+                    const usedPaths = new Set();
+                    requestedNames.forEach((requestedName, idx) => {
+                        const file = images.find(f => !usedPaths.has(f.path) && matchByBasename(f, requestedName))
+                            || videos.find(f => !usedPaths.has(f.path) && matchByBasename(f, requestedName));
+                        if (file) {
+                            usedPaths.add(file.path);
+                            selectedNames.push(file.name);
+                            matchDetails.push({ requested: requestedName, matched: file.name, path: file.path });
+                            window.appData.selectedImages.push({
+                                path: file.path,
+                                name: file.name,
+                                folder: file.folder || 'root',
+                                type: file.type || 'image',
+                                sequence: idx + 1
+                            });
+                            window.appData.imageOrder.push(file.path);
+                        } else {
+                            missingNames.push(requestedName);
+                            matchDetails.push({ requested: requestedName, matched: null });
+                        }
+                    });
+                    window.appData.urlFilterResult = {
+                        qualification: qualification,
+                        learner: learner,
+                        requestedCount: requestedNames.length,
+                        selectedNames: selectedNames,
+                        missingNames: missingNames
+                    };
+                    defaceDebugLog('Pre-selected from URL files param', window.appData.selectedImages.length + ' of ' + requestedNames.length + ', missing: ' + missingNames.length);
+                    if (typeof urlFilterDebug === 'function') {
+                        urlFilterDebug('result', {
+                            requested: requestedNames.length,
+                            selected: selectedNames.length,
+                            missing: missingNames.length,
+                            selectedNames: selectedNames,
+                            missingNames: missingNames
+                        });
+                        urlFilterDebug('match_details', matchDetails);
+                    }
+                } else {
+                    window.appData.urlFilterResult = null;
+                }
                 renderImageListDeface(images);
                 renderVideoListDeface(videos);
-                
-                // Update counts
                 updateFileCounts(images.length, videos.length);
+                if (window.appData.selectedImages && window.appData.selectedImages.length > 0) {
+                    if (typeof updateSequenceNumbers === 'function') updateSequenceNumbers();
+                    if (typeof updateSelectionUI === 'function') updateSelectionUI();
+                }
+                fetch('/v2p-formatter/deface_existing?qualification=' + encodeURIComponent(qualification) + '&learner=' + encodeURIComponent(learner))
+                    .then(function(r) { return r.json(); })
+                    .then(function(existing) {
+                        var items = existing.items || [];
+                        if (items.length > 0) {
+                            window.appData.defacedItems = items;
+                            window.appData.defaceSessionId = null;
+                            var reviewInterface = document.getElementById('reviewInterface');
+                            var grid = document.getElementById('reviewGrid');
+                            var genBtn = document.getElementById('generateDocumentsBtn');
+                            if (reviewInterface) reviewInterface.style.display = 'block';
+                            if (genBtn) genBtn.disabled = false;
+                            if (grid && (typeof window.renderReviewGrid === 'function')) window.renderReviewGrid(items);
+                            else if (grid) {
+                                var escapeHtmlSimple = function(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+                                var parts = [];
+                                items.forEach(function(item, index) {
+                                    var mediaId = item.sequence != null ? item.sequence : index + 1;
+                                    var isVideo = item.type === 'video';
+                                    var defacedUrl = item.defaced_url || '';
+                                    var originalName = item.original_name || 'Unknown';
+                                    parts.push('<div style="padding:15px;background:#1e1e1e;border-radius:6px;border:1px solid #555;">' +
+                                        '<div style="position:relative;width:100%;padding-top:75%;background:#000;border-radius:4px;overflow:hidden;margin-bottom:10px;">' +
+                                        (isVideo ? '<video src="' + escapeHtmlSimple(defacedUrl) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;" controls></video>' :
+                                            '<img src="' + escapeHtmlSimple(defacedUrl) + '" alt="' + escapeHtmlSimple(originalName) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;">') +
+                                        '</div><div style="text-align:center;">' +
+                                        '<div style="color:#e0e0e0;font-weight:500;margin-bottom:5px;">' + escapeHtmlSimple(originalName) + '</div>' +
+                                        '<div style="color:#51cf66;font-size:12px;margin-bottom:10px;">✓ Defaced (saved)</div>' +
+                                        '<button class="btn btn-secondary" onclick="openManualDefaceEditor(' + mediaId + ')" style="padding:6px 12px;font-size:13px;">Edit</button>' +
+                                        '</div></div>');
+                                });
+                                grid.innerHTML = parts.join('');
+                            }
+                        }
+                    })
+                    .catch(function() {});
             } else {
-                if (imageFilesList) imageFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No images found</p>';
-                if (videoFilesList) videoFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No videos found</p>';
+                if (filesParam && requestedNames.length > 0) {
+                    window.appData.urlFilterResult = {
+                        qualification: qualification,
+                        learner: learner,
+                        requestedCount: requestedNames.length,
+                        selectedNames: [],
+                        missingNames: requestedNames.slice()
+                    };
+                    if (typeof urlFilterDebug === 'function') {
+                        urlFilterDebug('result_no_files', { requested: requestedNames.length, selected: 0, missing: requestedNames.length, reason: data.success ? 'empty_list' : (data.error || 'api_error') });
+                    }
+                } else {
+                    window.appData.urlFilterResult = null;
+                }
+                if (imageFilesList) imageFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No images found. Check that ' + qualification + '/' + learner + ' exists under the output folder.</p>';
+                if (videoFilesList) videoFilesList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No videos found.</p>';
                 updateFileCounts(0, 0);
+                fetch('/v2p-formatter/deface_existing?qualification=' + encodeURIComponent(qualification) + '&learner=' + encodeURIComponent(learner))
+                    .then(function(r) { return r.json(); })
+                    .then(function(existing) {
+                        var items = existing.items || [];
+                        if (items.length > 0) {
+                            window.appData.defacedItems = items;
+                            window.appData.defaceSessionId = null;
+                            var reviewInterface = document.getElementById('reviewInterface');
+                            var grid = document.getElementById('reviewGrid');
+                            var genBtn = document.getElementById('generateDocumentsBtn');
+                            if (reviewInterface) reviewInterface.style.display = 'block';
+                            if (genBtn) genBtn.disabled = false;
+                            if (grid && (typeof window.renderReviewGrid === 'function')) window.renderReviewGrid(items);
+                            else if (grid) {
+                                var escapeHtmlSimple = function(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+                                var parts = [];
+                                items.forEach(function(item, index) {
+                                    var mediaId = item.sequence != null ? item.sequence : index + 1;
+                                    var isVideo = item.type === 'video';
+                                    var defacedUrl = item.defaced_url || '';
+                                    var originalName = item.original_name || 'Unknown';
+                                    parts.push('<div style="padding:15px;background:#1e1e1e;border-radius:6px;border:1px solid #555;">' +
+                                        '<div style="position:relative;width:100%;padding-top:75%;background:#000;border-radius:4px;overflow:hidden;margin-bottom:10px;">' +
+                                        (isVideo ? '<video src="' + escapeHtmlSimple(defacedUrl) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;" controls></video>' :
+                                            '<img src="' + escapeHtmlSimple(defacedUrl) + '" alt="' + escapeHtmlSimple(originalName) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;">') +
+                                        '</div><div style="text-align:center;">' +
+                                        '<div style="color:#e0e0e0;font-weight:500;margin-bottom:5px;">' + escapeHtmlSimple(originalName) + '</div>' +
+                                        '<div style="color:#51cf66;font-size:12px;margin-bottom:10px;">✓ Defaced (saved)</div>' +
+                                        '<button class="btn btn-secondary" onclick="openManualDefaceEditor(' + mediaId + ')" style="padding:6px 12px;font-size:13px;">Edit</button>' +
+                                        '</div></div>');
+                                });
+                                grid.innerHTML = parts.join('');
+                            }
+                        }
+                    })
+                    .catch(function() {});
+            }
+            if (window.appData.urlFilterResult && typeof renderUrlFilterStatusBlock === 'function') {
+                renderUrlFilterStatusBlock();
+            } else {
+                const block = document.getElementById('urlFilterStatusBlock');
+                if (block) block.style.display = 'none';
             }
         })
         .catch(err => {
             if (fileTreeLoading) fileTreeLoading.style.display = 'none';
             const errorMsg = err.message || 'Unknown error';
-            if (imageFilesList) imageFilesList.innerHTML = `<p style="text-align: center; color: #f44; padding: 20px;">Error loading images: ${errorMsg}</p>`;
-            if (videoFilesList) videoFilesList.innerHTML = `<p style="text-align: center; color: #f44; padding: 20px;">Error loading videos: ${errorMsg}</p>`;
+            defaceDebugLog('list_images error', errorMsg);
+            if (typeof urlFilterDebug === 'function' && new URLSearchParams(window.location.search).get('files')) {
+                urlFilterDebug('fetch_error', { error: errorMsg });
+            }
+            if (imageFilesList) imageFilesList.innerHTML = '<p style="text-align: center; color: #f44; padding: 20px;">Error: ' + errorMsg + '</p>';
+            if (videoFilesList) videoFilesList.innerHTML = '<p style="text-align: center; color: #f44; padding: 20px;">Error: ' + errorMsg + '</p>';
             console.error('Error loading files:', err);
             updateFileCounts(0, 0);
+            fetch('/v2p-formatter/deface_existing?qualification=' + encodeURIComponent(qualification) + '&learner=' + encodeURIComponent(learner))
+                .then(function(r) { return r.json(); })
+                .then(function(existing) {
+                    var items = existing.items || [];
+                    if (items.length > 0) {
+                        window.appData.defacedItems = items;
+                        window.appData.defaceSessionId = null;
+                        var reviewInterface = document.getElementById('reviewInterface');
+                        var grid = document.getElementById('reviewGrid');
+                        var genBtn = document.getElementById('generateDocumentsBtn');
+                        if (reviewInterface) reviewInterface.style.display = 'block';
+                        if (genBtn) genBtn.disabled = false;
+                        if (grid && (typeof window.renderReviewGrid === 'function')) window.renderReviewGrid(items);
+                        else if (grid) {
+                            var escapeHtmlSimple = function(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+                            var parts = [];
+                            items.forEach(function(item, index) {
+                                var mediaId = item.sequence != null ? item.sequence : index + 1;
+                                var isVideo = item.type === 'video';
+                                var defacedUrl = item.defaced_url || '';
+                                var originalName = item.original_name || 'Unknown';
+                                parts.push('<div style="padding:15px;background:#1e1e1e;border-radius:6px;border:1px solid #555;">' +
+                                    '<div style="position:relative;width:100%;padding-top:75%;background:#000;border-radius:4px;overflow:hidden;margin-bottom:10px;">' +
+                                    (isVideo ? '<video src="' + escapeHtmlSimple(defacedUrl) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;" controls></video>' :
+                                        '<img src="' + escapeHtmlSimple(defacedUrl) + '" alt="' + escapeHtmlSimple(originalName) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;">') +
+                                    '</div><div style="text-align:center;">' +
+                                    '<div style="color:#e0e0e0;font-weight:500;margin-bottom:5px;">' + escapeHtmlSimple(originalName) + '</div>' +
+                                    '<div style="color:#51cf66;font-size:12px;margin-bottom:10px;">✓ Defaced (saved)</div>' +
+                                    '<button class="btn btn-secondary" onclick="openManualDefaceEditor(' + mediaId + ')" style="padding:6px 12px;font-size:13px;">Edit</button>' +
+                                    '</div></div>');
+                            });
+                            grid.innerHTML = parts.join('');
+                        }
+                    }
+                })
+                .catch(function() {});
         });
 }
 
@@ -1094,8 +2181,106 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// Show/hide Layout, Images per Page, and Output Filename based on Format (hidden for "Media only")
+function toggleFormatDependentFields() {
+    const sel = document.getElementById('outputFormat');
+    const format = (sel && sel.value) ? String(sel.value).trim() : 'media';
+    const isMediaOnly = (format === 'media');
+    const pdfOpts = document.getElementById('pdfSettingsContainer');
+    const imgPerPage = document.getElementById('imagesPerPageContainer');
+    const filenameBlock = document.getElementById('outputFilenameContainer');
+    function hide(el) {
+        if (el) el.style.setProperty('display', 'none', 'important');
+    }
+    function show(el) {
+        if (el) el.style.removeProperty('display');
+    }
+    if (isMediaOnly) {
+        hide(pdfOpts);
+        hide(imgPerPage);
+        hide(filenameBlock);
+    } else {
+        show(pdfOpts);
+        show(imgPerPage);
+        show(filenameBlock);
+    }
+}
+
 // Initialize bulk mode toggle
 document.addEventListener('DOMContentLoaded', function() {
+    if (typeof initQualificationLearnerDeface === 'function') initQualificationLearnerDeface();
+    if (window.appData && window.appData.urlFilterResult && typeof renderUrlFilterStatusBlock === 'function') {
+        renderUrlFilterStatusBlock();
+    }
+    var urlParams = new URLSearchParams(window.location.search);
+    var urlQual = urlParams.get('qualification');
+    var urlLearner = urlParams.get('learner');
+    if (urlQual && urlLearner && typeof loadDefaceFiles === 'function' && typeof defaceDebugLog === 'function') {
+        defaceDebugLog('URL params present: loading files and deface_existing', urlQual + ' / ' + urlLearner);
+        var q = document.getElementById('qualificationSelect');
+        var l = document.getElementById('learnerSelect');
+        if (q && l && !q.value && urlQual) q.value = urlQual;
+        if (q && l && !l.value && urlLearner) l.value = urlLearner;
+        loadDefaceFiles(urlQual, urlLearner);
+        var showExistingWhenReady = function() {
+            fetch('/v2p-formatter/deface_existing?qualification=' + encodeURIComponent(urlQual) + '&learner=' + encodeURIComponent(urlLearner))
+                .then(function(r) { return r.json(); })
+                .then(function(existing) {
+                    var items = existing.items || [];
+                    if (items.length > 0) {
+                        window.appData = window.appData || {};
+                        window.appData.defacedItems = items;
+                        window.appData.defaceSessionId = null;
+                        var reviewInterface = document.getElementById('reviewInterface');
+                        var grid = document.getElementById('reviewGrid');
+                        var genBtn = document.getElementById('generateDocumentsBtn');
+                        if (reviewInterface) reviewInterface.style.display = 'block';
+                        if (genBtn) genBtn.disabled = false;
+                        if (grid && (typeof window.renderReviewGrid === 'function')) window.renderReviewGrid(items);
+                        else if (grid) {
+                            var escapeHtmlSimple = function(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+                            var parts = [];
+                            items.forEach(function(item, index) {
+                                var mediaId = item.sequence != null ? item.sequence : index + 1;
+                                var isVideo = item.type === 'video';
+                                var defacedUrl = item.defaced_url || '';
+                                var originalName = item.original_name || 'Unknown';
+                                parts.push('<div style="padding:15px;background:#1e1e1e;border-radius:6px;border:1px solid #555;">' +
+                                    '<div style="position:relative;width:100%;padding-top:75%;background:#000;border-radius:4px;overflow:hidden;margin-bottom:10px;">' +
+                                    (isVideo ? '<video src="' + escapeHtmlSimple(defacedUrl) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;" controls></video>' :
+                                        '<img src="' + escapeHtmlSimple(defacedUrl) + '" alt="' + escapeHtmlSimple(originalName) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;">') +
+                                    '</div><div style="text-align:center;">' +
+                                    '<div style="color:#e0e0e0;font-weight:500;margin-bottom:5px;">' + escapeHtmlSimple(originalName) + '</div>' +
+                                    '<div style="color:#51cf66;font-size:12px;margin-bottom:10px;">✓ Defaced (saved)</div>' +
+                                    '<button class="btn btn-secondary" onclick="openManualDefaceEditor(' + mediaId + ')" style="padding:6px 12px;font-size:13px;">Edit</button>' +
+                                    '</div></div>');
+                            });
+                            grid.innerHTML = parts.join('');
+                        }
+                    }
+                })
+                .catch(function() {});
+        };
+        setTimeout(showExistingWhenReady, 0);
+    }
+    var refreshBtn = document.getElementById('defaceRefreshBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            var q = document.getElementById('qualificationSelect');
+            var l = document.getElementById('learnerSelect');
+            var urlParams = new URLSearchParams(window.location.search);
+            var qualification = (q && q.value) || urlParams.get('qualification') || '';
+            var learner = (l && l.value) || urlParams.get('learner') || '';
+            if (qualification && learner) {
+                if (l && !l.value && urlParams.get('learner')) { l.value = urlParams.get('learner'); }
+                loadDefaceFiles(qualification, learner);
+            } else if (typeof defaceDebugLog === 'function') {
+                defaceDebugLog('Refresh: need qualification and learner', { qualification: qualification || '(empty)', learner: learner || '(empty)' });
+            }
+        });
+    }
+    toggleFormatDependentFields();
+    requestAnimationFrame(toggleFormatDependentFields);
     const selectAllCheckbox = document.getElementById('selectAllCheckbox');
     const resetOrderBtn = document.getElementById('resetOrderBtn');
     
@@ -1107,28 +2292,45 @@ document.addEventListener('DOMContentLoaded', function() {
         selectAllCheckbox.addEventListener('change', toggleSelectAll);
     }
     
-    if (resetOrderBtn) {
+    if (resetOrderBtn && !resetOrderBtn._defaceInlineBound) {
         resetOrderBtn.addEventListener('click', resetOrder);
     }
     
     const resetSelectionBtn = document.getElementById('resetSelectionBtn');
-    if (resetSelectionBtn) {
+    if (resetSelectionBtn && !resetSelectionBtn._defaceInlineBound) {
         resetSelectionBtn.addEventListener('click', resetSelection);
     }
     
-    // Thumbnails per row selector
+    // Thumbnails per row selector (skip if inline already bound)
     const thumbnailsPerRowSelect = document.getElementById('thumbnailsPerRow');
-    if (thumbnailsPerRowSelect) {
+    if (thumbnailsPerRowSelect && !thumbnailsPerRowSelect._defaceInlineBound) {
         thumbnailsPerRowSelect.value = window.appData.thumbnailsPerRow || 3;
         thumbnailsPerRowSelect.addEventListener('change', function() {
             window.appData.thumbnailsPerRow = parseInt(this.value) || 3;
-            // Re-render both sections with new layout
             if (window.appData.availableImages && window.appData.availableImages.length > 0) {
                 renderImageListDeface(window.appData.availableImages);
             }
             if (window.appData.availableVideos && window.appData.availableVideos.length > 0) {
                 renderVideoListDeface(window.appData.availableVideos);
             }
+        });
+    }
+
+    // Sort by (Name / Date) - only attach if inline did not
+    const sortBySelect = document.getElementById('sortBy');
+    if (sortBySelect && !sortBySelect._defaceInlineBound) {
+        sortBySelect.value = window.appData.sortBy || 'name';
+        sortBySelect.addEventListener('change', function() {
+            window.appData.sortBy = this.value || 'name';
+            var imgs = (window.appData.availableImages || []).slice();
+            var vids = (window.appData.availableVideos || []).slice();
+            var cmp = function(a, b) { return String(a.name || '').localeCompare(String(b.name || '')); };
+            imgs.sort(cmp);
+            vids.sort(cmp);
+            window.appData.availableImages = imgs;
+            window.appData.availableVideos = vids;
+            if (imgs.length > 0) renderImageListDeface(imgs);
+            if (vids.length > 0) renderVideoListDeface(vids);
         });
     }
     
@@ -1170,31 +2372,37 @@ document.addEventListener('DOMContentLoaded', function() {
         updateMosaicsizeVisibility(); // Initial state
     }
     
-    // Apply deface button
+    // Apply deface button (skip if inline script already bound to avoid double-firing)
     const applyDefaceBtn = document.getElementById('applyDefaceBtn');
-    if (applyDefaceBtn) {
+    if (applyDefaceBtn && !applyDefaceBtn._defaceInlineBound) {
         applyDefaceBtn.addEventListener('click', function() {
             if (window.appData.selectedImages.length === 0) {
                 alert('Please select at least one image or video');
                 return;
             }
-            
             applyDeface();
         });
     }
     
-    // Adjust settings & re-apply button
+    // Adjust settings & re-apply button (skip if inline already bound)
     const adjustSettingsBtn = document.getElementById('adjustSettingsBtn');
-    if (adjustSettingsBtn) {
+    if (adjustSettingsBtn && !adjustSettingsBtn._defaceInlineBound) {
         adjustSettingsBtn.addEventListener('click', function() {
             applyDeface();
         });
     }
     
-    // Accept & proceed button
+    // Show detailed steps (live log) toggle (also available via onclick="toggleDefaceDetailedSteps()")
+    const defaceDetailedStepsToggle = document.getElementById('defaceDetailedStepsToggle');
+    if (defaceDetailedStepsToggle) {
+        defaceDetailedStepsToggle.addEventListener('click', function() { toggleDefaceDetailedSteps(); });
+    }
+    
+    // Accept & proceed button (skip if inline already bound)
     const acceptAndProceedBtn = document.getElementById('acceptAndProceedBtn');
-    if (acceptAndProceedBtn) {
+    if (acceptAndProceedBtn && !acceptAndProceedBtn._defaceInlineBound) {
         acceptAndProceedBtn.addEventListener('click', function() {
+            toggleFormatDependentFields();
             const processingSection = document.getElementById('processingSection');
             if (processingSection) {
                 processingSection.style.display = 'block';
@@ -1203,17 +2411,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Generate documents button
+    // Generate documents button (disabled until Apply deface succeeds with items; skip if inline already bound)
     const generateBtn = document.getElementById('generateDocumentsBtn');
     if (generateBtn) {
-        generateBtn.addEventListener('click', function() {
-            if (!window.appData.defaceSessionId) {
-                alert('Please apply deface first');
-                return;
-            }
-            
-            generateImageDocuments();
-        });
+        generateBtn.disabled = true; // Enable only after apply deface returns processed items
+        if (!generateBtn._defaceInlineBound) {
+            generateBtn.addEventListener('click', function() {
+                if (!window.appData.defaceSessionId) {
+                    alert('Please apply deface first');
+                    return;
+                }
+                if (!window.appData.defacedItems || window.appData.defacedItems.length === 0) {
+                    alert('No defaced files in session. Apply deface first and wait for it to complete.');
+                    return;
+                }
+                generateImageDocuments();
+            });
+        }
     }
     
     // Manual deface editor modal handlers
@@ -1339,19 +2553,93 @@ function applyDeface() {
         applyBtn.textContent = 'Processing...';
     }
     
-    // Start progress simulation (updates gradually while waiting)
+    const progressStatusLine = document.getElementById('defaceProgressStatusLine');
+    const detailedStepsLog = document.getElementById('defaceDetailedStepsLog');
+    const progressQueueList = document.getElementById('defaceProgressQueueList');
+    
+    // Progress simulation (fallback when backend has not yet reported)
     let progressPercent = 0;
+    let progressPollInterval = null;
     const progressInterval = setInterval(function() {
-        // Gradually increase progress up to 90% while waiting
         if (progressPercent < 90) {
             progressPercent += 2;
             if (progressFill) progressFill.style.width = progressPercent + '%';
-            if (progressText) progressText.textContent = `Processing... ${progressPercent}%`;
+            if (progressText) progressText.textContent = 'Processing... ' + progressPercent + '%';
         }
-    }, 500); // Update every 500ms
+    }, 500);
     
-    // Call API
-    const fetchPromise = fetch('/v2p-formatter/apply_deface', {
+    function stopAllProgressIntervals() {
+        if (progressInterval) clearInterval(progressInterval);
+        if (progressPollInterval) clearInterval(progressPollInterval);
+    }
+    
+    // Poll deface_video_log every 1.5s for live progress and detailed steps
+    progressPollInterval = setInterval(function() {
+        fetch('/v2p-formatter/deface_video_log?limit=200')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var lines = data.lines || [];
+                var progress = data.progress || {};
+                if (detailedStepsLog) {
+                    detailedStepsLog.textContent = lines.length ? lines.join('\n') : '';
+                    detailedStepsLog.scrollTop = detailedStepsLog.scrollHeight;
+                }
+                if (progress.status === 'processing' && progress.total > 0) {
+                    var total = progress.total;
+                    var completed = progress.completed || 0;
+                    var currentPct = progress.current_item_pct != null ? progress.current_item_pct : 0;
+                    var overallPct = (completed / total) * 100 + (currentPct / 100) * (1 / total) * 100;
+                    overallPct = Math.round(overallPct * 10) / 10;
+                    if (overallPct >= 100) overallPct = 99.9;
+                    if (progressFill) progressFill.style.width = overallPct + '%';
+                    if (progressText) progressText.textContent = 'Processing... ' + overallPct + '%';
+                    if (progressStatusLine) {
+                        var idx = completed + 1;
+                        var part = 'Processing ' + idx + '/' + total;
+                        if (progress.current_item) part += ' — ' + progress.current_item;
+                        if (progress.elapsed_seconds != null) part += ' (' + progress.elapsed_seconds + 's)';
+                        if (progress.current_item_pct != null) part += ' — ' + progress.current_item_pct + '%';
+                        progressStatusLine.textContent = part;
+                        progressStatusLine.style.display = 'block';
+                    }
+                    if (progressQueueList && progress.queue && progress.queue.length > 1) {
+                        var q = progress.queue;
+                        var elapsed = progress.elapsed_seconds != null ? progress.elapsed_seconds : 0;
+                        var pct = progress.current_item_pct != null ? progress.current_item_pct : 0;
+                        var html = '<span style="color:#888;">Queue:</span> ';
+                        var parts = [];
+                        for (var i = 0; i < q.length; i++) {
+                            var ent = q[i];
+                            var label = (i + 1) + '. ' + ent.name;
+                            if (ent.state === 'done') parts.push('<span style="color:#51cf66;">' + label + ' — ✓</span>');
+                            else if (ent.state === 'in_progress') parts.push('<span style="color:#667eea;">' + label + ' — ⟳ ' + elapsed + 's' + (pct ? ' ' + pct + '%' : '') + '</span>');
+                            else parts.push('<span style="color:#666;">' + label + ' — waiting</span>');
+                        }
+                        progressQueueList.innerHTML = html + parts.join(' &nbsp;|&nbsp; ');
+                        progressQueueList.style.display = 'block';
+                    }
+                } else if (progress.status === 'complete' && progress.total > 0) {
+                    if (progressFill) progressFill.style.width = '100%';
+                    if (progressText) progressText.textContent = 'Complete!';
+                    if (progressStatusLine) {
+                        progressStatusLine.textContent = 'Complete — ' + progress.total + ' item(s) processed.';
+                        progressStatusLine.style.display = 'block';
+                    }
+                    if (progressQueueList && progress.queue && progress.queue.length > 1) {
+                        var q = progress.queue;
+                        var parts = [];
+                        for (var i = 0; i < q.length; i++) parts.push((i + 1) + '. ' + q[i].name + ' — ✓');
+                        progressQueueList.innerHTML = '<span style="color:#888;">Queue:</span> <span style="color:#51cf66;">' + parts.join(' &nbsp;|&nbsp; ') + '</span>';
+                        progressQueueList.style.display = 'block';
+                    }
+                }
+            })
+            .catch(function() {});
+    }, 1500);
+    
+    var qualification = (document.getElementById('qualificationSelect') && document.getElementById('qualificationSelect').value) || new URLSearchParams(window.location.search).get('qualification') || '';
+    var learner = (document.getElementById('learnerSelect') && document.getElementById('learnerSelect').value) || new URLSearchParams(window.location.search).get('learner') || '';
+    fetch('/v2p-formatter/apply_deface', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1364,13 +2652,14 @@ function applyDeface() {
             scale: scale,
             mosaicsize: mosaicsize,
             draw_scores: drawScores,
-            approve_video_processing: approveVideoProcessing
+            approve_video_processing: approveVideoProcessing,
+            qualification: qualification,
+            learner: learner
         })
     })
     .then(r => r.json())
     .then(data => {
-        // Clear progress simulation interval
-        clearInterval(progressInterval);
+        stopAllProgressIntervals();
         
         // Set to 100%
         if (progressFill) progressFill.style.width = '100%';
@@ -1380,6 +2669,10 @@ function applyDeface() {
             // Store session ID and processed items
             window.appData.defaceSessionId = data.session_id;
             window.appData.defacedItems = data.processed || [];
+            
+            // Enable Generate Documents only when we have processed items
+            const genBtn = document.getElementById('generateDocumentsBtn');
+            if (genBtn) genBtn.disabled = !(window.appData.defacedItems && window.appData.defacedItems.length > 0);
             
             // Show review interface
             if (reviewInterface) {
@@ -1398,8 +2691,7 @@ function applyDeface() {
         }
     })
     .catch(err => {
-        // Clear progress simulation interval
-        clearInterval(progressInterval);
+        stopAllProgressIntervals();
         
         if (progressFill) progressFill.style.width = '0%';
         if (progressText) progressText.textContent = 'Error occurred';
@@ -1413,6 +2705,7 @@ function applyDeface() {
         }
     });
 }
+window.applyDeface = applyDeface;
 
 // Render review grid
 function renderReviewGrid(processedItems) {
@@ -1553,6 +2846,8 @@ function openManualDefaceEditor(mediaId) {
     if (modal) modal.style.display = 'block';
     updateActiveAreasList();
 }
+window._openManualDefaceEditorImpl = openManualDefaceEditor;
+window.openManualDefaceEditor = openManualDefaceEditor;
 
 // Update video time display
 function updateVideoTimeDisplay() {
@@ -1939,34 +3234,32 @@ function generateImageDocuments() {
         return;
     }
     
-    // Get and validate filename (mandatory)
+    const outputFormat = document.getElementById('outputFormat').value || 'media';
     const filenameInput = document.getElementById('outputFilename');
-    if (!filenameInput) {
-        alert('Filename input not found');
-        return;
-    }
-    
-    let filename = filenameInput.value.trim();
-    if (!filename) {
-        alert('Please enter a filename');
-        filenameInput.focus();
-        return;
-    }
-    
-    // Sanitize filename: remove invalid characters
-    filename = filename.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
-    // Remove leading/trailing dots and spaces
-    filename = filename.replace(/^[.\s]+|[.\s]+$/g, '');
-    
-    if (filename.length === 0) {
-        alert('Filename contains only invalid characters. Please enter a valid filename.');
-        filenameInput.focus();
-        return;
-    }
-    
-    // Update input with sanitized value
-    if (filename !== filenameInput.value.trim()) {
-        filenameInput.value = filename;
+    let filename;
+    if (outputFormat === 'media') {
+        filename = 'media';
+    } else {
+        if (!filenameInput) {
+            alert('Filename input not found');
+            return;
+        }
+        filename = filenameInput.value.trim();
+        if (!filename) {
+            alert('Please enter a filename');
+            filenameInput.focus();
+            return;
+        }
+        filename = filename.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+        filename = filename.replace(/^[.\s]+|[.\s]+$/g, '');
+        if (filename.length === 0) {
+            alert('Filename contains only invalid characters. Please enter a valid filename.');
+            filenameInput.focus();
+            return;
+        }
+        if (filename !== filenameInput.value.trim()) {
+            filenameInput.value = filename;
+        }
     }
     
     // Validate session ID
@@ -1978,7 +3271,7 @@ function generateImageDocuments() {
     // Get settings
     const quality = parseInt(document.getElementById('qualitySlider').value) || 95;
     const maxSize = document.getElementById('resolutionSelect').value || '640x480';
-    const outputFormat = document.getElementById('outputFormat').value || 'pdf';
+    const outputFormat = document.getElementById('outputFormat').value || 'media';
     const layout = document.getElementById('layoutSelect').value || 'grid';
     const imagesPerPage = parseInt(document.getElementById('imagesPerPage').value) || 2;
     
@@ -2044,7 +3337,15 @@ function generateImageDocuments() {
             filename: filename
         })
     })
-    .then(r => r.json())
+    .then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+            const msg = data.error || data.message || r.statusText || `Request failed (${r.status})`;
+            console.warn('[generate_deface_documents]', r.status, data);
+            throw new Error(msg);
+        }
+        return data;
+    })
     .then(data => {
         if (progressFill) progressFill.style.width = '100%';
         if (progressText) progressText.textContent = 'Complete!';
@@ -2072,9 +3373,20 @@ function generateImageDocuments() {
             }
             
             // Add exported MP4 videos if any
+            if (data.exported_standalone_images && data.exported_standalone_images.length > 0) {
+                html += '<hr style="border: none; border-top: 1px solid #555; margin: 15px 0;">';
+                html += `<p style="color: #e0e0e0; margin-bottom: 10px;"><strong>Standalone defaced images (${data.exported_standalone_images.length}):</strong></p>`;
+                data.exported_standalone_images.forEach((img, index) => {
+                    const imgUrl = `/v2p-formatter/download?path=${encodeURIComponent(img.relative_path || img.path)}`;
+                    html += `<p style="color: #e0e0e0; margin-bottom: 8px; margin-left: 20px;">
+                        <span style="color: #999;">${index + 1}.</span> 
+                        <a href="${imgUrl}" download style="color: #667eea; text-decoration: underline;">🖼 ${img.name || img.path.split('/').pop()}</a>
+                    </p>`;
+                });
+            }
             if (data.exported_videos && data.exported_videos.length > 0) {
                 html += '<hr style="border: none; border-top: 1px solid #555; margin: 15px 0;">';
-                html += `<p style="color: #e0e0e0; margin-bottom: 10px;"><strong>Exported MP4 Videos (${data.exported_videos.length}):</strong></p>`;
+                html += `<p style="color: #e0e0e0; margin-bottom: 10px;"><strong>Standalone defaced videos (${data.exported_videos.length}):</strong></p>`;
                 data.exported_videos.forEach((video, index) => {
                     const videoUrl = video.url || `/v2p-formatter/download?path=${encodeURIComponent(video.relative_path || video.path)}`;
                     html += `<p style="color: #e0e0e0; margin-bottom: 8px; margin-left: 20px;">
@@ -2087,7 +3399,11 @@ function generateImageDocuments() {
             html += '</div>';
             resultsDiv.innerHTML = html;
         } else {
-            resultsDiv.innerHTML = `<div style="padding: 20px; background: #4a2a2a; border-radius: 6px; margin-top: 20px; color: #f44;">❌ Error: ${data.error || 'Unknown error'}</div>`;
+            const errMsg = data.error || 'Unknown error';
+            const hint = (errMsg.indexOf('No processed files') !== -1)
+                ? '<p style="margin-top: 10px; color: #aaa;">Apply deface first (select files, click Apply deface, wait for it to finish), then generate documents.</p>'
+                : '';
+            resultsDiv.innerHTML = `<div style="padding: 20px; background: #4a2a2a; border-radius: 6px; margin-top: 20px; color: #f44;">❌ Error: ${escapeHtml(errMsg)}</div>${hint}`;
         }
         
         // Re-enable button and filename input
@@ -2102,7 +3418,8 @@ function generateImageDocuments() {
     .catch(err => {
         if (progressFill) progressFill.style.width = '0%';
         if (progressText) progressText.textContent = 'Error occurred';
-        resultsDiv.innerHTML = `<div style="padding: 20px; background: #4a2a2a; border-radius: 6px; margin-top: 20px; color: #f44;">❌ Error: ${err.message}</div>`;
+        const errText = (err && err.message) ? String(err.message) : 'Request failed';
+        resultsDiv.innerHTML = `<div style="padding: 20px; background: #4a2a2a; border-radius: 6px; margin-top: 20px; color: #f44;">❌ Error: ${escapeHtml(errText)}</div>`;
         
         // Re-enable button and filename input
         if (generateBtn) {
@@ -2124,6 +3441,8 @@ function escapeHtml(text) {
 }
 
 // Make functions globally available
+window.generateImageDocuments = generateImageDocuments;
+window._openManualDefaceEditorImpl = openManualDefaceEditor;
 window.openManualDefaceEditor = openManualDefaceEditor;
 window.removeDefaceArea = removeDefaceArea;
 window.toggleSection = toggleSection;

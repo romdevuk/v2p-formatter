@@ -9,6 +9,7 @@ Create a new "Deface" module that allows users to select images and videos from 
 - Anonymize faces in images using the deface tool before generating documents
 - For videos: Extract frames, anonymize faces in frames, then generate documents
 - Generate PDF/DOCX documents with anonymized images/frames and their filenames
+- **Always save standalone defaced files** (each defaced image and each defaced MP4 video) in the output folder in addition to merged PDF/DOCX
 - Maintain consistent UI/UX with existing Image to PDF module
 - Provide configurable face anonymization settings
 - All output files use 'deface_' prefix
@@ -178,11 +179,11 @@ Create a new "Deface" module that allows users to select images and videos from 
 - Recommended default: 0.2
 
 **Detection Scale (Optional):**
-- Dropdown: Original Resolution (default), 640x360, 1280x720
-- Downscales input for faster face detection processing
-- Output quality remains same as input (detection only uses scale)
-- Use for high-resolution images to improve performance
-- Recommended: Original for quality, 640x360 or 1280x720 for speed
+- Dropdown: Original Resolution, 640x360, 1280x720
+- **Default when video is selected:** 640×360 (for faster video processing; output resolution unchanged)
+- Downscales input for faster face detection processing; output quality remains same as input (detection only uses scale)
+- Use for high-resolution images and all videos to improve performance
+- Recommended: 640×360 for video (default when videos selected), Original only when maximum detection detail is needed
 
 **Mosaic Size:**
 - Slider: 5 - 50 pixels (default: 20)
@@ -205,6 +206,13 @@ Create a new "Deface" module that allows users to select images and videos from 
   - Default: unchecked (user must explicitly approve video processing)
   - **Note**: Videos must be saved as MP4 format (not frames extracted to JPEG)
 
+##### 3.3.1 Video deface: speed and robustness (for approval)
+- **Full analysis and optimization spec:** [deface-video-optimization-spec.md](./deface-video-optimization-spec.md)
+- **Summary:** Video conversion can be slow because deface runs face detection on every frame (CPU-bound unless GPU packages are installed). Main levers: (1) **Detection Scale** — use 640×360 (or 1280×720) for much faster processing with unchanged output resolution; (2) **Hardware acceleration** — install `onnx onnxruntime-gpu` (Nvidia) or equivalent in the same env as the app for GPU-accelerated inference; (3) optional preflight and clearer errors for robustness.
+- **Proposed UX:** When the user has selected at least one video, default or suggest “Detection Scale” to 640×360. Document GPU install in README/Deface page for users who need faster runs.
+
+- **Implemented:** (1) When the user selects at least one **video**, "Detection Scale" defaults to **640×360** for faster processing (output resolution unchanged). (2) Per-video timeout is configurable via `config.DEFACE_VIDEO_TIMEOUT` (default 600 s; override with env `DEFACE_VIDEO_TIMEOUT`). Timeout and deface/FFmpeg failures are mapped to short user-facing messages (e.g. "Processing timed out… Try a shorter video or use Detection Scale 640×360"; "Video may be corrupt or in an unsupported format"). (3) Optional parallel video processing: set `DEFACE_MAX_CONCURRENT_VIDEOS` (or env) to 2–4 to process that many videos at once; default 1 (sequential). (4) Deface page includes a **Help** section "How Deface works (optimised)" describing detection scale, GPU acceleration, and what to expect when optimised (see [deface-video-optimization-spec.md](./deface-video-optimization-spec.md)).
+
 ##### 3.4 Output Format (same as Image to PDF)
 - **Format**: PDF Only (default), Both (PDF + DOCX), DOCX Only
 - **Layout**: Grid (default), Custom
@@ -221,11 +229,15 @@ Create a new "Deface" module that allows users to select images and videos from 
 │                                                              │
 │ [Apply Deface] Button                                       │
 │                                                              │
-│ (During processing:)                                        │
+│ (During processing — staged progression:)                  │
 │ ┌────────────────────────────────────────────────────────┐ │
 │ │ Processing Deface...                                   │ │
-│ │ [━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━] 75% │ │
-│ │ Processing images/videos with deface... (3/4)          │ │
+│ │ [████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░] 42%   │ │  ← overall bar moves (item count + per-item % from CLI)
+│ │ Processing 0/1 — intro.mp4 (45s) — 23%                 │ │  ← status: elapsed 5s, 10s… then % when from deface; per-file if bulk
+│ │ Estimate: images take a few seconds; each video 1–2 min │ │
+│ │ ▼ Show detailed steps (live log)                       │ │
+│ │   [23:08:55] [deface_video] 5_run | 23% 161/706 ...    │ │
+│ │   [23:08:56] [deface_video] 5_run | still processing...│ │
 │ └────────────────────────────────────────────────────────┘ │
 │                                                              │
 │ (After processing - Review Interface:)                      │
@@ -287,6 +299,29 @@ Create a new "Deface" module that allows users to select images and videos from 
 └─────────────────────────────────────────────────────────────┘
 ```
 
+**Bulk processing queue (for approval):**
+- When multiple files are selected, processing follows a **queue**: a fixed ordered list of items in **selection order**. Order is preserved: all images first (in selection order), then all videos (in selection order). Videos may be processed in parallel (e.g. up to N workers), but **reported progression is queue-based**: the UI shows which item(s) are in progress and how many are done (e.g. "Processing 3/8 — orbital-sander.mp4 (45s) — 23%").
+- Each queue item has a **state** at any moment: **Pending** (not yet started), **In progress** (current item; show name, elapsed, %), **Done** (completed).
+- The **main Deface page** and the **detailed page** (Open video debug log) **MUST** both show the same queue and progression: overall bar, status line, and a **queue list** (ordered items with state). The queue list is **required** on the detailed page; optional on the main page.
+
+**Progress display (staged progression — for approval):**
+- **Overall progress bar:** Must move during processing, not appear stuck. It reflects:
+  - Completed items (e.g. 2/5 done → 40% base) plus the current item’s sub-progress when the deface CLI outputs percentage or frame counts (e.g. 23% or 161/706). Formula: `(completed/total)*100 + (current_item_pct/100)*(1/total)*100`.
+- **Status line** shows staged updates in this order:
+  1. **Elapsed time:** First show seconds (5s, 10s, 15s …) so the user sees activity.
+  2. **Percentage:** When the deface CLI reports progress (e.g. 23%), append it (e.g. ` — 23%`).
+  3. **Per-file when bulk (queue):** For multiple files, show current queue position and file (e.g. `Processing 3/8 — orbital-sander.mp4 (45s) — 23%`).
+- **Queue list (bulk):** When more than one item is selected, the progress block MAY show an ordered queue list (each item: ✓ done / ⟳ in progress with time and % / waiting). This list SHALL be shown on the **detailed page** (see below).
+- **Detailed steps (live log):** Expandable section with timestamped lines from the server (heartbeat + deface stderr). Keeps updating so the user can see the process is running.
+- **Estimate:** Static note that images take a few seconds and each video often 1–2 minutes.
+- **Link to detailed page:** "Open video debug log (new tab)" so the user can open the full progression + log in a separate tab.
+
+**Progress API (for implementation):**
+- The backend exposes progress for polling (e.g. `GET /deface_video_log` with a `progress` object). To support queue-aware UIs, the API SHALL expose: `total`, `completed`, `current_item`, `current_item_pct`, `elapsed_seconds`, `status`, `phase`; and a **queue** (ordered list), e.g. a `queue` array of `{ name, state: 'pending' | 'in_progress' | 'done' }` or an `item_names` array so the UI can derive states. Both the detailed page and main page use this to render the same queue list and progression.
+
+**Detailed page (Open video debug log — for approval):**
+- The page opened via "Open video debug log (new tab)" SHALL show the **same** queue and progression as the main Deface page, plus the full live log. Required: **overall progress bar**, **status line** (queue position, current item, elapsed, %), **queue list** (ordered items with state: ✓ done / ⟳ in progress / waiting), and **live log** (timestamped lines, updating every 1.5–2 s). This gives one place for both high-level queue progression and detailed log output.
+
 **Behavior:**
 - User clicks "Apply Deface" button
 - System processes selected images/videos with deface settings
@@ -332,6 +367,13 @@ Create a new "Deface" module that allows users to select images and videos from 
 - "Adjust Settings & Re-apply" button allows user to modify automated deface settings and reprocess
 - "Accept & Proceed" button unlocks Step 4 (Document Generation)
 
+**Existing defaced files — persist on return (for approval):**
+- When the user opens the Deface page with a qualification and learner (e.g. `?qualification=Deco&learner=arjom`), the app checks for **already-saved** defaced files in `OUTPUT_FOLDER/<qualification>/<learner>/deface/`.
+- If any defaced files exist there (e.g. from a previous run or from Generate Documents), they are **listed in section 3 (Apply Deface & Review)** so the user can **edit or proceed again** without re-running Apply Deface.
+- **Return to page:** When the user returns to the same URL (e.g. after navigating away), the converted files **must stay there**: the review grid shows the same defaced items, and the user can [Edit], [Adjust Settings & Re-apply], or [Accept & Proceed to Document Generation]. Document generation from existing files does not require a session: the backend uses the saved deface folder when `session_id` is not provided (qualification and learner are required).
+- **Flow:** Page load with qual + learner → GET `/deface_existing?qualification=…&learner=…` → if `items.length > 0`, show the review grid with those items; each has an [Edit] button. Media are served from `/deface_output/<qualification>/<learner>/<filename>` (with Range support for video). Generate Documents (POST `/generate_deface_documents`) accepts either `session_id` (from a fresh Apply Deface) or `qualification` + `learner` (when using existing deface output); in the latter case the backend builds the document from files in the deface folder.
+- **Wireframe:** Same as the review grid in section 3: grid of defaced items with preview and [Edit]; label can show "✓ Defaced (saved)" for items loaded from existing output.
+
 ---
 
 ### 4. Document Generation Section
@@ -363,18 +405,42 @@ Create a new "Deface" module that allows users to select images and videos from 
 │ │                                                         │ │
 │ │ PDF: [📄 Open PDF]                                     │ │
 │ │ DOCX: [📝 Download DOCX]                               │ │
+│ │                                                         │ │
+│ │ Standalone defaced images (N):                         │ │
+│ │   1. 🖼 deface_IMG_0607.JPG  2. 🖼 deface_intro_frame_0_00.jpg  … │
+│ │ Standalone defaced videos (M):                         │ │
+│ │   1. 🎬 deface_intro.mp4  …                             │ │
 │ └────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+**Output folder contents (wireframe for approval):**
+All deface output is saved inside a **`deface`** subfolder under the learner folder:
+```
+OUTPUT_FOLDER/{qualification}/{learner}/
+└── deface/
+    ├── deface_{filename}.pdf      ← Merged document (if PDF requested)
+    ├── deface_{filename}.docx     ← Merged document (if DOCX requested)
+    ├── deface_IMG_0607.JPG        ← Standalone defaced image
+    ├── deface_intro_frame_0_00.jpg ← Standalone defaced video frame (if video included)
+    ├── deface_intro_frame_1_00.jpg
+    ├── …
+    ├── deface_intro.mp4           ← Standalone defaced video (MP4)
+    └── …
+```
+All of the above are saved under `deface/`: merged PDF/DOCX (when requested) plus every defaced image and defaced video as standalone files.
+
+**Approval:** Please confirm that the output folder must contain both (1) merged documents (PDF/DOCX) and (2) standalone defaced files (individual images and MP4 videos) as shown in the wireframe above.
 
 **Behavior:**
 - Only enabled after user accepts defaced files in Step 3
 - User enters output filename
 - User clicks "Generate Documents"
-- System generates PDF/DOCX from accepted defaced images/videos
+- System **always** saves standalone defaced files (each defaced image and each defaced MP4 video) to the output folder's **`deface`** subfolder with `deface_` prefix
+- System generates PDF/DOCX from accepted defaced images/videos (merged documents)
   - For videos: Extracts frames from defaced MP4 videos for document generation
-- Output files saved with 'deface_' prefix (e.g., `deface_report.pdf`)
-- Documents saved to `OUTPUT_FOLDER/{qualification}/{learner}/`
+- Merged documents saved with 'deface_' prefix (e.g., `deface_report.pdf`, `deface_report.docx`)
+- All output (standalone + merged) saved to `OUTPUT_FOLDER/{qualification}/{learner}/deface/`
 
 **Workflow:**
 1. User selects qualification and learner
@@ -394,7 +460,7 @@ Create a new "Deface" module that allows users to select images and videos from 
 12. User clicks "Generate Documents"
 13. System generates PDF/DOCX from accepted defaced images/frames
 14. Output files saved with 'deface_' prefix (e.g., `deface_report.pdf`)
-15. Documents saved to `OUTPUT_FOLDER/{qualification}/{learner}/`
+15. All deface output (documents and standalone files) saved to `OUTPUT_FOLDER/{qualification}/{learner}/deface/`
 
 **Supported File Formats:**
 - **Images**: `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`
@@ -530,11 +596,14 @@ Create a new "Deface" module that allows users to select images and videos from 
     "pdf_url": "/v2p-formatter/download?path=...",
     "docx_path": "/path/to/deface_report.docx",
     "docx_url": "/v2p-formatter/download?path=...",
-    "output_folder_path": "/path/to/output/folder"
+    "output_folder_path": "/path/to/output/folder/deface",
+    "exported_standalone_images": [{"path": "...", "relative_path": "...", "name": "deface_IMG_0607.JPG"}, ...],
+    "exported_standalone_images_count": 3,
+    "exported_videos": [{"path": "...", "relative_path": "...", "name": "deface_intro.mp4"}, ...],
+    "exported_videos_count": 1
   }
-```
-**Note**: All output files (PDF/DOCX) are prefixed with 'deface_' (e.g., if user enters "report", output will be "deface_report.pdf").
   ```
+**Note**: All output files use 'deface_' prefix and are saved inside the **`deface`** subfolder. Standalone defaced images and defaced videos are always saved there in addition to merged PDF/DOCX (when requested). The API returns `output_folder_path` pointing to this `deface` subfolder.
 
 #### Processing Flow
 
@@ -557,11 +626,16 @@ Create a new "Deface" module that allows users to select images and videos from 
 
 **Step 2: Generate Documents**
 1. Retrieve defaced files from session (using session_id)
-2. Generate PDF/DOCX from defaced images/videos (using existing `create_image_pdf` and `create_image_docx` functions)
+2. **Standalone defaced files (always saved):**
+   - Create subfolder `deface` under the learner output folder: `OUTPUT_FOLDER/{qualification}/{learner}/deface/`.
+   - Copy each defaced image (and each video frame image) to this `deface` subfolder as individual files with `deface_` prefix (e.g. `deface_IMG_0607.JPG`, `deface_intro_frame_0_00.jpg`).
+   - Copy each defaced video (MP4) to the same `deface` subfolder with `deface_` prefix (e.g. `deface_intro.mp4`).
+   - These standalone files are saved in addition to any merged PDF/DOCX.
+3. Generate PDF/DOCX from defaced images/videos (using existing `create_image_pdf` and `create_image_docx` functions)
    - For videos: Extract frames from defaced MP4 videos for document generation
-3. Save documents to output folder with 'deface_' prefix (e.g., `deface_report.pdf`)
-4. Clean up temporary defaced images/videos (after document generation)
-5. Return document paths
+4. Save merged documents to the `deface` subfolder with 'deface_' prefix (e.g., `deface_report.pdf`, `deface_report.docx`)
+5. Clean up temporary defaced images/videos (after document generation)
+6. Return document paths, standalone image list, and standalone video list
 
 **Session Management:**
 - Each deface operation creates a unique session
